@@ -1,15 +1,9 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import Section from '../components/ui/Section.astro';
-import Alert from '../components/ui/Alert.astro';
 import Hero from '../components/formation/Hero.astro';
-import Stepper from '../components/formation/Stepper.astro';
-import CheckoutForm from '../components/formation/CheckoutForm.astro';
-import StatusPanel from '../components/formation/StatusPanel.astro';
-import MagicLinkForm from '../components/formation/MagicLinkForm.astro';
+import AccessPanel from '../components/formation/AccessPanel.astro';
 import Faq from '../components/formation/Faq.astro';
-import NdaPreview from '../components/formation/NdaPreview.astro';
-import ContactAdmin from '../components/formation/ContactAdmin.astro';
 import {
 	createEnrollmentSessionToken,
 	enrollmentCookieOptions,
@@ -80,11 +74,13 @@ if (setCookie) {
 const awaitingWebhook =
 	enrollment?.status === 'paiement_en_attente' && Boolean(enrollment.stripeCheckoutSessionId);
 
-const showCheckout =
+const showFunnel =
 	!enrollment ||
 	enrollment.status === 'rembourse' ||
 	enrollment.status === 'acces_retire' ||
 	(enrollment.status === 'paiement_en_attente' && !enrollment.stripeCheckoutSessionId);
+
+const showTracking = Boolean(enrollment) && (!showFunnel || awaitingWebhook);
 
 const steps = enrollment
 	? stepStates(enrollment.status)
@@ -98,64 +94,34 @@ if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === '
 		ndaSignUrl = null;
 	}
 }
+
+const magicLinkFailed = Boolean(token && !enrollment);
+const sectionTitle = showTracking ? 'Où en êtes-vous ?' : 'Obtenir mon accès';
+const sectionDescription = showTracking
+	? 'Suivez votre parcours : paiement, signature, puis accès Teachizy.'
+	: 'Commencez ou reprenez ici. L’invitation Teachizy part dès que l’accord est signé.';
 ---
 
 <MarketingLayout>
-	<Hero showCta={showCheckout} ctaHref="#inscription" />
+	<Hero showCta={!showTracking} ctaHref="#acces" />
 
 	<Section
-		eyebrow="Votre accès"
-		title="Comment rejoindre la formation ?"
-		description="Le parcours complet tient en trois étapes. Après votre règlement, tout arrive directement par e-mail."
+		id="acces"
+		eyebrow={showTracking ? 'Suivi' : 'Accès'}
+		title={sectionTitle}
+		description={sectionDescription}
 		class="border-b border-ink/8"
 	>
-		<Stepper steps={steps} />
-		<ContactAdmin />
-	</Section>
-
-	{
-		enrollment && (!showCheckout || awaitingWebhook) ? (
-			<Section id="suivi" eyebrow="Suivi" title="Où en êtes-vous ?">
-				<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} flash={flash} />
-			</Section>
-		) : (
-			<Section
-				id="inscription"
-				eyebrow="Inscription"
-				title="Rejoindre la formation — 320 € TTC"
-				description="Renseignez vos informations, acceptez les consentements, puis réglez en toute sécurité."
-			>
-				{flash && (
-					<div class="mb-6">
-						<Alert variant={token && !enrollment ? 'error' : 'success'}>{flash}</Alert>
-					</div>
-				)}
-				{checkout === 'cancel' && (
-					<div class="mb-6">
-						<Alert variant="info">Paiement annulé. Vous pouvez reprendre quand vous voulez.</Alert>
-					</div>
-				)}
-				<CheckoutForm />
-			</Section>
-		)
-	}
-
-	<Section
-		id="retrouver"
-		eyebrow="Déjà inscrit·e ?"
-		title="Retrouver mon inscription"
-		description="Saisissez l’e-mail utilisé au paiement. Vous recevrez un lien magique — aucun code à recopier."
-	>
-		<MagicLinkForm />
-	</Section>
-
-	<Section
-		id="nda"
-		eyebrow="Avant de payer"
-		title="Aperçu de l’accord de confidentialité"
-		description="Vous le signerez après le paiement, par e-mail."
-	>
-		<NdaPreview />
+		<AccessPanel
+			showFunnel={!showTracking}
+			enrollment={enrollment}
+			steps={steps}
+			ndaSignUrl={ndaSignUrl}
+			flash={flash}
+			checkoutCancel={checkout === 'cancel'}
+			magicLinkFailed={magicLinkFailed}
+			defaultTab={magicLinkFailed ? 'retrouver' : 'nouveau'}
+		/>
 	</Section>
 
 	<Section id="faq" eyebrow="Questions" title="FAQ">

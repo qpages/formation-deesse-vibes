@@ -2,20 +2,13 @@
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import Container from '../components/ui/Container.astro';
 import Section from '../components/ui/Section.astro';
+import BackLink from '../components/ui/BackLink.astro';
 ---
 
 <MarketingLayout title="Confidentialité — Formation Matrice Évolution">
 	<div class="h-24 bg-ink"></div>
 	<Container class="pt-8 sm:pt-10">
-		<a
-			href="/"
-			class="inline-flex text-ink/40 transition duration-300 hover:text-ink"
-			aria-label="Retour à l’accueil"
-		>
-			<svg class="h-5 w-5 transition duration-300 hover:-translate-x-1" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-				<path d="M12.5 4.5 7 10l5.5 5.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
-			</svg>
-		</a>
+		<BackLink />
 	</Container>
 	<Section title="Politique de confidentialité" description="Traitement des données pour l’inscription et le suivi.">
 		<div class="max-w-2xl space-y-4 text-sm leading-relaxed text-ink-soft">

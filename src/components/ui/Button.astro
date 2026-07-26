@@ -33,14 +33,17 @@ type Props = VariantProps<typeof buttonVariants> & {
 	type?: 'button' | 'submit' | 'reset';
 	disabled?: boolean;
 	id?: string;
+	target?: string;
+	rel?: string;
 };
 
-const { variant, size, class: className, href, type = 'button', disabled, id } = Astro.props;
+const { variant, size, class: className, href, type = 'button', disabled, id, target, rel } =
+	Astro.props;
 const classes = cn(buttonVariants({ variant, size }), className);
 ---
 
 {href ? (
-	<a href={href} class={classes} id={id}>
+	<a href={href} class={classes} id={id} target={target} rel={rel}>
 		<slot />
 	</a>
 ) : (

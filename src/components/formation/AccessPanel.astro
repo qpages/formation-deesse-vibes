@@ -1,0 +1,179 @@
+---
+import type { Enrollment } from '../../generated/prisma/client';
+import type { StepKey, StepState } from '../../lib/status';
+import Alert from '../ui/Alert.astro';
+import AccessSteps from './AccessSteps.astro';
+import CheckoutForm from './CheckoutForm.astro';
+import ContactAdmin from './ContactAdmin.astro';
+import MagicLinkForm from './MagicLinkForm.astro';
+import StatusPanel from './StatusPanel.astro';
+import Stepper from './Stepper.astro';
+
+interface Props {
+	showFunnel: boolean;
+	enrollment: Enrollment | null;
+	steps: Record<StepKey, StepState>;
+	ndaSignUrl?: string | null;
+	flash?: string | null;
+	checkoutCancel?: boolean;
+	magicLinkFailed?: boolean;
+	defaultTab?: 'nouveau' | 'retrouver';
+}
+
+const {
+	showFunnel,
+	enrollment,
+	steps,
+	ndaSignUrl = null,
+	flash = null,
+	checkoutCancel = false,
+	magicLinkFailed = false,
+	defaultTab = 'nouveau',
+} = Astro.props;
+
+const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
+---
+
+{
+	showFunnel ? (
+		<div id="access-funnel" class="space-y-8">
+			<div>
+				<AccessSteps />
+			</div>
+
+			{(flash || checkoutCancel) && (
+				<div class="space-y-3">
+					{flash && (
+						<Alert variant={magicLinkFailed ? 'error' : 'success'}>{flash}</Alert>
+					)}
+					{checkoutCancel && (
+						<Alert variant="info">Paiement annulé. Vous pouvez reprendre quand vous voulez.</Alert>
+					)}
+				</div>
+			)}
+
+			<div class="border-t border-ink/10 pt-6">
+				<div
+					class="inline-flex rounded-sm border border-ink/15 p-1"
+					role="tablist"
+					aria-label="Choisir votre parcours"
+				>
+					<button
+						type="button"
+						role="tab"
+						id="tab-nouveau"
+						aria-controls="panel-nouveau"
+						aria-selected={activeTab === 'nouveau' ? 'true' : 'false'}
+						data-access-tab="nouveau"
+						class:list={[
+							'access-tab h-10 px-4 text-sm font-medium transition',
+							activeTab === 'nouveau'
+								? 'bg-ink text-mist'
+								: 'text-ink-soft hover:text-ink',
+						]}
+					>
+						Nouveau
+					</button>
+					<button
+						type="button"
+						role="tab"
+						id="tab-retrouver"
+						aria-controls="panel-retrouver"
+						aria-selected={activeTab === 'retrouver' ? 'true' : 'false'}
+						data-access-tab="retrouver"
+						class:list={[
+							'access-tab h-10 px-4 text-sm font-medium transition',
+							activeTab === 'retrouver'
+								? 'bg-ink text-mist'
+								: 'text-ink-soft hover:text-ink',
+						]}
+					>
+						Déjà inscrit·e
+					</button>
+				</div>
+
+				<div
+					id="panel-nouveau"
+					role="tabpanel"
+					aria-labelledby="tab-nouveau"
+					class:list={['mt-6', activeTab !== 'nouveau' && 'hidden']}
+					data-access-panel="nouveau"
+				>
+					<p class="mb-5 text-sm text-ink-soft">
+						Renseignez vos informations, puis réglez en toute sécurité via la plateforme de paiement Stripe.
+					</p>
+					<CheckoutForm />
+				</div>
+
+				<div
+					id="panel-retrouver"
+					role="tabpanel"
+					aria-labelledby="tab-retrouver"
+					class:list={['mt-6', activeTab !== 'retrouver' && 'hidden']}
+					data-access-panel="retrouver"
+				>
+					<p class="mb-1 text-sm text-ink-soft">
+						L’e-mail de votre paiement suffit. Vous recevez un lien de connexion — rien à
+						recopier.
+					</p>
+					<MagicLinkForm />
+				</div>
+			</div>
+		</div>
+	) : (
+		<div id="access-tracking" class="space-y-8">
+			{enrollment && (
+				<>
+					<Stepper steps={steps} />
+					<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} flash={flash} />
+					<div class="border-t border-ink/10 pt-6">
+						<button
+							type="button"
+							id="clear-session"
+							class="mb-2 text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+						>
+							Ce n’est pas moi
+						</button>
+						<ContactAdmin />
+					</div>
+				</>
+			)}
+		</div>
+	)
+}
+
+<script>
+	const tabs = document.querySelectorAll<HTMLButtonElement>('[data-access-tab]');
+	const panels = document.querySelectorAll<HTMLElement>('[data-access-panel]');
+
+	function setTab(name: string) {
+		tabs.forEach((tab) => {
+			const active = tab.dataset.accessTab === name;
+			tab.setAttribute('aria-selected', active ? 'true' : 'false');
+			tab.classList.toggle('bg-ink', active);
+			tab.classList.toggle('text-mist', active);
+			tab.classList.toggle('text-ink-soft', !active);
+		});
+		panels.forEach((panel) => {
+			panel.classList.toggle('hidden', panel.dataset.accessPanel !== name);
+		});
+	}
+
+	tabs.forEach((tab) => {
+		tab.addEventListener('click', () => {
+			const name = tab.dataset.accessTab;
+			if (name) setTab(name);
+		});
+	});
+
+	const clearBtn = document.getElementById('clear-session');
+	clearBtn?.addEventListener('click', async () => {
+		clearBtn.setAttribute('disabled', 'true');
+		try {
+			await fetch('/api/session/clear', { method: 'POST' });
+			window.location.href = '/#acces';
+		} catch {
+			clearBtn.removeAttribute('disabled');
+		}
+	});
+</script>
