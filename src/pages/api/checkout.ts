@@ -49,7 +49,7 @@ export const POST: APIRoute = async ({ request }) => {
 			return json(
 				{
 					error:
-						'Cet e-mail est déjà inscrit. Utilisez « Retrouver mon inscription » ci-dessous.',
+						'Cet e-mail est déjà inscrit. Utilisez l’onglet « Déjà inscrit·e ».',
 				},
 				409,
 			);

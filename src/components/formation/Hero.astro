@@ -7,7 +7,7 @@ interface Props {
 	showCta?: boolean;
 }
 
-const { ctaHref = '#inscription', showCta = true } = Astro.props;
+const { ctaHref = '#acces', showCta = true } = Astro.props;
 ---
 
 <section class="relative overflow-hidden bg-ink text-mist">
@@ -41,7 +41,7 @@ const { ctaHref = '#inscription', showCta = true } = Astro.props;
 			{showCta && (
 				<div class="animate-rise mt-8" style="animation-delay: 300ms">
 					<Button href={ctaHref} variant="primary" size="lg" class="bg-mist text-ink hover:bg-gold-soft">
-						Accéder à la formation — 320 €
+						Rejoindre la formation
 					</Button>
 				</div>
 			)}
