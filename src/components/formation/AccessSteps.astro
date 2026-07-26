@@ -15,16 +15,19 @@ const steps = [
 ];
 ---
 
-<ol class="access-steps grid gap-5 sm:grid-cols-3 sm:gap-6">
+<ol class="grid gap-10 sm:grid-cols-3 sm:gap-12">
 	{
 		steps.map((step, index) => (
-			<li class="relative grid grid-cols-[2.5rem_1fr] gap-3 sm:block">
-				<span class="flex h-10 w-10 items-center justify-center rounded-full border border-gold/45 font-display text-xl text-ink">
+			<li>
+				<span
+					class="block font-display text-[2.75rem] leading-none tracking-tight text-gold"
+					aria-hidden="true"
+				>
 					{index + 1}
 				</span>
-				<div class="pt-1 sm:mt-4 sm:pt-0">
+				<div class="mt-4 border-t border-ink/12 pt-4">
 					<h3 class="font-display text-xl leading-snug text-ink sm:text-2xl">{step.title}</h3>
-					<p class="mt-1.5 text-sm leading-relaxed text-ink-soft">{step.text}</p>
+					<p class="mt-2 text-sm leading-relaxed text-ink-soft">{step.text}</p>
 				</div>
 			</li>
 		))

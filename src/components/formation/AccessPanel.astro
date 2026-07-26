@@ -38,9 +38,6 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 	showFunnel ? (
 		<div id="access-funnel" class="space-y-8">
 			<div>
-				<p class="mb-5 text-sm leading-relaxed text-ink-soft sm:text-base">
-					Trois étapes distinctes. L’accès Teachizy arrive seulement après la signature.
-				</p>
 				<AccessSteps />
 			</div>
 
@@ -103,7 +100,7 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 					data-access-panel="nouveau"
 				>
 					<p class="mb-5 text-sm text-ink-soft">
-						320 € TTC — renseignez vos informations, puis réglez en toute sécurité.
+						Renseignez vos informations, puis réglez en toute sécurité via la plateforme de paiement Stripe.
 					</p>
 					<CheckoutForm />
 				</div>
@@ -116,8 +113,8 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 					data-access-panel="retrouver"
 				>
 					<p class="mb-1 text-sm text-ink-soft">
-						Saisissez l’e-mail utilisé au paiement. Vous recevrez un lien magique — aucun
-						code à recopier.
+						L’e-mail de votre paiement suffit. Vous recevez un lien de connexion — rien à
+						recopier.
 					</p>
 					<MagicLinkForm />
 				</div>

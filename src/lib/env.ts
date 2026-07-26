@@ -25,6 +25,13 @@ const serverSchema = z.object({
 	ADMIN_PASSWORD: z.string().min(1).default(''),
 	PUBLIC_SITE_URL: z.string().url().default('http://localhost:4321'),
 	PUBLIC_ADMIN_CONTACT_EMAIL: z.string().email().default('admin@deesse-vibes.com'),
+	PUBLIC_WHATSAPP_NUMBER: z.preprocess(
+		(value) => (value === '' || value === undefined || value === null ? undefined : value),
+		z
+			.string()
+			.regex(/^\d+$/, 'PUBLIC_WHATSAPP_NUMBER must be digits only (e.g. 33612345678)')
+			.optional(),
+	),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
@@ -64,6 +71,8 @@ export function getEnv(): ServerEnv {
 		PUBLIC_ADMIN_CONTACT_EMAIL:
 			import.meta.env.PUBLIC_ADMIN_CONTACT_EMAIL ??
 			process.env.PUBLIC_ADMIN_CONTACT_EMAIL,
+		PUBLIC_WHATSAPP_NUMBER:
+			import.meta.env.PUBLIC_WHATSAPP_NUMBER ?? process.env.PUBLIC_WHATSAPP_NUMBER,
 	});
 	return cached;
 }

@@ -32,18 +32,30 @@ function tone(state: StepState) {
 	if (state === 'en_cours') return 'progress' as const;
 	return 'neutral' as const;
 }
+
+function numberClass(state: StepState) {
+	if (state === 'termine') return 'text-sage';
+	if (state === 'action_requise' || state === 'en_cours') return 'text-blush-deep';
+	return 'text-gold';
+}
 ---
 
-<ol class="stepper grid md:grid-cols-3">
+<ol class="grid gap-10 md:grid-cols-3 md:gap-12">
 	{
 		items.map((item, index) => {
 			const state = steps[item.key];
 			return (
-				<li class="step relative grid grid-cols-[3rem_1fr] gap-4 pb-8 last:pb-0 md:block md:px-5 md:pb-0 first:md:pl-0 last:md:pr-0">
-					<div class="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-gold/50 bg-mist font-display text-2xl text-ink">
+				<li>
+					<span
+						class:list={[
+							'block font-display text-[2.75rem] leading-none tracking-tight',
+							numberClass(state),
+						]}
+						aria-hidden="true"
+					>
 						{index + 1}
-					</div>
-					<div class="pt-1 md:pt-5">
+					</span>
+					<div class="mt-4 border-t border-ink/12 pt-4">
 						<div class="mb-3">
 							<StatusBadge tone={tone(state)}>{stepLabel(state)}</StatusBadge>
 						</div>
@@ -55,39 +67,3 @@ function tone(state: StepState) {
 		})
 	}
 </ol>
-
-<style>
-	.step::before {
-		content: "";
-		position: absolute;
-		left: 1.5rem;
-		top: 3rem;
-		bottom: 0;
-		width: 1px;
-		background: rgb(184 149 108 / 0.38);
-	}
-
-	.step:last-child::before {
-		display: none;
-	}
-
-	@media (min-width: 768px) {
-		.stepper {
-			position: relative;
-		}
-
-		.stepper::before {
-			content: "";
-			position: absolute;
-			left: 1.5rem;
-			right: 1.5rem;
-			top: 1.5rem;
-			height: 1px;
-			background: rgb(184 149 108 / 0.38);
-		}
-
-		.step::before {
-			display: none;
-		}
-	}
-</style>

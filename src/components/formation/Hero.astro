@@ -39,9 +39,17 @@ const { ctaHref = '#acces', showCta = true } = Astro.props;
 				Un parcours simple vous mène du paiement à la formation.
 			</p>
 			{showCta && (
-				<div class="animate-rise mt-8" style="animation-delay: 300ms">
+				<div class="animate-rise mt-8 flex flex-wrap items-center gap-3" style="animation-delay: 300ms">
 					<Button href={ctaHref} variant="primary" size="lg" class="bg-mist text-ink hover:bg-gold-soft">
 						Rejoindre la formation
+					</Button>
+					<Button
+						href="#faq"
+						variant="secondary"
+						size="lg"
+						class="border-mist/25 text-mist hover:border-mist/50 hover:bg-mist/10"
+					>
+						J'ai une question ?
 					</Button>
 				</div>
 			)}

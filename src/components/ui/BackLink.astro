@@ -1,0 +1,14 @@
+---
+import Button from './Button.astro';
+
+interface Props {
+	href?: string;
+	label?: string;
+}
+
+const { href = '/', label = 'Retour à l’accueil' } = Astro.props;
+---
+
+<Button href={href} variant="secondary" size="sm">
+	{label}
+</Button>

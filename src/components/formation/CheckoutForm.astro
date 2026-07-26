@@ -21,7 +21,7 @@ const { lockedEmail } = Astro.props;
 		</FormField>
 	</div>
 
-	<FormField label="E-mail" name="email" hint="Utilisé pour le paiement, le NDA et vos accès.">
+	<FormField label="E-mail" name="email">
 		<Input
 			type="email"
 			name="email"
@@ -34,10 +34,12 @@ const { lockedEmail } = Astro.props;
 
 	<div class="space-y-3 border-t border-ink/10 pt-5 text-sm text-ink-soft">
 		<label class="flex gap-3">
-			<input type="checkbox" name="consentCgv" value="true" required class="mt-1" />
+			<input type="checkbox" name="consentLegal" value="true" required class="mt-1" />
 			<span>
-				J’accepte les
-				<a href="/cgv" class="underline underline-offset-2 hover:text-ink">conditions générales de vente</a>.
+				J’accepte les{' '}
+				<a href="/cgv" class="underline underline-offset-2 hover:text-ink">conditions générales de vente</a>
+				{' '}et la{' '}
+				<a href="/confidentialite" class="underline underline-offset-2 hover:text-ink">politique de confidentialité</a>.
 			</span>
 		</label>
 		<label class="flex gap-3">
@@ -66,13 +68,6 @@ const { lockedEmail } = Astro.props;
 				</ul>
 			</div>
 		</details>
-		<label class="flex gap-3">
-			<input type="checkbox" name="consentPrivacy" value="true" required class="mt-1" />
-			<span>
-				J’accepte la
-				<a href="/confidentialite" class="underline underline-offset-2 hover:text-ink">politique de confidentialité</a>.
-			</span>
-		</label>
 	</div>
 
 	<div id="checkout-error" class="hidden">
@@ -80,7 +75,7 @@ const { lockedEmail } = Astro.props;
 	</div>
 
 	<Button type="submit" size="lg" class="w-full sm:w-auto" id="checkout-submit">
-		Je m’inscris — 320 €
+		Je m’inscris
 	</Button>
 </form>
 
@@ -99,13 +94,14 @@ const { lockedEmail } = Astro.props;
 		submit.textContent = 'Redirection…';
 
 		const data = new FormData(form);
+		const consentLegal = data.get('consentLegal') === 'true';
 		const payload = {
 			firstName: String(data.get('firstName') ?? ''),
 			lastName: String(data.get('lastName') ?? ''),
 			email: String(data.get('email') ?? ''),
-			consentCgv: data.get('consentCgv') === 'true',
+			consentCgv: consentLegal,
 			consentNda: data.get('consentNda') === 'true',
-			consentPrivacy: data.get('consentPrivacy') === 'true',
+			consentPrivacy: consentLegal,
 		};
 
 		try {

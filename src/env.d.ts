@@ -23,6 +23,7 @@ interface ImportMetaEnv {
 	readonly ADMIN_PASSWORD?: string;
 	readonly PUBLIC_SITE_URL?: string;
 	readonly PUBLIC_ADMIN_CONTACT_EMAIL?: string;
+	readonly PUBLIC_WHATSAPP_NUMBER?: string;
 }
 
 interface ImportMeta {
