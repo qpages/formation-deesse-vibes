@@ -1,0 +1,128 @@
+---
+import type { Enrollment } from '../../generated/prisma/client';
+import { primaryAction, STATUS_LABELS } from '../../lib/status';
+import Alert from '../ui/Alert.astro';
+import Button from '../ui/Button.astro';
+import StatusBadge from '../ui/StatusBadge.astro';
+
+interface Props {
+	enrollment: Enrollment;
+	ndaSignUrl?: string | null;
+	flash?: string | null;
+}
+
+const { enrollment, ndaSignUrl, flash } = Astro.props;
+const action = primaryAction(enrollment.status, ndaSignUrl);
+const canResend =
+	enrollment.status === 'nda_envoye' || enrollment.status === 'paiement_confirme';
+---
+
+<div class="space-y-6 border-t border-ink/15 pt-8">
+	<div class="flex flex-wrap items-center gap-3">
+		<p class="font-display text-3xl text-ink">Votre inscription</p>
+		<StatusBadge tone={enrollment.status === 'invitation_envoyee' ? 'success' : 'progress'}>
+			{STATUS_LABELS[enrollment.status]}
+		</StatusBadge>
+	</div>
+
+	{
+		flash && (
+			<Alert variant="success">{flash}</Alert>
+		)
+	}
+
+	{
+		enrollment.status === 'paiement_en_attente' && enrollment.stripeCheckoutSessionId && (
+			<p class="text-ink-soft">
+				Paiement en cours de confirmation. Cette page se mettra à jour automatiquement —
+				vous pouvez aussi consulter vos e-mails dans un instant.
+			</p>
+		)
+	}
+	{
+		enrollment.status === 'paiement_confirme' && (
+			<p class="text-ink-soft">
+				Paiement confirmé. Votre accord de confidentialité arrive par e-mail sous peu.
+			</p>
+		)
+	}
+	{
+		enrollment.status === 'nda_envoye' && (
+			<p class="text-ink-soft">
+				Il ne reste plus qu’à signer votre accord pour débloquer vos accès Teachizy.
+			</p>
+		)
+	}
+	{
+		enrollment.status === 'nda_signe' && (
+			<p class="text-ink-soft">
+				Accord reçu. Votre invitation Teachizy est en cours d’envoi — consultez vos e-mails.
+			</p>
+		)
+	}
+	{
+		enrollment.status === 'invitation_envoyee' && (
+			<p class="text-ink-soft">
+				Vos accès ont été envoyés. Ouvrez l’e-mail Teachizy pour commencer la formation.
+			</p>
+		)
+	}
+	{
+		(enrollment.status === 'rembourse' || enrollment.status === 'acces_retire') && (
+			<Alert variant="info">
+				Cette inscription est clôturée. Contactez un administrateur si besoin.
+			</Alert>
+		)
+	}
+
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+		{
+			action.kind === 'sign_nda' && (
+				<Button href={action.href} size="lg">{action.label}</Button>
+			)
+		}
+		{
+			action.kind === 'check_email' && (
+				<Button href={`mailto:${enrollment.email}`} size="lg" variant="primary">
+					{action.label}
+				</Button>
+			)
+		}
+		{
+			canResend && (
+				<button
+					id="resend-nda"
+					type="button"
+					class="text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+				>
+					Renvoyer l’accord de confidentialité
+				</button>
+			)
+		}
+	</div>
+	<p id="resend-feedback" class="hidden text-sm text-ink-soft"></p>
+</div>
+
+<script>
+	const btn = document.getElementById('resend-nda');
+	const feedback = document.getElementById('resend-feedback');
+	btn?.addEventListener('click', async () => {
+		if (!btn || !feedback) return;
+		btn.setAttribute('disabled', 'true');
+		feedback.classList.remove('hidden');
+		feedback.textContent = 'Envoi en cours…';
+		try {
+			const res = await fetch('/api/nda/resend', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({}),
+			});
+			const json = await res.json();
+			feedback.textContent = res.ok ? json.message : json.error;
+		} catch {
+			feedback.textContent = 'Impossible de renvoyer pour le moment.';
+		} finally {
+			btn.removeAttribute('disabled');
+		}
+	});
+</script>

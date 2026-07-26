@@ -1,0 +1,130 @@
+---
+import Button from '../ui/Button.astro';
+import Container from '../ui/Container.astro';
+
+interface Props {
+	ctaHref?: string;
+	showCta?: boolean;
+}
+
+const { ctaHref = '#inscription', showCta = true } = Astro.props;
+---
+
+<section class="relative overflow-hidden bg-ink text-mist">
+	<div
+		class="absolute inset-0 bg-[radial-gradient(ellipse_at_16%_10%,rgb(196_120_106/0.2),transparent_42%),radial-gradient(ellipse_at_88%_45%,rgb(184_149_108/0.13),transparent_38%),linear-gradient(145deg,#17120f_0%,#241c18_58%,#18130f_100%)]"
+		aria-hidden="true"
+	>
+	</div>
+
+	<Container class="relative grid min-h-142.5 items-center gap-10 pb-12 pt-28 sm:min-h-155 sm:grid-cols-[1.15fr_0.85fr] sm:gap-8 sm:pb-16 sm:pt-24">
+		<div class="relative z-10">
+			<p
+				class="animate-rise text-[11px] font-medium uppercase tracking-[0.28em] text-gold-soft"
+				style="animation-delay: 60ms"
+			>
+				Formation en ligne sur Teachizy
+			</p>
+			<h1
+				class="animate-rise mt-5 max-w-2xl font-display text-5xl leading-[0.94] tracking-[-0.02em] text-mist sm:text-6xl md:text-7xl text-balance"
+				style="animation-delay: 140ms"
+			>
+				Matrice <span class="italic text-gold-soft">Évolution</span>
+			</h1>
+			<p
+				class="animate-rise mt-6 max-w-lg text-base leading-relaxed text-mist/72 sm:text-lg"
+				style="animation-delay: 220ms"
+			>
+				Une méthode à intégrer à votre rythme, dans un espace en ligne confidentiel.
+				Un parcours simple vous mène du paiement à la formation.
+			</p>
+			{showCta && (
+				<div class="animate-rise mt-8" style="animation-delay: 300ms">
+					<Button href={ctaHref} variant="primary" size="lg" class="bg-mist text-ink hover:bg-gold-soft">
+						Accéder à la formation — 320 €
+					</Button>
+				</div>
+			)}
+		</div>
+
+		<figure class="hero-portrait animate-fade">
+			<div class="hero-portrait__frame">
+				<img
+					src="/images/jessica.png"
+					alt="Portrait de Jessica"
+					width="732"
+					height="732"
+					decoding="async"
+					fetchpriority="high"
+				/>
+			</div>
+			<figcaption>Jessica · accompagnement &amp; méthode</figcaption>
+		</figure>
+	</Container>
+</section>
+
+<style>
+	.hero-portrait {
+		position: relative;
+		z-index: 1;
+		margin: 0 auto;
+		width: min(72vw, 20rem);
+		justify-self: center;
+	}
+
+	.hero-portrait__frame {
+		position: relative;
+		aspect-ratio: 1;
+		border-radius: 50%;
+		padding: 0.35rem;
+		background:
+			linear-gradient(145deg, rgb(212 188 154 / 0.55), rgb(196 120 106 / 0.35) 45%, rgb(184 149 108 / 0.2));
+		box-shadow:
+			0 0 0 1px rgb(212 188 154 / 0.18),
+			0 28px 70px rgb(0 0 0 / 0.35),
+			0 0 80px rgb(184 149 108 / 0.12);
+	}
+
+	.hero-portrait__frame::before {
+		content: "";
+		position: absolute;
+		inset: -18%;
+		border-radius: 50%;
+		background: radial-gradient(circle, rgb(184 149 108 / 0.22), transparent 68%);
+		pointer-events: none;
+		z-index: -1;
+	}
+
+	.hero-portrait__frame img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		border-radius: 50%;
+		object-fit: cover;
+		background: #2a221d;
+	}
+
+	.hero-portrait figcaption {
+		margin-top: 1.1rem;
+		text-align: center;
+		font-family: var(--font-display);
+		font-size: 0.95rem;
+		font-style: italic;
+		letter-spacing: 0.06em;
+		color: rgb(243 235 227 / 0.55);
+	}
+
+	@media (min-width: 640px) {
+		.hero-portrait {
+			width: min(100%, 22rem);
+			justify-self: end;
+			margin-right: 0.5rem;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.hero-portrait {
+			width: min(100%, 24rem);
+		}
+	}
+</style>

@@ -1,0 +1,93 @@
+---
+import StatusBadge from '../ui/StatusBadge.astro';
+import { stepLabel, type StepKey, type StepState } from '../../lib/status';
+
+interface Props {
+	steps: Record<StepKey, StepState>;
+}
+
+const { steps } = Astro.props;
+
+const items: Array<{ key: StepKey; title: string; text: string }> = [
+	{
+		key: 'paiement',
+		title: 'Vous réglez en ligne',
+		text: 'Paiement sécurisé de 320 € TTC avec Stripe.',
+	},
+	{
+		key: 'nda',
+		title: 'Vous signez par e-mail',
+		text: 'Vous recevez votre accord de confidentialité à signer en ligne.',
+	},
+	{
+		key: 'acces',
+		title: 'Vous entrez dans la formation',
+		text: 'Votre invitation Teachizy arrive dès que la signature est confirmée.',
+	},
+];
+
+function tone(state: StepState) {
+	if (state === 'termine') return 'success' as const;
+	if (state === 'action_requise') return 'action' as const;
+	if (state === 'en_cours') return 'progress' as const;
+	return 'neutral' as const;
+}
+---
+
+<ol class="stepper grid md:grid-cols-3">
+	{
+		items.map((item, index) => {
+			const state = steps[item.key];
+			return (
+				<li class="step relative grid grid-cols-[3rem_1fr] gap-4 pb-8 last:pb-0 md:block md:px-5 md:pb-0 first:md:pl-0 last:md:pr-0">
+					<div class="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-gold/50 bg-mist font-display text-2xl text-ink">
+						{index + 1}
+					</div>
+					<div class="pt-1 md:pt-5">
+						<div class="mb-3">
+							<StatusBadge tone={tone(state)}>{stepLabel(state)}</StatusBadge>
+						</div>
+						<h3 class="font-display text-2xl leading-snug text-ink">{item.title}</h3>
+						<p class="mt-2 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+					</div>
+				</li>
+			);
+		})
+	}
+</ol>
+
+<style>
+	.step::before {
+		content: "";
+		position: absolute;
+		left: 1.5rem;
+		top: 3rem;
+		bottom: 0;
+		width: 1px;
+		background: rgb(184 149 108 / 0.38);
+	}
+
+	.step:last-child::before {
+		display: none;
+	}
+
+	@media (min-width: 768px) {
+		.stepper {
+			position: relative;
+		}
+
+		.stepper::before {
+			content: "";
+			position: absolute;
+			left: 1.5rem;
+			right: 1.5rem;
+			top: 1.5rem;
+			height: 1px;
+			background: rgb(184 149 108 / 0.38);
+		}
+
+		.step::before {
+			display: none;
+		}
+	}
+</style>

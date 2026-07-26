@@ -1,0 +1,44 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Container from '../components/ui/Container.astro';
+
+interface Props {
+	title?: string;
+	description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+	<div class="flex min-h-screen flex-col">
+		<header class="absolute inset-x-0 top-0 z-20 animate-fade">
+			<Container class="flex items-center justify-between py-6">
+				<a href="/" class="font-display text-xl tracking-wide text-mist sm:text-2xl">
+					Déesse Vibes
+				</a>
+				<nav class="flex items-center gap-4 sm:gap-6" aria-label="Navigation">
+					<a href="/" class="text-[11px] uppercase tracking-[0.2em] text-mist/70 hover:text-mist">
+						Formation
+					</a>
+					<a href="/admin" class="text-[11px] uppercase tracking-[0.2em] text-mist/70 hover:text-mist">
+						Admin
+					</a>
+				</nav>
+			</Container>
+		</header>
+		<main class="flex-1">
+			<slot />
+		</main>
+		<footer class="border-t border-ink/10 py-10">
+			<Container class="flex flex-col gap-3 text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between">
+				<p>© {new Date().getFullYear()} Déesse Vibes — Formation Matrice Évolution</p>
+				<div class="flex gap-5">
+					<a href="/#faq" class="hover:text-ink">FAQ</a>
+					<a href="/mentions-legales" class="hover:text-ink">Mentions légales</a>
+					<a href="/confidentialite" class="hover:text-ink">Confidentialité</a>
+				</div>
+			</Container>
+		</footer>
+	</div>
+</BaseLayout>

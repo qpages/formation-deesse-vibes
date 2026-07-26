@@ -1,17 +1,164 @@
 ---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import Section from '../components/ui/Section.astro';
+import Alert from '../components/ui/Alert.astro';
+import Hero from '../components/formation/Hero.astro';
+import Stepper from '../components/formation/Stepper.astro';
+import CheckoutForm from '../components/formation/CheckoutForm.astro';
+import StatusPanel from '../components/formation/StatusPanel.astro';
+import MagicLinkForm from '../components/formation/MagicLinkForm.astro';
+import Faq from '../components/formation/Faq.astro';
+import NdaPreview from '../components/formation/NdaPreview.astro';
+import ContactAdmin from '../components/formation/ContactAdmin.astro';
+import {
+	createEnrollmentSessionToken,
+	enrollmentCookieOptions,
+	parseCookie,
+	TRACKING_COOKIE,
+	verifyEnrollmentSessionToken,
+} from '../lib/auth/session';
+import {
+	consumeMagicLink,
+	findEnrollmentByCheckoutSession,
+	findEnrollmentById,
+	resolveNdaSignUrl,
+} from '../lib/services/enrollment';
+import { stepStates } from '../lib/status';
+import type { Enrollment } from '../generated/prisma/client';
 
+export const prerender = false;
+
+const url = Astro.url;
+const token = url.searchParams.get('token');
+const sessionId = url.searchParams.get('session_id');
+const checkout = url.searchParams.get('checkout');
+
+let enrollment: Enrollment | null = null;
+let flash: string | null = null;
+let setCookie: string | null = null;
+
+try {
+	if (token) {
+		enrollment = await consumeMagicLink(token);
+		if (enrollment) {
+			const sessionToken = await createEnrollmentSessionToken(enrollment.id);
+			setCookie = enrollmentCookieOptions(sessionToken);
+			flash = 'Lien magique validé. Voici l’état de votre inscription.';
+		} else {
+			flash = 'Ce lien est invalide ou a expiré. Demandez-en un nouveau ci-dessous.';
+		}
+	}
+
+	if (!enrollment && sessionId) {
+		enrollment = await findEnrollmentByCheckoutSession(sessionId);
+		if (enrollment) {
+			const sessionToken = await createEnrollmentSessionToken(enrollment.id);
+			setCookie = enrollmentCookieOptions(sessionToken);
+			if (checkout === 'success') {
+				flash = 'Paiement reçu. Nous préparons votre accord de confidentialité.';
+			}
+		}
+	}
+
+	if (!enrollment) {
+		const cookieToken = parseCookie(Astro.request.headers.get('cookie'), TRACKING_COOKIE);
+		if (cookieToken) {
+			const enrollmentId = await verifyEnrollmentSessionToken(cookieToken);
+			if (enrollmentId) {
+				enrollment = await findEnrollmentById(enrollmentId);
+			}
+		}
+	}
+} catch (error) {
+	console.error('[index] enrollment lookup', error);
+}
+
+if (setCookie) {
+	Astro.response.headers.append('Set-Cookie', setCookie);
+}
+
+const awaitingWebhook =
+	enrollment?.status === 'paiement_en_attente' && Boolean(enrollment.stripeCheckoutSessionId);
+
+const showCheckout =
+	!enrollment ||
+	enrollment.status === 'rembourse' ||
+	enrollment.status === 'acces_retire' ||
+	(enrollment.status === 'paiement_en_attente' && !enrollment.stripeCheckoutSessionId);
+
+const steps = enrollment
+	? stepStates(enrollment.status)
+	: { paiement: 'a_faire' as const, nda: 'a_faire' as const, acces: 'a_faire' as const };
+
+let ndaSignUrl: string | null = null;
+if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === 'paiement_confirme')) {
+	try {
+		ndaSignUrl = await resolveNdaSignUrl(enrollment);
+	} catch {
+		ndaSignUrl = null;
+	}
+}
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<MarketingLayout>
+	<Hero showCta={showCheckout} ctaHref="#inscription" />
+
+	<Section
+		eyebrow="Votre accès"
+		title="Comment rejoindre la formation ?"
+		description="Le parcours complet tient en trois étapes. Après votre règlement, tout arrive directement par e-mail."
+		class="border-b border-ink/8"
+	>
+		<Stepper steps={steps} />
+		<ContactAdmin />
+	</Section>
+
+	{
+		enrollment && (!showCheckout || awaitingWebhook) ? (
+			<Section id="suivi" eyebrow="Suivi" title="Où en êtes-vous ?">
+				<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} flash={flash} />
+			</Section>
+		) : (
+			<Section
+				id="inscription"
+				eyebrow="Inscription"
+				title="Rejoindre la formation — 320 € TTC"
+				description="Renseignez vos informations, acceptez les consentements, puis réglez en toute sécurité."
+			>
+				{flash && (
+					<div class="mb-6">
+						<Alert variant={token && !enrollment ? 'error' : 'success'}>{flash}</Alert>
+					</div>
+				)}
+				{checkout === 'cancel' && (
+					<div class="mb-6">
+						<Alert variant="info">Paiement annulé. Vous pouvez reprendre quand vous voulez.</Alert>
+					</div>
+				)}
+				<CheckoutForm />
+			</Section>
+		)
+	}
+
+	<Section
+		id="retrouver"
+		eyebrow="Déjà inscrit·e ?"
+		title="Retrouver mon inscription"
+		description="Saisissez l’e-mail utilisé au paiement. Vous recevrez un lien magique — aucun code à recopier."
+	>
+		<MagicLinkForm />
+	</Section>
+
+	<Section
+		id="nda"
+		eyebrow="Avant de payer"
+		title="Aperçu de l’accord de confidentialité"
+		description="Vous le signerez après le paiement, par e-mail."
+	>
+		<NdaPreview />
+	</Section>
+
+	<Section id="faq" eyebrow="Questions" title="FAQ">
+		<Faq />
+	</Section>
+</MarketingLayout>

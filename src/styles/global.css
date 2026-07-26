@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+	--font-display: "Cormorant Garamond", "Times New Roman", serif;
+	--font-sans: "Outfit", "Helvetica Neue", sans-serif;
+
+	--color-ink: #1a1410;
+	--color-ink-soft: #3d3229;
+	--color-mist: #f3ebe3;
+	--color-blush: #c4786a;
+	--color-blush-deep: #a85a4d;
+	--color-gold: #b8956c;
+	--color-gold-soft: #d4bc9a;
+	--color-sage: #6b7f6a;
+	--color-surface: #fff9f4;
+	--color-line: rgb(26 20 16 / 0.12);
+
+	--shadow-soft: 0 24px 60px rgb(26 20 16 / 0.08);
+}
+
+@layer base {
+	html {
+		scroll-behavior: smooth;
+	}
+
+	body {
+		@apply bg-mist text-ink font-sans antialiased;
+		background-image:
+			radial-gradient(ellipse 80% 50% at 10% -10%, rgb(200 120 106 / 0.18), transparent),
+			radial-gradient(ellipse 60% 40% at 90% 10%, rgb(184 149 108 / 0.16), transparent),
+			radial-gradient(ellipse 50% 30% at 50% 100%, rgb(107 127 106 / 0.08), transparent);
+		background-attachment: fixed;
+		min-height: 100vh;
+	}
+
+	::selection {
+		background: rgb(196 120 106 / 0.35);
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--color-blush);
+		outline-offset: 3px;
+	}
+}
+
+@layer utilities {
+	.font-display {
+		font-family: var(--font-display);
+	}
+
+	.font-sans {
+		font-family: var(--font-sans);
+	}
+
+	.text-balance {
+		text-wrap: balance;
+	}
+
+	.grain::before {
+		content: "";
+		pointer-events: none;
+		position: absolute;
+		inset: 0;
+		opacity: 0.04;
+		background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+		mix-blend-mode: multiply;
+	}
+
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(18px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	@keyframes fade-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	.animate-rise {
+		animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+	}
+
+	.animate-fade {
+		animation: fade-in 1s ease both;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html {
+			scroll-behavior: auto;
+		}
+
+		.animate-rise,
+		.animate-fade {
+			animation: none !important;
+		}
+	}
+}

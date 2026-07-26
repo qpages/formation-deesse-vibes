@@ -1,0 +1,112 @@
+---
+import Alert from '../ui/Alert.astro';
+import Button from '../ui/Button.astro';
+import FormField from '../ui/FormField.astro';
+import Input from '../ui/Input.astro';
+
+interface Props {
+	lockedEmail?: string;
+}
+
+const { lockedEmail } = Astro.props;
+---
+
+<form id="checkout-form" class="space-y-5" novalidate>
+	<div class="grid gap-5 sm:grid-cols-2">
+		<FormField label="Prénom" name="firstName">
+			<Input name="firstName" required autocomplete="given-name" placeholder="Camille" />
+		</FormField>
+		<FormField label="Nom" name="lastName">
+			<Input name="lastName" required autocomplete="family-name" placeholder="Martin" />
+		</FormField>
+	</div>
+
+	<FormField label="E-mail" name="email" hint="Utilisé pour le paiement, le NDA et vos accès.">
+		<Input
+			type="email"
+			name="email"
+			required
+			autocomplete="email"
+			placeholder="camille.martin@email.com"
+			value={lockedEmail}
+		/>
+	</FormField>
+
+	<div class="space-y-3 border-t border-ink/10 pt-5 text-sm text-ink-soft">
+		<label class="flex gap-3">
+			<input type="checkbox" name="consentCgv" value="true" required class="mt-1" />
+			<span>
+				J’accepte les
+				<a href="/cgv" class="underline underline-offset-2 hover:text-ink">conditions générales de vente</a>.
+			</span>
+		</label>
+		<label class="flex gap-3">
+			<input type="checkbox" name="consentNda" value="true" required class="mt-1" />
+			<span>
+				J’ai pris connaissance de l’
+				<a href="#nda" class="underline underline-offset-2 hover:text-ink">accord de confidentialité</a>
+				et m’engage à le signer après paiement.
+			</span>
+		</label>
+		<label class="flex gap-3">
+			<input type="checkbox" name="consentPrivacy" value="true" required class="mt-1" />
+			<span>
+				J’accepte la
+				<a href="/confidentialite" class="underline underline-offset-2 hover:text-ink">politique de confidentialité</a>.
+			</span>
+		</label>
+	</div>
+
+	<div id="checkout-error" class="hidden">
+		<Alert variant="error"><span id="checkout-error-text"></span></Alert>
+	</div>
+
+	<Button type="submit" size="lg" class="w-full sm:w-auto" id="checkout-submit">
+		Je m’inscris — 320 €
+	</Button>
+</form>
+
+<script>
+	const form = document.getElementById('checkout-form') as HTMLFormElement | null;
+	const submit = document.getElementById('checkout-submit') as HTMLButtonElement | null;
+	const errorBox = document.getElementById('checkout-error');
+	const errorText = document.getElementById('checkout-error-text');
+
+	form?.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		if (!form || !submit) return;
+
+		errorBox?.classList.add('hidden');
+		submit.disabled = true;
+		submit.textContent = 'Redirection…';
+
+		const data = new FormData(form);
+		const payload = {
+			firstName: String(data.get('firstName') ?? ''),
+			lastName: String(data.get('lastName') ?? ''),
+			email: String(data.get('email') ?? ''),
+			consentCgv: data.get('consentCgv') === 'true',
+			consentNda: data.get('consentNda') === 'true',
+			consentPrivacy: data.get('consentPrivacy') === 'true',
+		};
+
+		try {
+			const res = await fetch('/api/checkout', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload),
+			});
+			const json = await res.json();
+			if (!res.ok) throw new Error(json.error || 'Erreur de paiement');
+			window.location.href = json.url;
+		} catch (error) {
+			if (errorText) {
+				errorText.textContent =
+					error instanceof Error ? error.message : 'Une erreur est survenue.';
+			}
+			errorBox?.classList.remove('hidden');
+			submit.disabled = false;
+			submit.textContent = 'Je m’inscris — 320 €';
+		}
+	});
+</script>

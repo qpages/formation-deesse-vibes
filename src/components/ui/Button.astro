@@ -1,0 +1,50 @@
+---
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '../../lib/cn';
+
+const buttonVariants = cva(
+	'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush disabled:pointer-events-none disabled:opacity-50',
+	{
+		variants: {
+			variant: {
+				primary:
+					'bg-ink text-mist hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]',
+				secondary:
+					'bg-transparent text-ink border border-ink/20 hover:border-ink/40 hover:bg-surface/60',
+				ghost: 'bg-transparent text-ink-soft hover:text-ink underline-offset-4 hover:underline',
+				danger: 'bg-blush-deep text-mist hover:bg-blush',
+			},
+			size: {
+				sm: 'h-10 px-4 text-sm',
+				md: 'h-12 px-6 text-sm tracking-wide',
+				lg: 'h-14 px-8 text-base tracking-wide',
+			},
+		},
+		defaultVariants: {
+			variant: 'primary',
+			size: 'md',
+		},
+	},
+);
+
+type Props = VariantProps<typeof buttonVariants> & {
+	class?: string;
+	href?: string;
+	type?: 'button' | 'submit' | 'reset';
+	disabled?: boolean;
+	id?: string;
+};
+
+const { variant, size, class: className, href, type = 'button', disabled, id } = Astro.props;
+const classes = cn(buttonVariants({ variant, size }), className);
+---
+
+{href ? (
+	<a href={href} class={classes} id={id}>
+		<slot />
+	</a>
+) : (
+	<button type={type} class={classes} disabled={disabled} id={id}>
+		<slot />
+	</button>
+)}

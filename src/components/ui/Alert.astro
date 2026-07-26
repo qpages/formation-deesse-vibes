@@ -1,0 +1,23 @@
+---
+import { cn } from '../../lib/cn';
+
+interface Props {
+	variant?: 'info' | 'success' | 'error';
+	class?: string;
+}
+
+const { variant = 'info', class: className } = Astro.props;
+
+const styles = {
+	info: 'border-gold/40 bg-gold/10 text-ink',
+	success: 'border-sage/40 bg-sage/10 text-ink',
+	error: 'border-blush/50 bg-blush/10 text-ink',
+};
+---
+
+<div
+	role="status"
+	class={cn('rounded-sm border px-4 py-3 text-sm leading-relaxed', styles[variant], className)}
+>
+	<slot />
+</div>

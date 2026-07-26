@@ -1,0 +1,39 @@
+---
+import { cn } from '../../lib/cn';
+
+interface Props {
+	type?: string;
+	name: string;
+	id?: string;
+	required?: boolean;
+	autocomplete?: string;
+	placeholder?: string;
+	value?: string;
+	class?: string;
+}
+
+const {
+	type = 'text',
+	name,
+	id = name,
+	required,
+	autocomplete,
+	placeholder,
+	value,
+	class: className,
+} = Astro.props;
+---
+
+<input
+	type={type}
+	name={name}
+	id={id}
+	required={required}
+	autocomplete={autocomplete}
+	placeholder={placeholder}
+	value={value}
+	class={cn(
+		'h-12 w-full rounded-sm border border-ink/15 bg-surface/80 px-4 text-ink placeholder:text-ink/35 transition focus:border-blush focus:bg-surface',
+		className,
+	)}
+/>

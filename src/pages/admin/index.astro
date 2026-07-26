@@ -1,0 +1,129 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import Button from '../../components/ui/Button.astro';
+import StatusBadge from '../../components/ui/StatusBadge.astro';
+import {
+	ADMIN_COOKIE,
+	parseCookie,
+	verifyAdminSessionToken,
+} from '../../lib/auth/session';
+import { getPrisma } from '../../lib/db';
+import { STATUS_LABELS } from '../../lib/status';
+
+export const prerender = false;
+
+const adminEmail = await verifyAdminSessionToken(
+	parseCookie(Astro.request.headers.get('cookie'), ADMIN_COOKIE) ?? '',
+);
+if (!adminEmail) {
+	return Astro.redirect('/admin/login');
+}
+
+const enrollments = await getPrisma().enrollment.findMany({
+	orderBy: { createdAt: 'desc' },
+	take: 200,
+});
+---
+
+<AdminLayout title="Inscriptions" email={adminEmail}>
+	<div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+		<div>
+			<h1 class="font-display text-4xl text-ink">Inscriptions</h1>
+			<p class="mt-2 text-sm text-ink-soft">{enrollments.length} dossier(s) récents</p>
+		</div>
+		<Button href="/api/admin/export" variant="secondary" size="sm">Export CSV</Button>
+	</div>
+
+	<div class="overflow-x-auto">
+		<table class="w-full min-w-[720px] text-left text-sm">
+			<thead class="border-b border-ink/15 text-xs uppercase tracking-[0.12em] text-ink-soft">
+				<tr>
+					<th class="py-3 pr-4 font-medium">Personne</th>
+					<th class="py-3 pr-4 font-medium">État</th>
+					<th class="py-3 pr-4 font-medium">Créé</th>
+					<th class="py-3 font-medium">Actions</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-ink/10">
+				{
+					enrollments.map((row) => (
+						<tr>
+							<td class="py-4 pr-4 align-top">
+								<p class="font-medium text-ink">
+									{row.firstName} {row.lastName}
+								</p>
+								<p class="text-ink-soft">{row.email}</p>
+								<p class="mt-1 font-mono text-[11px] text-ink/50">{row.id}</p>
+							</td>
+							<td class="py-4 pr-4 align-top">
+								<StatusBadge>{STATUS_LABELS[row.status]}</StatusBadge>
+							</td>
+							<td class="py-4 pr-4 align-top text-ink-soft">
+								{row.createdAt.toLocaleString('fr-FR')}
+							</td>
+							<td class="py-4 align-top">
+								<div class="flex flex-wrap gap-2" data-enrollment={row.id}>
+									<button
+										type="button"
+										data-action="relance_nda"
+										class="text-xs underline underline-offset-2 hover:text-blush-deep"
+									>
+										Relancer NDA
+									</button>
+									<button
+										type="button"
+										data-action="recreate_nda"
+										class="text-xs underline underline-offset-2 hover:text-blush-deep"
+									>
+										Recréer NDA
+									</button>
+									<button
+										type="button"
+										data-action="retrigger_make"
+										class="text-xs underline underline-offset-2 hover:text-blush-deep"
+									>
+										Relancer Make
+									</button>
+									<button
+										type="button"
+										data-action="mark_rembourse"
+										class="text-xs underline underline-offset-2 hover:text-blush-deep"
+									>
+										Remboursé
+									</button>
+									<button
+										type="button"
+										data-action="mark_acces_retire"
+										class="text-xs underline underline-offset-2 hover:text-blush-deep"
+									>
+										Retrait accès
+									</button>
+								</div>
+							</td>
+						</tr>
+					))
+				}
+			</tbody>
+		</table>
+	</div>
+</AdminLayout>
+
+<script>
+	document.querySelectorAll('[data-action]').forEach((btn) => {
+		btn.addEventListener('click', async () => {
+			const action = btn.getAttribute('data-action');
+			const wrap = btn.closest('[data-enrollment]');
+			const enrollmentId = wrap?.getAttribute('data-enrollment');
+			if (!action || !enrollmentId) return;
+			if (!confirm(`Confirmer l’action « ${action} » ?`)) return;
+			const res = await fetch('/api/admin/action', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enrollmentId, action }),
+			});
+			const json = await res.json();
+			alert(res.ok ? 'Action effectuée.' : json.error || 'Échec');
+			if (res.ok) location.reload();
+		});
+	});
+</script>

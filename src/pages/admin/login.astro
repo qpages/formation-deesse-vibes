@@ -1,0 +1,154 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import Alert from '../../components/ui/Alert.astro';
+import Button from '../../components/ui/Button.astro';
+import FormField from '../../components/ui/FormField.astro';
+import Input from '../../components/ui/Input.astro';
+import { getEnv } from '../../lib/env';
+import {
+	ADMIN_COOKIE,
+	parseCookie,
+	verifyAdminSessionToken,
+} from '../../lib/auth/session';
+
+export const prerender = false;
+
+const existing = await verifyAdminSessionToken(
+	parseCookie(Astro.request.headers.get('cookie'), ADMIN_COOKIE) ?? '',
+);
+if (existing) {
+	return Astro.redirect('/admin');
+}
+
+/** Prefill local uniquement — jamais en prod. */
+let prefillEmail = '';
+let prefillPassword = '';
+if (import.meta.env.DEV) {
+	const env = getEnv();
+	prefillEmail = env.ADMIN_EMAIL;
+	prefillPassword = env.ADMIN_PASSWORD;
+}
+---
+
+<AdminLayout title="Connexion admin">
+	<div class="mx-auto max-w-md space-y-6">
+		<div>
+			<p class="text-xs uppercase tracking-[0.18em] text-ink-soft">Accès restreint</p>
+			<h1 class="mt-2 font-display text-4xl text-ink">Connexion</h1>
+		</div>
+
+		<form id="admin-login" class="space-y-4">
+			<FormField label="E-mail" name="email">
+				<Input
+					type="email"
+					name="email"
+					required
+					autocomplete="username"
+					value={prefillEmail}
+				/>
+			</FormField>
+			<FormField label="Mot de passe" name="password">
+				<div class="relative">
+					<Input
+						type="password"
+						name="password"
+						required
+						autocomplete="current-password"
+						value={prefillPassword}
+						class="pr-12"
+					/>
+					<button
+						type="button"
+						id="toggle-password"
+						class="absolute inset-y-0 right-0 flex items-center px-3 text-ink-soft transition hover:text-ink"
+						aria-label="Afficher le mot de passe"
+						aria-pressed="false"
+					>
+						<svg
+							id="icon-eye"
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.75"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+							<circle cx="12" cy="12" r="3"></circle>
+						</svg>
+						<svg
+							id="icon-eye-off"
+							class="hidden"
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.75"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.2 3.1"></path>
+							<path d="M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.4-1"></path>
+							<path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"></path>
+							<path d="m3 3 18 18"></path>
+						</svg>
+					</button>
+				</div>
+			</FormField>
+			<div id="login-error" class="hidden">
+				<Alert variant="error"><span id="login-error-text"></span></Alert>
+			</div>
+			<Button type="submit" class="w-full">Se connecter</Button>
+		</form>
+	</div>
+</AdminLayout>
+
+<script>
+	const form = document.getElementById('admin-login') as HTMLFormElement | null;
+	const toggle = document.getElementById('toggle-password');
+	const passwordInput = form?.querySelector<HTMLInputElement>('input[name="password"]');
+	const iconEye = document.getElementById('icon-eye');
+	const iconEyeOff = document.getElementById('icon-eye-off');
+
+	toggle?.addEventListener('click', () => {
+		if (!passwordInput || !toggle) return;
+		const visible = passwordInput.type === 'text';
+		passwordInput.type = visible ? 'password' : 'text';
+		toggle.setAttribute('aria-pressed', String(!visible));
+		toggle.setAttribute(
+			'aria-label',
+			visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+		);
+		iconEye?.classList.toggle('hidden', !visible);
+		iconEyeOff?.classList.toggle('hidden', visible);
+	});
+
+	form?.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const data = new FormData(form);
+		const res = await fetch('/api/admin/login', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				email: data.get('email'),
+				password: data.get('password'),
+			}),
+		});
+		const json = await res.json();
+		if (!res.ok) {
+			const box = document.getElementById('login-error');
+			const text = document.getElementById('login-error-text');
+			if (text) text.textContent = json.error || 'Accès refusé';
+			box?.classList.remove('hidden');
+			return;
+		}
+		window.location.href = '/admin';
+	});
+</script>

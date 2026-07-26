@@ -1,0 +1,36 @@
+---
+const items = [
+	{
+		q: 'Dois-je créer un compte ?',
+		a: 'Non. Votre e-mail de paiement suffit. Pour revenir plus tard, demandez un lien magique.',
+	},
+	{
+		q: 'Quand vais-je recevoir mes accès Teachizy ?',
+		a: 'Uniquement après confirmation du paiement et de la signature de l’accord de confidentialité. Jamais depuis une simple page de succès.',
+	},
+	{
+		q: 'Puis-je utiliser un code promo ?',
+		a: 'Oui. Les codes promotionnels Stripe sont acceptés au moment du paiement.',
+	},
+	{
+		q: 'Que se passe-t-il si je ne signe pas le NDA ?',
+		a: 'Sans signature, les accès ne sont pas ouverts. Un remboursement peut être traité manuellement par l’équipe.',
+	},
+];
+---
+
+<div class="divide-y divide-ink/10">
+	{
+		items.map((item) => (
+			<details class="group py-5">
+				<summary class="cursor-pointer list-none font-display text-2xl text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+					<span class="flex items-center justify-between gap-4">
+						{item.q}
+						<span class="text-gold transition group-open:rotate-45">+</span>
+					</span>
+				</summary>
+				<p class="mt-3 max-w-2xl text-sm leading-relaxed text-ink-soft sm:text-base">{item.a}</p>
+			</details>
+		))
+	}
+</div>

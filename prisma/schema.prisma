@@ -1,0 +1,100 @@
+// Prisma schema - Formation Matrice Evolution
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EnrollmentStatus {
+  paiement_en_attente
+  paiement_confirme
+  nda_envoye
+  nda_signe
+  invitation_envoyee
+  rembourse
+  acces_retire
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  email     String           @unique
+  firstName String
+  lastName  String
+  status    EnrollmentStatus @default(paiement_en_attente)
+
+  consentCgvAt     DateTime?
+  consentNdaAt     DateTime?
+  consentPrivacyAt DateTime?
+
+  stripeCustomerId        String?
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String? @unique
+  amountCents             Int     @default(32000)
+
+  yousignRequestId String?   @unique
+  yousignSignerId  String?
+  ndaResendCount   Int       @default(0)
+  ndaResendDay     DateTime?
+  ndaLastResendAt  DateTime?
+
+  makeWebhookSentAt DateTime?
+  teachizyInvitedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events       ProcessedEvent[]
+  magicLinks   MagicLink[]
+  adminActions AdminAction[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("enrollments")
+}
+
+model ProcessedEvent {
+  id                String      @id @default(cuid())
+  provider          String
+  eventId           String
+  enrollmentId      String?
+  enrollment        Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  payloadCipherText String?
+  createdAt         DateTime    @default(now())
+
+  @@unique([provider, eventId])
+  @@index([createdAt])
+  @@index([enrollmentId])
+  @@map("processed_events")
+}
+
+model MagicLink {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  tokenHash    String     @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([enrollmentId])
+  @@index([expiresAt])
+  @@map("magic_links")
+}
+
+model AdminAction {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  adminEmail   String
+  action       String
+  meta         Json?
+  createdAt    DateTime   @default(now())
+
+  @@index([enrollmentId])
+  @@index([createdAt])
+  @@map("admin_actions")
+}
