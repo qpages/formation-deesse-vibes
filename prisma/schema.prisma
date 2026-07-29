@@ -14,9 +14,20 @@ enum EnrollmentStatus {
   paiement_confirme
   nda_envoye
   nda_signe
-  invitation_envoyee
+  teachizy_envoye
   rembourse
   acces_retire
+}
+
+/// État de la demande Yousign (indépendant du statut métier EnrollmentStatus).
+enum YousignRequestStatus {
+  ongoing
+  done
+  expired
+  declined
+  canceled
+  rejected
+  error
 }
 
 model Enrollment {
@@ -35,13 +46,13 @@ model Enrollment {
   stripePaymentIntentId   String? @unique
   amountCents             Int     @default(32000)
 
-  yousignRequestId String?   @unique
+  yousignRequestId String?               @unique
   yousignSignerId  String?
-  ndaResendCount   Int       @default(0)
+  yousignStatus    YousignRequestStatus?
+  ndaResendCount   Int                   @default(0)
   ndaResendDay     DateTime?
   ndaLastResendAt  DateTime?
 
-  makeWebhookSentAt DateTime?
   teachizyInvitedAt DateTime?
 
   createdAt DateTime @default(now())

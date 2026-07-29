@@ -27,22 +27,3 @@ export async function sendMagicLinkEmail(input: {
 		`,
 	});
 }
-
-export async function sendNdaReminderEmail(input: {
-	to: string;
-	firstName: string;
-	signUrl: string;
-}) {
-	const env = getEnv();
-	await getResend().emails.send({
-		from: env.RESEND_FROM,
-		to: input.to,
-		subject: `Signature requise — ${FORMATION.name}`,
-		html: `
-			<p>Bonjour ${input.firstName},</p>
-			<p>Votre paiement est confirmé. Merci de signer votre accord de confidentialité pour recevoir vos accès :</p>
-			<p><a href="${input.signUrl}">Signer mon accord</a></p>
-			<p>— ${FORMATION.brand}</p>
-		`,
-	});
-}

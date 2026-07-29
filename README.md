@@ -2,15 +2,19 @@
 
 Portail `formation.deesse-vibes.com` — Formation Matrice Évolution (320 €).
 
-Parcours : landing → Stripe Checkout → NDA Yousign → Make → Teachizy.  
-Suivi sur la même page via lien magique Resend. Accès Teachizy uniquement via webhooks vérifiés.
+Parcours : landing → Stripe Checkout → NDA Yousign → Teachizy.  
+Suivi sur la même page via lien magique Resend. Accès Teachizy uniquement via API directe après signature vérifiée.
 
 ## Stack
 
 - Astro 7 SSR + Vercel
 - Neon Postgres + Prisma
-- Stripe, Yousign, Inngest, Resend, Make, Slack
+- Stripe, Yousign, Inngest, Resend, Teachizy, Slack
 - Admin : `/admin` (credentials env `ADMIN_EMAIL` / `ADMIN_PASSWORD`)
+
+## Liens utiles
+
+- [Documentation API Teachizy](https://developer.teachizy.fr/)
 
 ## Démarrage
 
@@ -23,5 +27,4 @@ npm run dev
 
 Scripts utiles : `npm test`, `npm run build`, `npm run db:deploy`.
 
-Détails produit / décisions : [`PLAN.md`](./PLAN.md).  
-Consoles & webhooks : [`TOOLS.md`](./TOOLS.md).
+Vue d’ensemble (parcours, Inngest, webhooks, consoles) : [`docs/overview.md`](./docs/overview.md).

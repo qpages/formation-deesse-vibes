@@ -10,9 +10,7 @@ import { getPrisma } from '../../../lib/db';
 import {
 	canResendNda,
 	markNdaResent,
-	resolveNdaSignUrl,
 } from '../../../lib/services/enrollment';
-import { sendNdaReminderEmail } from '../../../lib/services/resend';
 import { reactivateNda } from '../../../lib/services/yousign';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -53,22 +51,10 @@ export const POST: APIRoute = async ({ request }) => {
 			return json({ error: allowed.reason }, 429);
 		}
 
-		if (enrollment.yousignRequestId) {
-			await reactivateNda(enrollment.yousignRequestId);
-		}
-
-		const signUrl = await resolveNdaSignUrl(enrollment);
-		if (signUrl) {
-			await sendNdaReminderEmail({
-				to: enrollment.email,
-				firstName: enrollment.firstName,
-				signUrl,
-			});
-		}
-
+		await reactivateNda(enrollment.yousignRequestId!);
 		await markNdaResent(enrollment);
 
-		return json({ ok: true, message: 'L’accord a été renvoyé par e-mail.' });
+		return json({ ok: true, message: 'L’accord a été renvoyé par e-mail (Yousign).' });
 	} catch (error) {
 		console.error('[nda/resend]', error);
 		return json({ error: 'Échec du renvoi du NDA.' }, 500);

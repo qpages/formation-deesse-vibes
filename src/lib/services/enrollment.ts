@@ -94,6 +94,13 @@ export async function recordProcessedEvent(input: {
 	}
 }
 
+/** Libère un event pour permettre un retry Stripe après échec de traitement. */
+export async function releaseProcessedEvent(provider: string, eventId: string) {
+	await getPrisma().processedEvent.deleteMany({
+		where: { provider, eventId },
+	});
+}
+
 export async function transitionStatus(
 	enrollmentId: string,
 	from: EnrollmentStatus | EnrollmentStatus[],
@@ -201,6 +208,7 @@ export async function markNdaResent(enrollment: Enrollment) {
 			ndaLastResendAt: new Date(),
 			ndaResendDay: dayStart,
 			ndaResendCount: sameDay ? enrollment.ndaResendCount + 1 : 1,
+			yousignStatus: 'ongoing',
 		},
 	});
 }

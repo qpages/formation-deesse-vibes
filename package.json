@@ -7,16 +7,22 @@
   },
   "scripts": {
     "dev": "astro dev",
+    "webhook:yousign": "ngrok http 4321",
+    "webhook:stripe": "stripe listen --forward-to localhost:4321/api/stripe/webhook",
     "build": "prisma generate && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "stop": "astro dev stop",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:env": "node scripts/boot-check.mjs",
+    "check:env:prod": "node scripts/boot-check.mjs --prod",
+    "teachizy:list-trainings": "node scripts/list-teachizy-trainings.mjs",
     "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "inngest:dev": "npx inngest-cli@latest dev",
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:4321/api/inngest",
     "postinstall": "prisma generate"
   },
   "dependencies": {

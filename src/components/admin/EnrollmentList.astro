@@ -1,0 +1,156 @@
+---
+import StatusBadge from '../ui/StatusBadge.astro';
+import type { AdminEnrollmentRow } from '../../lib/admin/enrollments';
+import ExternalLinks from './ExternalLinks.astro';
+
+interface Props {
+	rows: AdminEnrollmentRow[];
+}
+
+const { rows } = Astro.props;
+
+const actions = [
+	{ action: 'sync_payment', label: 'Sync paiement' },
+	{ action: 'relance_nda', label: "Renvoyer l'email de signature" },
+	{ action: 'recreate_nda', label: "Créer l'email de signature" },
+	{ action: 'sync_yousign', label: '[dev] sync Yousign' },
+	{ action: 'retrigger_nda', label: '[dev] trigger Inngest stripe/payment.confirmed' },
+	{ action: 'retrigger_signature', label: '[dev] trigger Inngest yousign/signature.done' },
+	{ action: 'retrigger_teachizy', label: '[dev] Renvoyer lien Teachizy' },
+	{ action: 'delete_nda', label: '[dev] supprimer NDA' },
+] as const;
+---
+
+{/* Mobile: cards */}
+<ul class="space-y-3 lg:hidden">
+	{
+		rows.map((row) => (
+			<li class="border border-ink/10 bg-mist/40 px-4 py-4">
+				<div class="flex items-start justify-between gap-3">
+					<div class="min-w-0">
+						<p class="truncate font-medium text-ink">{row.displayName}</p>
+						<p class="truncate text-sm text-ink-soft">{row.email}</p>
+					</div>
+					<p class="shrink-0 text-[11px] text-ink/45">
+						{row.createdAt.toLocaleDateString('fr-FR')}
+					</p>
+				</div>
+
+				<div class="mt-3 space-y-2">
+					<div class="flex items-center justify-between gap-3">
+						<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Paiement</span>
+						<StatusBadge tone={row.pipeline.paiement.tone}>
+							{row.pipeline.paiement.label}
+						</StatusBadge>
+					</div>
+					<div class="flex items-center justify-between gap-3">
+						<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Signature</span>
+						<StatusBadge tone={row.pipeline.signature.tone}>
+							{row.pipeline.signature.label}
+						</StatusBadge>
+					</div>
+					<div class="flex items-center justify-between gap-3">
+						<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Accès</span>
+						<StatusBadge tone={row.pipeline.acces.tone}>
+							{row.pipeline.acces.label}
+						</StatusBadge>
+					</div>
+				</div>
+
+				<div class="mt-3 flex items-center gap-1 border-t border-ink/10 pt-3">
+					<ExternalLinks
+						stripeUrl={row.stripeUrl}
+						yousignUrl={row.yousignUrl}
+						signUrl={row.signUrl}
+					/>
+					<div
+						class="ml-auto flex flex-wrap justify-end gap-x-3 gap-y-1"
+						data-enrollment={row.id}
+						data-name={row.displayName}
+					>
+						{actions.map(({ action, label }) => (
+							<button
+								type="button"
+								data-action={action}
+								class="text-[11px] text-ink-soft underline underline-offset-2 hover:text-blush-deep"
+							>
+								{label}
+							</button>
+						))}
+					</div>
+				</div>
+			</li>
+		))
+	}
+</ul>
+
+{/* Desktop: table */}
+<div class="hidden overflow-x-auto lg:block">
+	<table class="w-full text-left text-sm">
+		<thead class="border-b border-ink/15 text-[11px] uppercase tracking-[0.12em] text-ink-soft">
+			<tr>
+				<th class="py-3 pr-4 font-medium">Personne</th>
+				<th class="py-3 pr-3 font-medium">Paiement</th>
+				<th class="py-3 pr-3 font-medium">Signature</th>
+				<th class="py-3 pr-3 font-medium">Accès</th>
+				<th class="py-3 pr-4 font-medium">Créé</th>
+				<th class="py-3 pr-3 font-medium">Liens</th>
+				<th class="py-3 font-medium">Actions</th>
+			</tr>
+		</thead>
+		<tbody class="divide-y divide-ink/10">
+			{
+				rows.map((row) => (
+					<tr class="align-middle hover:bg-ink/[0.02]">
+						<td class="py-3.5 pr-4">
+							<p class="font-medium text-ink">{row.displayName}</p>
+							<p class="text-ink-soft">{row.email}</p>
+						</td>
+						<td class="py-3.5 pr-3">
+							<StatusBadge tone={row.pipeline.paiement.tone}>
+								{row.pipeline.paiement.label}
+							</StatusBadge>
+						</td>
+						<td class="py-3.5 pr-3">
+							<StatusBadge tone={row.pipeline.signature.tone}>
+								{row.pipeline.signature.label}
+							</StatusBadge>
+						</td>
+						<td class="py-3.5 pr-3">
+							<StatusBadge tone={row.pipeline.acces.tone}>
+								{row.pipeline.acces.label}
+							</StatusBadge>
+						</td>
+						<td class="whitespace-nowrap py-3.5 pr-4 text-ink-soft">
+							{row.createdAt.toLocaleString('fr-FR', {
+								dateStyle: 'short',
+								timeStyle: 'short',
+							})}
+						</td>
+						<td class="py-3.5 pr-3">
+							<ExternalLinks
+								stripeUrl={row.stripeUrl}
+								yousignUrl={row.yousignUrl}
+								signUrl={row.signUrl}
+							/>
+						</td>
+						<td class="py-3.5">
+							<select
+								class="max-w-[9.5rem] cursor-pointer border border-ink/15 bg-transparent py-1 pl-2 pr-1 text-[11px] text-ink-soft outline-none hover:border-ink/30 focus:border-ink/40"
+								data-enrollment={row.id}
+								data-name={row.displayName}
+								data-action-select
+								aria-label={`Actions pour ${row.displayName}`}
+							>
+								<option value="">Actions…</option>
+								{actions.map(({ action, label }) => (
+									<option value={action}>{label}</option>
+								))}
+							</select>
+						</td>
+					</tr>
+				))
+			}
+		</tbody>
+	</table>
+</div>

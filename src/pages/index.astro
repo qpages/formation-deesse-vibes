@@ -17,7 +17,11 @@ import {
 	findEnrollmentById,
 	resolveNdaSignUrl,
 } from '../lib/services/enrollment';
-import { stepStates } from '../lib/status';
+import {
+	confirmPaidCheckout,
+	retrieveCheckoutSession,
+} from '../lib/services/payment';
+import { checkoutSuccessFlash, stepStates } from '../lib/status';
 import type { Enrollment } from '../generated/prisma/client';
 
 export const prerender = false;
@@ -48,9 +52,6 @@ try {
 		if (enrollment) {
 			const sessionToken = await createEnrollmentSessionToken(enrollment.id);
 			setCookie = enrollmentCookieOptions(sessionToken);
-			if (checkout === 'success') {
-				flash = 'Paiement reçu. Nous préparons votre accord de confidentialité.';
-			}
 		}
 	}
 
@@ -62,6 +63,38 @@ try {
 				enrollment = await findEnrollmentById(enrollmentId);
 			}
 		}
+	}
+
+	// Filet de sécurité : si Stripe a encaissé mais le webhook a loupé
+	const checkoutToSync =
+		sessionId ??
+		(enrollment?.status === 'paiement_en_attente'
+			? enrollment.stripeCheckoutSessionId
+			: null);
+	if (
+		checkoutToSync &&
+		(!enrollment || enrollment.status === 'paiement_en_attente')
+	) {
+		try {
+			const stripeSession = await retrieveCheckoutSession(checkoutToSync);
+			const confirmed = await confirmPaidCheckout(stripeSession, {
+				stripeEventId: `return:${checkoutToSync}`,
+			});
+			if (confirmed.ok) {
+				enrollment = await findEnrollmentById(confirmed.enrollmentId);
+				if (enrollment && !setCookie) {
+					setCookie = enrollmentCookieOptions(
+						await createEnrollmentSessionToken(enrollment.id),
+					);
+				}
+			}
+		} catch (error) {
+			console.error('[index] checkout reconcile', error);
+		}
+	}
+
+	if (checkout === 'success' && enrollment) {
+		flash = checkoutSuccessFlash(enrollment.status);
 	}
 } catch (error) {
 	console.error('[index] enrollment lookup', error);
@@ -96,10 +129,7 @@ if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === '
 }
 
 const magicLinkFailed = Boolean(token && !enrollment);
-const sectionTitle = showTracking ? 'Où en êtes-vous ?' : 'Obtenir mon accès';
-const sectionDescription = showTracking
-	? 'Suivez votre parcours : paiement, signature, puis accès Teachizy.'
-	: 'Commencez ou reprenez ici. L’invitation Teachizy part dès que l’accord est signé.';
+const sectionDescription = 'Suivez votre parcours en temps réel : paiement, signature, puis accès à Teachizy.';
 ---
 
 <MarketingLayout>
@@ -107,8 +137,8 @@ const sectionDescription = showTracking
 
 	<Section
 		id="acces"
-		eyebrow={showTracking ? 'Suivi' : 'Accès'}
-		title={sectionTitle}
+		eyebrow={showTracking ? undefined : 'Accès'}
+		title="Comment ça fonctionne ?"
 		description={sectionDescription}
 		class="border-b border-ink/8"
 	>

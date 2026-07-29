@@ -12,14 +12,18 @@ const serverSchema = z.object({
 	YOUSIGN_TEMPLATE_ID: z.string().optional(),
 	YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
 	YOUSIGN_API_BASE: z.string().url().default('https://api-sandbox.yousign.app/v3'),
+	YOUSIGN_SIGNER_LABEL: z.string().default('signer'),
 	RESEND_API_KEY: z.string().optional(),
 	RESEND_FROM: z.string().default('formation@deesse-vibes.com'),
 	MAGIC_LINK_SECRET: z.string().min(32).optional(),
 	SESSION_SECRET: z.string().min(32).optional(),
 	PAYLOAD_ENCRYPTION_KEY: z.string().min(32).optional(),
+	INNGEST_DEV: z.string().optional(),
 	INNGEST_EVENT_KEY: z.string().optional(),
 	INNGEST_SIGNING_KEY: z.string().optional(),
-	MAKE_WEBHOOK_URL: optionalUrl,
+	TEACHIZY_API_KEY: z.string().optional(),
+	TEACHIZY_API_BASE: z.string().url().default('https://api.teachizy.fr/api/v1'),
+	TEACHIZY_TRAINING_UUID: z.string().optional(),
 	SLACK_WEBHOOK_URL: optionalUrl,
 	ADMIN_EMAIL: z.string().email().default('admin@deesse-vibes.com'),
 	ADMIN_PASSWORD: z.string().min(1).default(''),
@@ -54,16 +58,22 @@ export function getEnv(): ServerEnv {
 		YOUSIGN_WEBHOOK_SECRET:
 			import.meta.env.YOUSIGN_WEBHOOK_SECRET ?? process.env.YOUSIGN_WEBHOOK_SECRET,
 		YOUSIGN_API_BASE: import.meta.env.YOUSIGN_API_BASE ?? process.env.YOUSIGN_API_BASE,
+		YOUSIGN_SIGNER_LABEL:
+			import.meta.env.YOUSIGN_SIGNER_LABEL ?? process.env.YOUSIGN_SIGNER_LABEL,
 		RESEND_API_KEY: import.meta.env.RESEND_API_KEY ?? process.env.RESEND_API_KEY,
 		RESEND_FROM: import.meta.env.RESEND_FROM ?? process.env.RESEND_FROM,
 		MAGIC_LINK_SECRET: import.meta.env.MAGIC_LINK_SECRET ?? process.env.MAGIC_LINK_SECRET,
 		SESSION_SECRET: import.meta.env.SESSION_SECRET ?? process.env.SESSION_SECRET,
 		PAYLOAD_ENCRYPTION_KEY:
 			import.meta.env.PAYLOAD_ENCRYPTION_KEY ?? process.env.PAYLOAD_ENCRYPTION_KEY,
+		INNGEST_DEV: import.meta.env.INNGEST_DEV ?? process.env.INNGEST_DEV,
 		INNGEST_EVENT_KEY: import.meta.env.INNGEST_EVENT_KEY ?? process.env.INNGEST_EVENT_KEY,
 		INNGEST_SIGNING_KEY:
 			import.meta.env.INNGEST_SIGNING_KEY ?? process.env.INNGEST_SIGNING_KEY,
-		MAKE_WEBHOOK_URL: import.meta.env.MAKE_WEBHOOK_URL ?? process.env.MAKE_WEBHOOK_URL,
+		TEACHIZY_API_KEY: import.meta.env.TEACHIZY_API_KEY ?? process.env.TEACHIZY_API_KEY,
+		TEACHIZY_API_BASE: import.meta.env.TEACHIZY_API_BASE ?? process.env.TEACHIZY_API_BASE,
+		TEACHIZY_TRAINING_UUID:
+			import.meta.env.TEACHIZY_TRAINING_UUID ?? process.env.TEACHIZY_TRAINING_UUID,
 		SLACK_WEBHOOK_URL: import.meta.env.SLACK_WEBHOOK_URL ?? process.env.SLACK_WEBHOOK_URL,
 		ADMIN_EMAIL: import.meta.env.ADMIN_EMAIL ?? process.env.ADMIN_EMAIL,
 		ADMIN_PASSWORD: import.meta.env.ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD,
@@ -97,3 +107,5 @@ export const FORMATION = {
 	priceCents: 32000,
 	currency: 'eur',
 } as const;
+
+export const env = getEnv();

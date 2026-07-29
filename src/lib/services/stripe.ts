@@ -55,11 +55,21 @@ export function constructStripeEvent(body: string, signature: string) {
 	);
 }
 
-export async function assertPriceMatches(session: Stripe.Checkout.Session) {
-	const expected = getEnv().STRIPE_AMOUNT_CENTS;
-	if (session.amount_total !== expected) {
-		throw new Error(
-			`Montant Checkout incorrect: ${session.amount_total} ≠ ${expected}`,
-		);
+/** Lien Dashboard Stripe pour un paiement / une session Checkout. */
+export function stripeDashboardUrl(input: {
+	paymentIntentId?: string | null;
+	checkoutSessionId?: string | null;
+}): string | null {
+	const key = getEnv().STRIPE_SECRET_KEY ?? '';
+	const base = key.startsWith('sk_test_')
+		? 'https://dashboard.stripe.com/test'
+		: 'https://dashboard.stripe.com';
+
+	if (input.paymentIntentId) {
+		return `${base}/payments/${input.paymentIntentId}`;
 	}
+	if (input.checkoutSessionId) {
+		return `${base}/checkout/sessions/${input.checkoutSessionId}`;
+	}
+	return null;
 }

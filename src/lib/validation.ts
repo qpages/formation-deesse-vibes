@@ -23,10 +23,25 @@ export const adminLoginSchema = z.object({
 export const adminActionSchema = z.object({
 	enrollmentId: z.string().min(1),
 	action: z.enum([
+		'sync_payment',
+		'sync_yousign',
+		'retrigger_nda',
+		'retrigger_signature',
 		'relance_nda',
 		'recreate_nda',
-		'mark_rembourse',
-		'mark_acces_retire',
-		'retrigger_make',
+		'delete_nda',
+		'retrigger_teachizy',
 	]),
 });
+
+const adminSearchQuerySchema = z.string().trim().max(100);
+const adminPageSchema = z.coerce.number().int().min(1).max(10_000);
+
+export function parseAdminListQuery(params: URLSearchParams) {
+	const q = adminSearchQuerySchema.safeParse(params.get('q') ?? '');
+	const page = adminPageSchema.safeParse(params.get('page') ?? 1);
+	return {
+		q: q.success ? q.data : '',
+		page: page.success ? page.data : 1,
+	};
+}

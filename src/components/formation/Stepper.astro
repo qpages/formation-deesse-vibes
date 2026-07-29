@@ -12,17 +12,17 @@ const items: Array<{ key: StepKey; title: string; text: string }> = [
 	{
 		key: 'paiement',
 		title: 'Vous réglez en ligne',
-		text: 'Paiement sécurisé de 320 € TTC avec Stripe.',
+		text: 'Paiement sécurisé via la plateforme de paiement Stripe.',
 	},
 	{
 		key: 'nda',
 		title: 'Vous signez par e-mail',
-		text: 'Vous recevez votre accord de confidentialité à signer en ligne.',
+		text: 'Vous recevez votre accord de confidentialité à signer via Yousign, envoyée dès confirmation du paiement.',
 	},
 	{
 		key: 'acces',
 		title: 'Vous entrez dans la formation',
-		text: 'Votre invitation Teachizy arrive dès que la signature est confirmée.',
+		text: 'Votre invitation Teachizy avec vos identifiants vous est envoyée dès que la signature est confirmée.',
 	},
 ];
 
@@ -33,11 +33,6 @@ function tone(state: StepState) {
 	return 'neutral' as const;
 }
 
-function numberClass(state: StepState) {
-	if (state === 'termine') return 'text-sage';
-	if (state === 'action_requise' || state === 'en_cours') return 'text-blush-deep';
-	return 'text-gold';
-}
 ---
 
 <ol class="grid gap-10 md:grid-cols-3 md:gap-12">
@@ -47,10 +42,7 @@ function numberClass(state: StepState) {
 			return (
 				<li>
 					<span
-						class:list={[
-							'block font-display text-[2.75rem] leading-none tracking-tight',
-							numberClass(state),
-						]}
+						class="block font-display text-[2.75rem] leading-none tracking-tight text-ink"
 						aria-hidden="true"
 					>
 						{index + 1}

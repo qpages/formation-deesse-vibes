@@ -1,13 +1,17 @@
 ---
-import Button from '../ui/Button.astro';
 import { getEnv } from '../../lib/env';
 
+interface Props {
+	label?: string;
+}
+
+const { label = 'Contacter un administrateur' } = Astro.props;
 const email = getEnv().PUBLIC_ADMIN_CONTACT_EMAIL;
 ---
 
-<div>
-	<p class="mb-3 text-sm text-ink-soft">Besoin d’aide sur votre parcours ?</p>
-	<Button href={`mailto:${email}?subject=Formation%20Matrice%20Évolution`} variant="secondary" size="sm">
-		Contacter un administrateur
-	</Button>
-</div>
+<a
+	href={`mailto:${email}?subject=${encodeURIComponent('Formation Matrice Évolution')}`}
+	class="text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+>
+	{label}
+</a>

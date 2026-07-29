@@ -17,7 +17,6 @@ interface ImportMetaEnv {
 	readonly PAYLOAD_ENCRYPTION_KEY?: string;
 	readonly INNGEST_EVENT_KEY?: string;
 	readonly INNGEST_SIGNING_KEY?: string;
-	readonly MAKE_WEBHOOK_URL?: string;
 	readonly SLACK_WEBHOOK_URL?: string;
 	readonly ADMIN_EMAIL?: string;
 	readonly ADMIN_PASSWORD?: string;

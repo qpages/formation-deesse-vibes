@@ -3,29 +3,121 @@ import { cn } from '../../lib/cn';
 
 interface Props {
 	id: string;
-	title: string;
+	title?: string;
 	class?: string;
 }
 
-const { id, title, class: className } = Astro.props;
+const { id, title = '', class: className } = Astro.props;
 ---
 
 <dialog
 	id={id}
-	class={cn(
-		'w-[min(100%,28rem)] rounded-sm border border-ink/10 bg-surface p-6 text-ink shadow-[var(--shadow-soft)] backdrop:bg-ink/40',
-		className,
-	)}
+	class={cn('admin-dialog', className)}
+	aria-labelledby={`${id}-title`}
+	aria-describedby={`${id}-desc`}
 >
-	<form method="dialog" class="space-y-4">
-		<header class="flex items-start justify-between gap-4">
-			<h2 class="font-display text-2xl">{title}</h2>
-			<button type="submit" class="text-ink-soft hover:text-ink" aria-label="Fermer">
-				×
-			</button>
-		</header>
-		<div>
-			<slot />
+	<div class="admin-dialog__panel grain relative overflow-hidden">
+		<div
+			class="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-gold/50 to-transparent"
+			aria-hidden="true"
+		>
 		</div>
-	</form>
+
+		<header class="pr-8">
+			<p
+				data-dialog-eyebrow
+				class="text-[10px] font-medium uppercase tracking-[0.22em] text-gold"
+			>
+			</p>
+			<h2 id={`${id}-title`} data-dialog-title class="mt-2 font-display text-[1.85rem] leading-tight text-ink">
+				{title}
+			</h2>
+		</header>
+
+		<button
+			type="button"
+			data-dialog-close
+			class="absolute right-4 top-4 flex size-8 items-center justify-center text-ink/40 transition-colors hover:text-ink"
+			aria-label="Fermer"
+		>
+			<svg class="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+				<path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.25"></path>
+			</svg>
+		</button>
+
+		<p
+			id={`${id}-desc`}
+			data-dialog-description
+			class="mt-3 text-sm leading-relaxed text-ink-soft"
+		>
+			<slot />
+		</p>
+
+		<footer class="mt-8 flex flex-wrap items-center justify-end gap-2.5">
+			<slot name="footer" />
+		</footer>
+	</div>
 </dialog>
+
+<style>
+	.admin-dialog {
+		margin: auto;
+		max-width: calc(100% - 2rem);
+		width: min(100%, 26.5rem);
+		border: 0;
+		background: transparent;
+		padding: 0;
+		color: var(--color-ink);
+	}
+
+	.admin-dialog::backdrop {
+		background:
+			radial-gradient(ellipse 70% 50% at 50% 40%, rgb(26 20 16 / 0.35), rgb(26 20 16 / 0.55));
+		backdrop-filter: blur(4px);
+	}
+
+	.admin-dialog__panel {
+		border: 1px solid rgb(26 20 16 / 0.1);
+		background: var(--color-surface);
+		padding: 1.75rem 1.75rem 1.5rem;
+		box-shadow:
+			0 1px 0 rgb(255 255 255 / 0.65) inset,
+			var(--shadow-soft),
+			0 40px 80px rgb(26 20 16 / 0.14);
+	}
+
+	.admin-dialog[open] {
+		animation: dialog-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+	}
+
+	.admin-dialog[open]::backdrop {
+		animation: dialog-backdrop 0.32s ease both;
+	}
+
+	@keyframes dialog-rise {
+		from {
+			opacity: 0;
+			transform: translateY(14px) scale(0.985);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	@keyframes dialog-backdrop {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.admin-dialog[open],
+		.admin-dialog[open]::backdrop {
+			animation: none !important;
+		}
+	}
+</style>

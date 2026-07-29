@@ -1,9 +1,9 @@
 ---
 import type { Enrollment } from '../../generated/prisma/client';
-import { primaryAction, STATUS_LABELS } from '../../lib/status';
+import { primaryAction, statusMessage } from '../../lib/status';
 import Alert from '../ui/Alert.astro';
 import Button from '../ui/Button.astro';
-import StatusBadge from '../ui/StatusBadge.astro';
+import SignLinkCard from './SignLinkCard.astro';
 
 interface Props {
 	enrollment: Enrollment;
@@ -13,16 +13,17 @@ interface Props {
 
 const { enrollment, ndaSignUrl, flash } = Astro.props;
 const action = primaryAction(enrollment.status, ndaSignUrl);
+const message = statusMessage(enrollment.status);
+const panelTitle =
+	enrollment.status === 'teachizy_envoye' ? 'Accès prêt' : 'Votre inscription';
 const canResend =
 	enrollment.status === 'nda_envoye' || enrollment.status === 'paiement_confirme';
+const showSignCard = Boolean(ndaSignUrl);
 ---
 
-<div class="space-y-6 border-t border-ink/15 pt-8">
+<div class="space-y-6">
 	<div class="flex flex-wrap items-center gap-3">
-		<p class="font-display text-3xl text-ink">Votre inscription</p>
-		<StatusBadge tone={enrollment.status === 'invitation_envoyee' ? 'success' : 'progress'}>
-			{STATUS_LABELS[enrollment.status]}
-		</StatusBadge>
+		<h3 class="font-display text-3xl text-ink">{panelTitle}</h3>
 	</div>
 
 	{
@@ -34,39 +35,27 @@ const canResend =
 	{
 		enrollment.status === 'paiement_en_attente' && enrollment.stripeCheckoutSessionId && (
 			<p class="text-ink-soft">
-				Paiement en cours de confirmation. Cette page se mettra à jour automatiquement —
-				vous pouvez aussi consulter vos e-mails dans un instant.
+				Paiement en cours de confirmation. Rechargez cette page dans un instant.
 			</p>
 		)
 	}
 	{
-		enrollment.status === 'paiement_confirme' && (
+		enrollment.status === 'paiement_confirme' && !showSignCard && (
 			<p class="text-ink-soft">
-				Paiement confirmé. Votre accord de confidentialité arrive par e-mail sous peu.
+				Paiement confirmé. Votre lien de signature apparaît ici dès qu’il est prêt —
+				rechargez la page dans un instant.
 			</p>
 		)
 	}
 	{
-		enrollment.status === 'nda_envoye' && (
+		enrollment.status === 'nda_envoye' && !showSignCard && (
 			<p class="text-ink-soft">
-				Il ne reste plus qu’à signer votre accord pour débloquer vos accès Teachizy.
+				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page
+				ou contactez un administrateur.
 			</p>
 		)
 	}
-	{
-		enrollment.status === 'nda_signe' && (
-			<p class="text-ink-soft">
-				Accord reçu. Votre invitation Teachizy est en cours d’envoi — consultez vos e-mails.
-			</p>
-		)
-	}
-	{
-		enrollment.status === 'invitation_envoyee' && (
-			<p class="text-ink-soft">
-				Vos accès ont été envoyés. Ouvrez l’e-mail Teachizy pour commencer la formation.
-			</p>
-		)
-	}
+	{message && <p class="text-ink-soft">{message}</p>}
 	{
 		(enrollment.status === 'rembourse' || enrollment.status === 'acces_retire') && (
 			<Alert variant="info">
@@ -75,31 +64,42 @@ const canResend =
 		)
 	}
 
-	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-		{
-			action.kind === 'sign_nda' && (
-				<Button href={action.href} size="lg">{action.label}</Button>
-			)
-		}
-		{
-			action.kind === 'check_email' && (
-				<Button href={`mailto:${enrollment.email}`} size="lg" variant="primary">
-					{action.label}
-				</Button>
-			)
-		}
-		{
-			canResend && (
-				<button
-					id="resend-nda"
-					type="button"
-					class="text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
-				>
-					Renvoyer l’accord de confidentialité
-				</button>
-			)
-		}
-	</div>
+	{showSignCard && ndaSignUrl && <SignLinkCard signUrl={ndaSignUrl} />}
+
+	{
+		!showSignCard && (
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+				{action.kind === 'refresh' && (
+					<Button href="/" size="lg" variant="primary">
+						{action.label}
+					</Button>
+				)}
+				{action.kind === 'open_platform' && (
+					<Button
+						href={action.href}
+						size="lg"
+						variant="primary"
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						{action.label}
+					</Button>
+				)}
+			</div>
+		)
+	}
+
+	{
+		canResend && (
+			<button
+				id="resend-nda"
+				type="button"
+				class="text-sm text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+			>
+				Renvoyer l’accord de confidentialité
+			</button>
+		)
+	}
 	<p id="resend-feedback" class="hidden text-sm text-ink-soft"></p>
 </div>
 

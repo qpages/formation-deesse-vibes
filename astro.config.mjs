@@ -7,6 +7,9 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
 	output: 'server',
 	adapter: vercel(),
+	server: {
+		allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.io'],
+	},
 	vite: {
 		plugins: [tailwindcss()],
 	},

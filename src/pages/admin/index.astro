@@ -1,14 +1,17 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import Button from '../../components/ui/Button.astro';
-import StatusBadge from '../../components/ui/StatusBadge.astro';
+import Dialog from '../../components/ui/Dialog.astro';
+import SearchBar from '../../components/admin/SearchBar.astro';
+import Pagination from '../../components/admin/Pagination.astro';
+import EnrollmentList from '../../components/admin/EnrollmentList.astro';
 import {
 	ADMIN_COOKIE,
 	parseCookie,
 	verifyAdminSessionToken,
 } from '../../lib/auth/session';
-import { getPrisma } from '../../lib/db';
-import { STATUS_LABELS } from '../../lib/status';
+import { listAdminEnrollments } from '../../lib/admin/enrollments';
+import { parseAdminListQuery } from '../../lib/validation';
 
 export const prerender = false;
 
@@ -19,111 +22,289 @@ if (!adminEmail) {
 	return Astro.redirect('/admin/login');
 }
 
-const enrollments = await getPrisma().enrollment.findMany({
-	orderBy: { createdAt: 'desc' },
-	take: 200,
-});
+const { q, page } = parseAdminListQuery(Astro.url.searchParams);
+const list = await listAdminEnrollments({ q, page });
+
+const summary =
+	list.total === 0
+		? q
+			? `Aucun résultat pour « ${q} »`
+			: 'Aucune inscription'
+		: q
+			? `${list.from}–${list.to} sur ${list.total} pour « ${q} »`
+			: `${list.from}–${list.to} sur ${list.total} clients`;
 ---
 
 <AdminLayout title="Inscriptions" email={adminEmail}>
-	<div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+	<div class="mb-6 flex flex-wrap items-end justify-between gap-4">
 		<div>
 			<h1 class="font-display text-4xl text-ink">Inscriptions</h1>
-			<p class="mt-2 text-sm text-ink-soft">{enrollments.length} dossier(s) récents</p>
+			<p class="mt-2 text-sm text-ink-soft">{summary}</p>
 		</div>
 		<Button href="/api/admin/export" variant="secondary" size="sm">Export CSV</Button>
 	</div>
 
-	<div class="overflow-x-auto">
-		<table class="w-full min-w-[720px] text-left text-sm">
-			<thead class="border-b border-ink/15 text-xs uppercase tracking-[0.12em] text-ink-soft">
-				<tr>
-					<th class="py-3 pr-4 font-medium">Personne</th>
-					<th class="py-3 pr-4 font-medium">État</th>
-					<th class="py-3 pr-4 font-medium">Créé</th>
-					<th class="py-3 font-medium">Actions</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y divide-ink/10">
-				{
-					enrollments.map((row) => (
-						<tr>
-							<td class="py-4 pr-4 align-top">
-								<p class="font-medium text-ink">
-									{row.firstName} {row.lastName}
-								</p>
-								<p class="text-ink-soft">{row.email}</p>
-								<p class="mt-1 font-mono text-[11px] text-ink/50">{row.id}</p>
-							</td>
-							<td class="py-4 pr-4 align-top">
-								<StatusBadge>{STATUS_LABELS[row.status]}</StatusBadge>
-							</td>
-							<td class="py-4 pr-4 align-top text-ink-soft">
-								{row.createdAt.toLocaleString('fr-FR')}
-							</td>
-							<td class="py-4 align-top">
-								<div class="flex flex-wrap gap-2" data-enrollment={row.id}>
-									<button
-										type="button"
-										data-action="relance_nda"
-										class="text-xs underline underline-offset-2 hover:text-blush-deep"
-									>
-										Relancer NDA
-									</button>
-									<button
-										type="button"
-										data-action="recreate_nda"
-										class="text-xs underline underline-offset-2 hover:text-blush-deep"
-									>
-										Recréer NDA
-									</button>
-									<button
-										type="button"
-										data-action="retrigger_make"
-										class="text-xs underline underline-offset-2 hover:text-blush-deep"
-									>
-										Relancer Make
-									</button>
-									<button
-										type="button"
-										data-action="mark_rembourse"
-										class="text-xs underline underline-offset-2 hover:text-blush-deep"
-									>
-										Remboursé
-									</button>
-									<button
-										type="button"
-										data-action="mark_acces_retire"
-										class="text-xs underline underline-offset-2 hover:text-blush-deep"
-									>
-										Retrait accès
-									</button>
-								</div>
-							</td>
-						</tr>
-					))
-				}
-			</tbody>
-		</table>
+	<div class="mb-6">
+		<SearchBar q={list.q} />
 	</div>
+
+	{
+		list.rows.length === 0 ? (
+			<p class="border border-dashed border-ink/15 px-4 py-10 text-center text-sm text-ink-soft">
+				{q
+					? 'Aucune inscription ne correspond à cette recherche.'
+					: 'Les inscriptions apparaîtront ici.'}
+			</p>
+		) : (
+			<>
+				<EnrollmentList rows={list.rows} />
+				<Pagination
+					class="mt-6"
+					q={list.q}
+					page={list.page}
+					totalPages={list.totalPages}
+					hasPrev={list.hasPrev}
+					hasNext={list.hasNext}
+				/>
+			</>
+		)
+	}
+
+	<Dialog id="admin-action-dialog" title="Confirmer l’action">
+		<Button slot="footer" type="button" variant="secondary" size="sm" id="admin-dialog-cancel">
+			Annuler
+		</Button>
+		<Button slot="footer" type="button" variant="primary" size="sm" id="admin-dialog-confirm">
+			Confirmer
+		</Button>
+	</Dialog>
 </AdminLayout>
 
 <script>
-	document.querySelectorAll('[data-action]').forEach((btn) => {
-		btn.addEventListener('click', async () => {
-			const action = btn.getAttribute('data-action');
-			const wrap = btn.closest('[data-enrollment]');
-			const enrollmentId = wrap?.getAttribute('data-enrollment');
-			if (!action || !enrollmentId) return;
-			if (!confirm(`Confirmer l’action « ${action} » ?`)) return;
+	type ActionKey =
+		| 'sync_payment'
+		| 'sync_yousign'
+		| 'retrigger_nda'
+		| 'retrigger_signature'
+		| 'relance_nda'
+		| 'recreate_nda'
+		| 'delete_nda'
+		| 'retrigger_teachizy';
+
+	const ACTION_META: Record<
+		ActionKey,
+		{ eyebrow: string; title: string; description: (name: string) => string; confirm: string; danger?: boolean }
+	> = {
+		sync_payment: {
+			eyebrow: 'Paiement',
+			title: 'Synchroniser le paiement',
+			description: (name) =>
+				`Vérifier la session Stripe de ${name} et passer le statut à « paiement confirmé » si le paiement est bien abouti (puis déclencher le NDA).`,
+			confirm: 'Synchroniser',
+		},
+		sync_yousign: {
+			eyebrow: 'Dev',
+			title: 'Synchroniser Yousign',
+			description: (name) =>
+				`Lire le statut de la demande Yousign de ${name} et aligner yousignStatus en base. Ne change pas le statut métier ni ne déclenche Teachizy.`,
+			confirm: 'Synchroniser',
+		},
+		retrigger_nda: {
+			eyebrow: 'Signature',
+			title: 'Déclencher création NDA (Inngest)',
+			description: (name) =>
+				`Envoyer l’event Inngest stripe/payment.confirmed pour ${name} (création Yousign + e-mail). Utile si le job a raté après un paiement déjà confirmé.`,
+			confirm: 'Déclencher Inngest',
+		},
+		retrigger_signature: {
+			eyebrow: 'Dev',
+			title: 'Déclencher invitation Teachizy (Inngest)',
+			description: (name) =>
+				`Envoyer l’event Inngest yousign/signature.done pour ${name} (invitation Teachizy). Utile si le job a raté après une signature déjà faite.`,
+			confirm: 'Déclencher Inngest',
+		},
+		relance_nda: {
+			eyebrow: 'Signature',
+			title: 'Relancer le NDA',
+			description: (name) =>
+				`Renvoyer un e-mail de relance à ${name} et réactiver le lien de signature YouSign.`,
+			confirm: 'Envoyer la relance',
+		},
+		recreate_nda: {
+			eyebrow: 'Signature',
+			title: 'Recréer le NDA',
+			description: (name) =>
+				`Créer une nouvelle demande YouSign pour ${name} et remplacer le lien actuel. L’ancien lien ne sera plus valide.`,
+			confirm: 'Recréer le NDA',
+			danger: true,
+		},
+		delete_nda: {
+			eyebrow: 'Dev',
+			title: 'Supprimer le NDA',
+			description: (name) =>
+				`Effacer les IDs YouSign de ${name} en base (local uniquement) et revenir à « paiement confirmé ». Permet de retester [dev] Trigger Inngest.`,
+			confirm: 'Supprimer le NDA',
+			danger: true,
+		},
+		retrigger_teachizy: {
+			eyebrow: 'Dev',
+			title: 'Renvoyer le lien Teachizy',
+			description: (name) =>
+				`Appeler l’API Teachizy pour renvoyer l’invitation à ${name}. Si c’est la 1ère fois : pose le statut « accès envoyés ». Sinon : ne touche pas teachizyInvitedAt (audit via AdminAction).`,
+			confirm: 'Renvoyer le lien',
+		},
+	};
+
+	const dialog = document.getElementById('admin-action-dialog') as HTMLDialogElement | null;
+	const eyebrowEl = dialog?.querySelector<HTMLElement>('[data-dialog-eyebrow]');
+	const titleEl = dialog?.querySelector<HTMLElement>('[data-dialog-title]');
+	const descEl = dialog?.querySelector<HTMLElement>('[data-dialog-description]');
+	const confirmBtn = document.getElementById('admin-dialog-confirm') as HTMLButtonElement | null;
+	const cancelBtn = document.getElementById('admin-dialog-cancel') as HTMLButtonElement | null;
+	const closeBtn = dialog?.querySelector<HTMLButtonElement>('[data-dialog-close]');
+
+	dialog?.addEventListener('cancel', (event) => {
+		if (busy) event.preventDefault();
+	});
+
+	const confirmBtnBase =
+		'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush disabled:pointer-events-none disabled:opacity-50 h-10 px-4 text-sm text-mist';
+	const confirmBtnPrimary = `${confirmBtnBase} bg-ink hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]`;
+	const confirmBtnDanger = `${confirmBtnBase} bg-blush-deep hover:bg-blush`;
+
+	let busy = false;
+	let pendingConfirmLabel = 'Confirmer';
+
+	function toast(message: string, variant: 'success' | 'error' | 'info' = 'info') {
+		window.toast?.(message, variant);
+	}
+
+	function setBusy(next: boolean) {
+		busy = next;
+		if (confirmBtn) {
+			confirmBtn.disabled = next;
+			confirmBtn.textContent = next ? 'En cours…' : pendingConfirmLabel;
+		}
+		if (cancelBtn) cancelBtn.disabled = next;
+		if (closeBtn) closeBtn.disabled = next;
+	}
+
+	function closeDialog() {
+		dialog?.close();
+		setBusy(false);
+	}
+
+	function askConfirm(action: ActionKey, name: string): Promise<boolean> {
+		const meta = ACTION_META[action];
+		if (!dialog || !meta) return Promise.resolve(false);
+
+		pendingConfirmLabel = meta.confirm;
+		if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow;
+		if (titleEl) titleEl.textContent = meta.title;
+		if (descEl) descEl.textContent = meta.description(name || 'cette personne');
+		if (confirmBtn) {
+			confirmBtn.textContent = meta.confirm;
+			confirmBtn.className = meta.danger ? confirmBtnDanger : confirmBtnPrimary;
+		}
+
+		setBusy(false);
+		dialog.showModal();
+		confirmBtn?.focus();
+
+		return new Promise((resolve) => {
+			let settled = false;
+
+			const finish = (value: boolean) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				if (!value && dialog.open) dialog.close();
+				resolve(value);
+			};
+
+			const onConfirm = () => {
+				if (busy) return;
+				finish(true);
+			};
+			const onCancel = () => {
+				if (busy) return;
+				finish(false);
+			};
+			const onClose = () => finish(false);
+
+			const cleanup = () => {
+				confirmBtn?.removeEventListener('click', onConfirm);
+				cancelBtn?.removeEventListener('click', onCancel);
+				closeBtn?.removeEventListener('click', onCancel);
+				dialog.removeEventListener('click', onBackdrop);
+				dialog.removeEventListener('close', onClose);
+			};
+
+			const onBackdrop = (event: MouseEvent) => {
+				if (busy) return;
+				if (event.target === dialog) finish(false);
+			};
+
+			confirmBtn?.addEventListener('click', onConfirm);
+			cancelBtn?.addEventListener('click', onCancel);
+			closeBtn?.addEventListener('click', onCancel);
+			dialog.addEventListener('click', onBackdrop);
+			dialog.addEventListener('close', onClose);
+		});
+	}
+
+	async function runAdminAction(enrollmentId: string, action: string, name: string) {
+		if (!(action in ACTION_META)) return false;
+
+		const confirmed = await askConfirm(action as ActionKey, name);
+		if (!confirmed) return false;
+
+		setBusy(true);
+
+		try {
 			const res = await fetch('/api/admin/action', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ enrollmentId, action }),
 			});
 			const json = await res.json();
-			alert(res.ok ? 'Action effectuée.' : json.error || 'Échec');
-			if (res.ok) location.reload();
+
+			closeDialog();
+
+			if (res.ok) {
+				toast('Action effectuée.', 'success');
+				window.setTimeout(() => location.reload(), 700);
+				return true;
+			}
+
+			toast(json.error || 'Échec de l’action.', 'error');
+			return false;
+		} catch {
+			closeDialog();
+			toast('Erreur réseau. Réessayez.', 'error');
+			return false;
+		}
+	}
+
+	document.querySelectorAll('[data-action]').forEach((btn) => {
+		btn.addEventListener('click', async () => {
+			const action = btn.getAttribute('data-action');
+			const wrap = btn.closest('[data-enrollment]');
+			const enrollmentId = wrap?.getAttribute('data-enrollment');
+			const name = wrap?.getAttribute('data-name') ?? '';
+			if (!action || !enrollmentId) return;
+			await runAdminAction(enrollmentId, action, name);
+		});
+	});
+
+	document.querySelectorAll<HTMLSelectElement>('[data-action-select]').forEach((select) => {
+		select.addEventListener('change', async () => {
+			const action = select.value;
+			const enrollmentId = select.getAttribute('data-enrollment');
+			const name = select.getAttribute('data-name') ?? '';
+			if (!action || !enrollmentId) return;
+			const ok = await runAdminAction(enrollmentId, action, name);
+			if (!ok) select.value = '';
 		});
 	});
 </script>

@@ -1,13 +1,17 @@
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
-import { inngest } from '../../../lib/inngest/client';
-import { getPrisma } from '../../../lib/db';
 import {
 	recordProcessedEvent,
-	transitionStatus,
+	releaseProcessedEvent,
 } from '../../../lib/services/enrollment';
+import { confirmPaidCheckout } from '../../../lib/services/payment';
 import { alertFinalFailure } from '../../../lib/services/slack';
-import { assertPriceMatches, constructStripeEvent } from '../../../lib/services/stripe';
+import { constructStripeEvent } from '../../../lib/services/stripe';
+
+const PAID_CHECKOUT_EVENTS = new Set([
+	'checkout.session.completed',
+	'checkout.session.async_payment_succeeded',
+]);
 
 export const POST: APIRoute = async ({ request }) => {
 	const signature = request.headers.get('stripe-signature');
@@ -39,8 +43,16 @@ export const POST: APIRoute = async ({ request }) => {
 	}
 
 	try {
-		if (event.type === 'checkout.session.completed') {
-			await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, event.id);
+		if (PAID_CHECKOUT_EVENTS.has(event.type)) {
+			const session = event.data.object as Stripe.Checkout.Session;
+			const result = await confirmPaidCheckout(session, { stripeEventId: event.id });
+			if (!result.ok && result.reason.startsWith('payment_status=')) {
+				// Paiement différé — attendre async_payment_succeeded
+				return json({ received: true, deferred: true });
+			}
+			if (!result.ok) {
+				throw new Error(result.reason);
+			}
 		} else if (
 			event.type === 'charge.dispute.created' ||
 			event.type === 'charge.dispute.funds_withdrawn'
@@ -49,72 +61,28 @@ export const POST: APIRoute = async ({ request }) => {
 		}
 	} catch (error) {
 		console.error('[stripe webhook] handler', error);
+		await releaseProcessedEvent('stripe', event.id);
 		await alertFinalFailure({
 			title: `Erreur traitement Stripe ${event.type}`,
 			error: error instanceof Error ? error.message : String(error),
 		});
+		return new Response('Webhook handler failed', { status: 500 });
 	}
 
-	return new Response(JSON.stringify({ received: true }), {
-		status: 200,
-		headers: { 'Content-Type': 'application/json' },
-	});
+	return json({ received: true });
 };
-
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session, eventId: string) {
-	await assertPriceMatches(session);
-
-	const enrollmentId =
-		session.metadata?.enrollmentId ?? session.client_reference_id ?? undefined;
-	if (!enrollmentId) {
-		throw new Error('checkout.session.completed sans enrollmentId');
-	}
-
-	const prisma = getPrisma();
-	const enrollment = await prisma.enrollment.findUnique({ where: { id: enrollmentId } });
-	if (!enrollment) {
-		throw new Error(`Enrollment introuvable: ${enrollmentId}`);
-	}
-
-	await recordProcessedEvent({
-		provider: 'stripe',
-		eventId: `${eventId}:link`,
-		enrollmentId,
-		payload: { sessionId: session.id },
-	});
-
-	const paymentIntentId =
-		typeof session.payment_intent === 'string'
-			? session.payment_intent
-			: session.payment_intent?.id;
-
-	const transitioned = await transitionStatus(
-		enrollmentId,
-		'paiement_en_attente',
-		'paiement_confirme',
-		{
-			stripeCheckoutSessionId: session.id,
-			stripePaymentIntentId: paymentIntentId,
-			stripeCustomerId:
-				typeof session.customer === 'string' ? session.customer : session.customer?.id,
-		},
-	);
-
-	if (!transitioned && enrollment.status !== 'paiement_en_attente') {
-		// Déjà traité — idempotent
-		return;
-	}
-
-	await inngest.send({
-		name: 'stripe/payment.confirmed',
-		data: { enrollmentId, stripeEventId: eventId },
-	});
-}
 
 async function handleDispute(event: Stripe.Event) {
 	const dispute = event.data.object as Stripe.Dispute;
 	await alertFinalFailure({
 		title: 'Litige Stripe — décision manuelle requise',
 		error: `Dispute ${dispute.id} — statut ${dispute.status}`,
+	});
+}
+
+function json(data: unknown, status = 200) {
+	return new Response(JSON.stringify(data), {
+		status,
+		headers: { 'Content-Type': 'application/json' },
 	});
 }

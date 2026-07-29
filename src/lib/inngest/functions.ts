@@ -1,14 +1,36 @@
 import { getPrisma } from '../db';
 import { alertFinalFailure } from '../services/slack';
-import { triggerTeachizyInvite } from '../services/make';
+import { inviteToTeachizy } from '../services/teachizy';
 import {
 	purgeOldWebhookPayloads,
 	transitionStatus,
 } from '../services/enrollment';
-import { sendNdaReminderEmail } from '../services/resend';
-import { createNdaFromTemplate } from '../services/yousign';
+import {
+	activateNdaRequest,
+	createNdaDraft,
+	isNdaFullyProvisioned,
+} from '../services/yousign';
 import { inngest } from './client';
 
+/**
+ * Fonction Inngest : Création du NDA Yousign après paiement confirmé
+ *
+ * **Trigger:** Event `stripe/payment.confirmed`
+ *
+ * **Flow:**
+ * 1. Charge l'inscription depuis la base de données
+ * 2. Skip si NDA déjà activé (requestId + signerId)
+ * 3. Skip si status incompatible
+ * 4. Crée un brouillon Yousign (ou reprend l'ID déjà persisté)
+ * 5. Persiste yousignRequestId avant activate (idempotence retries)
+ * 6. Active la demande (e-mail Yousign) — no-op si déjà hors draft
+ * 7. Persiste signerId + statut métier
+ *
+ * **Retries:** 5 tentatives avec backoff exponentiel
+ * **Échec final:** Alerte Slack envoyée
+ *
+ * @see docs/overview.md#inngest
+ */
 export const createNdaAfterPayment = inngest.createFunction(
 	{
 		id: 'create-nda-after-payment',
@@ -30,7 +52,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 			return getPrisma().enrollment.findUniqueOrThrow({ where: { id: enrollmentId } });
 		});
 
-		if (enrollment.yousignRequestId) {
+		if (isNdaFullyProvisioned(enrollment)) {
 			return { skipped: true, reason: 'nda_already_created' };
 		}
 
@@ -41,13 +63,29 @@ export const createNdaAfterPayment = inngest.createFunction(
 			return { skipped: true, reason: `status_${enrollment.status}` };
 		}
 
-		const nda = await step.run('create-yousign-request', async () => {
-			return createNdaFromTemplate({
-				enrollmentId: enrollment.id,
-				email: enrollment.email,
-				firstName: enrollment.firstName,
-				lastName: enrollment.lastName,
+		const requestId =
+			enrollment.yousignRequestId ??
+			(await step.run('create-yousign-draft', async () => {
+				const draft = await createNdaDraft({
+					enrollmentId: enrollment.id,
+					email: enrollment.email,
+					firstName: enrollment.firstName,
+					lastName: enrollment.lastName,
+				});
+				return draft.requestId;
+			}));
+
+		if (!enrollment.yousignRequestId) {
+			await step.run('persist-yousign-draft-id', async () => {
+				await getPrisma().enrollment.update({
+					where: { id: enrollment.id },
+					data: { yousignRequestId: requestId },
+				});
 			});
+		}
+
+		const nda = await step.run('activate-yousign-request', async () => {
+			return activateNdaRequest(requestId);
 		});
 
 		await step.run('persist-nda', async () => {
@@ -56,25 +94,34 @@ export const createNdaAfterPayment = inngest.createFunction(
 				data: {
 					yousignRequestId: nda.requestId,
 					yousignSignerId: nda.signerId,
+					yousignStatus: 'ongoing',
 					status: 'nda_envoye',
 				},
 			});
 		});
 
-		if (nda.signatureLink) {
-			await step.run('email-nda-link', async () => {
-				await sendNdaReminderEmail({
-					to: enrollment.email,
-					firstName: enrollment.firstName,
-					signUrl: nda.signatureLink!,
-				});
-			});
-		}
-
 		return { requestId: nda.requestId };
 	},
 );
 
+/**
+ * Fonction Inngest : Invitation Teachizy après signature du NDA
+ *
+ * **Trigger:** Event `yousign/signature.done`
+ *
+ * **Flow:**
+ * 1. Charge l'inscription depuis la base de données
+ * 2. Skip si déjà invité (idempotence)
+ * 3. Marque le NDA comme signé (transition status)
+ * 4. Crée le compte apprenant sur Teachizy
+ * 5. Inscrit à la formation
+ * 6. Marque l'inscription comme complétée
+ *
+ * **Retries:** 5 tentatives avec backoff exponentiel
+ * **Échec final:** Alerte Slack envoyée
+ *
+ * @see docs/overview.md#inngest
+ */
 export const inviteAfterNdaSigned = inngest.createFunction(
 	{
 		id: 'invite-after-nda-signed',
@@ -83,7 +130,7 @@ export const inviteAfterNdaSigned = inngest.createFunction(
 		onFailure: async ({ event, error }) => {
 			const original = event.data as { event?: { data?: { enrollmentId?: string } } };
 			await alertFinalFailure({
-				title: 'Échec définitif invitation Teachizy (Make)',
+				title: 'Échec définitif invitation Teachizy',
 				enrollmentId: original.event?.data?.enrollmentId,
 				error: error.message,
 			});
@@ -96,7 +143,7 @@ export const inviteAfterNdaSigned = inngest.createFunction(
 			return getPrisma().enrollment.findUniqueOrThrow({ where: { id: enrollmentId } });
 		});
 
-		if (enrollment.makeWebhookSentAt || enrollment.status === 'invitation_envoyee') {
+		if (enrollment.teachizyInvitedAt || enrollment.status === 'teachizy_envoye') {
 			return { skipped: true, reason: 'already_invited' };
 		}
 
@@ -104,13 +151,12 @@ export const inviteAfterNdaSigned = inngest.createFunction(
 			await transitionStatus(enrollment.id, ['nda_envoye', 'paiement_confirme'], 'nda_signe');
 		});
 
-		await step.run('trigger-make', async () => {
-			await triggerTeachizyInvite({
+		await step.run('invite-teachizy', async () => {
+			await inviteToTeachizy({
 				enrollmentId: enrollment.id,
 				email: enrollment.email,
 				firstName: enrollment.firstName,
 				lastName: enrollment.lastName,
-				yousignRequestId: requestId,
 			});
 		});
 
@@ -118,8 +164,7 @@ export const inviteAfterNdaSigned = inngest.createFunction(
 			await getPrisma().enrollment.update({
 				where: { id: enrollment.id },
 				data: {
-					status: 'invitation_envoyee',
-					makeWebhookSentAt: new Date(),
+					status: 'teachizy_envoye',
 					teachizyInvitedAt: new Date(),
 				},
 			});
@@ -129,6 +174,23 @@ export const inviteAfterNdaSigned = inngest.createFunction(
 	},
 );
 
+/**
+ * Fonction Inngest : Purge des anciens payloads webhook
+ *
+ * **Trigger:** Cron `0 3 * * *` (tous les jours à 3h du matin)
+ *
+ * **Flow:**
+ * 1. Supprime tous les WebhookEvent de plus de 90 jours
+ *
+ * **Objectif:**
+ * - Maintenance de la base de données
+ * - Conformité RGPD (rétention limitée)
+ *
+ * **Retries:** 3 tentatives par défaut
+ * **Échec final:** Log uniquement (non critique)
+ *
+ * @see docs/overview.md#inngest
+ */
 export const purgeWebhookPayloads = inngest.createFunction(
 	{
 		id: 'purge-webhook-payloads',
