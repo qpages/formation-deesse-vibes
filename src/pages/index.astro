@@ -133,11 +133,11 @@ const sectionDescription = 'Suivez votre parcours en temps réel : paiement, sig
 ---
 
 <MarketingLayout>
-	<Hero showCta={!showTracking} ctaHref="#acces" />
+	<Hero showJoinCta={!showTracking} ctaHref="#acces" />
 
 	<Section
 		id="acces"
-		eyebrow={showTracking ? undefined : 'Accès'}
+		eyebrow="Accès"
 		title="Comment ça fonctionne ?"
 		description={sectionDescription}
 		class="border-b border-ink/8"

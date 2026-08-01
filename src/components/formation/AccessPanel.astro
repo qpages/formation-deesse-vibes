@@ -2,7 +2,6 @@
 import type { Enrollment } from '../../generated/prisma/client';
 import type { StepKey, StepState } from '../../lib/status';
 import Alert from '../ui/Alert.astro';
-import AccessSteps from './AccessSteps.astro';
 import CheckoutForm from './CheckoutForm.astro';
 import ContactAdmin from './ContactAdmin.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
@@ -38,7 +37,7 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 	showFunnel ? (
 		<div id="access-funnel" class="space-y-8">
 			<div>
-				<AccessSteps />
+				<Stepper />
 			</div>
 
 			{(flash || checkoutCancel) && (
@@ -52,7 +51,7 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 				</div>
 			)}
 
-			<div>
+			<div class="border-t border-ink/10 pt-8">
 				<h3 class="mb-5 font-display text-3xl text-ink">Démarrer ma formation</h3>
 				<div
 					class="inline-flex rounded-sm border border-ink/15 p-1"
@@ -130,49 +129,28 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 
 					<div class="border-t border-ink/10 pt-8">
 						<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} flash={flash} />
-						{enrollment.status === 'teachizy_envoye' ? (
-							<div class="mt-6">
-								<p class="text-xs text-ink-soft">
-									Session :{' '}
-									<span class="text-ink/80">
-										{enrollment.firstName} {enrollment.lastName}
-									</span>
-									{' · '}
-									<button
-										type="button"
-										id="clear-session"
-										class="underline-offset-4 hover:text-ink hover:underline"
-									>
-										Ce n’est pas moi
-									</button>
-									{' · '}
-									<ContactAdmin label="Aide" />
-								</p>
+						<div class="mt-6">
+							<p class="text-sm text-ink-soft">
+								Connecté·e en tant que{' '}
+								<span class="font-medium text-ink">
+									{enrollment.firstName} {enrollment.lastName}
+								</span>{' '}
+								({enrollment.email})
+							</p>
+							<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+								<button
+									type="button"
+									id="clear-session"
+									class="underline-offset-4 hover:text-ink hover:underline"
+								>
+									Ce n’est pas moi
+								</button>
+								<span class="text-ink/25" aria-hidden="true">
+									·
+								</span>
+								<ContactAdmin />
 							</div>
-						) : (
-							<div class="mt-6">
-								<p class="text-sm text-ink-soft">
-									Connecté·e en tant que{' '}
-									<span class="font-medium text-ink">
-										{enrollment.firstName} {enrollment.lastName}
-									</span>{' '}
-									({enrollment.email})
-								</p>
-								<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
-									<button
-										type="button"
-										id="clear-session"
-										class="underline-offset-4 hover:text-ink hover:underline"
-									>
-										Ce n’est pas moi
-									</button>
-									<span class="text-ink/25" aria-hidden="true">
-										·
-									</span>
-									<ContactAdmin />
-								</div>
-							</div>
-						)}
+						</div>
 					</div>
 				</>
 			)}

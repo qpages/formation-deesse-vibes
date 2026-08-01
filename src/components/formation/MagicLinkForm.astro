@@ -9,7 +9,9 @@ import Input from '../ui/Input.astro';
 	<FormField label="Votre e-mail d’inscription" name="magicEmail">
 		<Input type="email" name="magicEmail" required autocomplete="email" />
 	</FormField>
-	<Button type="submit" variant="secondary" id="magic-submit">Retrouver mon inscription</Button>
+	<Button type="submit" variant="primary" size="lg" id="magic-submit">
+		Retrouver mon inscription
+	</Button>
 	<div id="magic-feedback" class="hidden">
 		<Alert variant="error"><span id="magic-feedback-text"></span></Alert>
 	</div>

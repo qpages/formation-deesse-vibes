@@ -3,26 +3,28 @@ import StatusBadge from '../ui/StatusBadge.astro';
 import { stepLabel, type StepKey, type StepState } from '../../lib/status';
 
 interface Props {
-	steps: Record<StepKey, StepState>;
+	/** Absent = mode marketing (sans badges). Présent = suivi d’inscription. */
+	steps?: Record<StepKey, StepState>;
 }
 
 const { steps } = Astro.props;
+const showBadges = Boolean(steps);
 
 const items: Array<{ key: StepKey; title: string; text: string }> = [
 	{
 		key: 'paiement',
-		title: 'Vous réglez en ligne',
-		text: 'Paiement sécurisé via la plateforme de paiement Stripe.',
+		title: 'Vous payez en ligne',
+		text: 'Règlement sécurisé via la plateforme de paiement Stripe.',
 	},
 	{
 		key: 'nda',
-		title: 'Vous signez par e-mail',
-		text: 'Vous recevez votre accord de confidentialité à signer via Yousign, envoyée dès confirmation du paiement.',
+		title: 'Vous signez l’accord par e-mail',
+		text: 'Signature électronique de l’accord de confidentialité via Yousign, envoyée dès confirmation du paiement.',
 	},
 	{
 		key: 'acces',
-		title: 'Vous entrez dans la formation',
-		text: 'Votre invitation Teachizy avec vos identifiants vous est envoyée dès que la signature est confirmée.',
+		title: 'Vous recevez vos accès Teachizy',
+		text: 'L’invitation Teachizy avec vos identifiants vous est envoyée dès que la signature est confirmée.',
 	},
 ];
 
@@ -32,26 +34,27 @@ function tone(state: StepState) {
 	if (state === 'en_cours') return 'progress' as const;
 	return 'neutral' as const;
 }
-
 ---
 
-<ol class="grid gap-10 md:grid-cols-3 md:gap-12">
+<ol class="grid gap-10 sm:grid-cols-3 sm:gap-12">
 	{
 		items.map((item, index) => {
-			const state = steps[item.key];
+			const state = steps?.[item.key];
 			return (
 				<li>
 					<span
-						class="block font-display text-[2.75rem] leading-none tracking-tight text-ink"
+						class="block font-display text-[2.75rem] leading-none tracking-tight text-gold"
 						aria-hidden="true"
 					>
 						{index + 1}
 					</span>
 					<div class="mt-4 border-t border-ink/12 pt-4">
-						<div class="mb-3">
-							<StatusBadge tone={tone(state)}>{stepLabel(state)}</StatusBadge>
-						</div>
-						<h3 class="font-display text-2xl leading-snug text-ink">{item.title}</h3>
+						{showBadges && state && (
+							<div class="mb-3">
+								<StatusBadge tone={tone(state)}>{stepLabel(state)}</StatusBadge>
+							</div>
+						)}
+						<h3 class="font-display text-xl leading-snug text-ink sm:text-2xl">{item.title}</h3>
 						<p class="mt-2 text-sm leading-relaxed text-ink-soft">{item.text}</p>
 					</div>
 				</li>

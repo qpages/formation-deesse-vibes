@@ -4,10 +4,11 @@ import Container from '../ui/Container.astro';
 
 interface Props {
 	ctaHref?: string;
-	showCta?: boolean;
+	/** CTA « Rejoindre la formation » — masqué une fois le parcours suivi. */
+	showJoinCta?: boolean;
 }
 
-const { ctaHref = '#acces', showCta = true } = Astro.props;
+const { ctaHref = '#acces', showJoinCta = true } = Astro.props;
 ---
 
 <section class="relative overflow-hidden bg-ink text-mist">
@@ -38,21 +39,21 @@ const { ctaHref = '#acces', showCta = true } = Astro.props;
 				Une méthode à intégrer à votre rythme, dans un espace en ligne confidentiel.
 				Un parcours simple vous mène du paiement à la formation.
 			</p>
-			{showCta && (
-				<div class="animate-rise mt-8 flex flex-wrap items-center gap-3" style="animation-delay: 300ms">
+			<div class="animate-rise mt-8 flex flex-wrap items-center gap-3" style="animation-delay: 300ms">
+				{showJoinCta && (
 					<Button href={ctaHref} variant="primary" size="lg" class="bg-mist text-ink hover:bg-gold-soft">
 						Rejoindre la formation
 					</Button>
-					<Button
-						href="#faq"
-						variant="secondary"
-						size="lg"
-						class="border-mist/25 text-mist hover:border-mist/50 hover:bg-mist/10"
-					>
-						J'ai une question ?
-					</Button>
-				</div>
-			)}
+				)}
+				<Button
+					href="#faq"
+					variant="secondary"
+					size="lg"
+					class="border-mist/25 text-mist hover:border-mist/50 hover:bg-mist/10"
+				>
+					J'ai une question ?
+				</Button>
+			</div>
 		</div>
 
 		<figure class="hero-portrait animate-fade">
