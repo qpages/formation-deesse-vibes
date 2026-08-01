@@ -1,0 +1,87 @@
+---
+type PlanId = 'x2' | 'x4' | 'x6' | 'unique';
+
+interface Plan {
+	id: PlanId;
+	title: string;
+	total?: string;
+}
+
+const plans: Plan[] = [
+	{
+		id: 'unique',
+		title: '1 849,00 € en une seule fois',
+	},
+	{
+		id: 'x2',
+		title: '949,50 € × 2 paiements tous les 30 jours',
+		total: '1 899,00 € au total',
+	},
+	{
+		id: 'x4',
+		title: '499,75 € × 4 paiements tous les 30 jours',
+		total: '1 999,00 € au total',
+	},
+	{
+		id: 'x6',
+		title: '346,50 € × 6 paiements tous les 30 jours',
+		total: '2 079,00 € au total',
+	},
+];
+
+const defaultPlanId: PlanId = 'unique';
+---
+
+<fieldset class="payment-plans space-y-2 border-0 p-0">
+	<legend class="float-none p-0 text-sm font-medium text-ink">Règlement</legend>
+
+	<div class="divide-y divide-ink/10" role="presentation">
+		{
+			plans.map((plan) => (
+				<label class="payment-plan flex cursor-pointer items-start gap-4 py-4 first:pt-0 last:pb-0">
+					<input
+						type="radio"
+						name="paymentPlan"
+						value={plan.id}
+						checked={plan.id === defaultPlanId}
+						required
+						class="payment-plan__input peer sr-only"
+					/>
+					<span
+						class="payment-plan__radio mt-1 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-ink/20 transition duration-200 peer-checked:border-ink peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blush"
+						aria-hidden="true"
+					>
+						<span class="payment-plan__dot h-2 w-2 rounded-full bg-ink opacity-0 transition duration-200" />
+					</span>
+					<span class="payment-plan__copy min-w-0 flex-1">
+						<span class="block text-[15px] font-medium leading-snug tracking-[-0.01em] text-ink">
+							{plan.title}
+						</span>
+						{plan.total && (
+							<span class="mt-1 block text-sm text-ink-soft/75">{plan.total}</span>
+						)}
+					</span>
+				</label>
+			))
+		}
+	</div>
+</fieldset>
+
+<style>
+	.payment-plan__copy {
+		opacity: 0.5;
+		transition: opacity 0.2s ease;
+	}
+
+	.payment-plan:hover .payment-plan__copy {
+		opacity: 0.75;
+	}
+
+	.payment-plan:has(.payment-plan__input:checked) .payment-plan__copy {
+		opacity: 1;
+	}
+
+	.payment-plan__input:checked + .payment-plan__radio .payment-plan__dot {
+		opacity: 1;
+	}
+</style>

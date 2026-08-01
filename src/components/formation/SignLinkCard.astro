@@ -13,7 +13,7 @@ const { signUrl } = Astro.props;
 	aria-labelledby="sign-link-title"
 >
 	<div
-		class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold to-transparent"
+		class="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-gold to-transparent"
 		aria-hidden="true"
 	></div>
 	<div
@@ -57,7 +57,7 @@ const { signUrl } = Astro.props;
 				Signer mon accord
 				<span aria-hidden="true" class="text-gold-soft">→</span>
 			</Button>
-			<p class="text-xs text-ink-soft/80 sm:max-w-[14rem]">
+			<p class="text-xs text-ink-soft/80 sm:max-w-56">
 				S’ouvre dans un nouvel onglet · signature sécurisée Yousign
 			</p>
 		</div>

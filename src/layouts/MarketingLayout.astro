@@ -1,6 +1,7 @@
 ---
 import BaseLayout from './BaseLayout.astro';
 import Container from '../components/ui/Container.astro';
+import Toast from '../components/ui/Toast.astro';
 
 interface Props {
 	title?: string;
@@ -27,6 +28,7 @@ const { title, description } = Astro.props;
 				</nav>
 			</Container>
 		</header>
+		<Toast />
 		<main class="flex-1">
 			<slot />
 		</main>

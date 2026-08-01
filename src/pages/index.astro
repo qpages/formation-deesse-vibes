@@ -104,8 +104,12 @@ if (setCookie) {
 	Astro.response.headers.append('Set-Cookie', setCookie);
 }
 
+const checkoutCancel = checkout === 'cancel';
+
 const awaitingWebhook =
-	enrollment?.status === 'paiement_en_attente' && Boolean(enrollment.stripeCheckoutSessionId);
+	!checkoutCancel &&
+	enrollment?.status === 'paiement_en_attente' &&
+	Boolean(enrollment.stripeCheckoutSessionId);
 
 const showFunnel =
 	!enrollment ||
@@ -113,7 +117,8 @@ const showFunnel =
 	enrollment.status === 'acces_retire' ||
 	(enrollment.status === 'paiement_en_attente' && !enrollment.stripeCheckoutSessionId);
 
-const showTracking = Boolean(enrollment) && (!showFunnel || awaitingWebhook);
+const showTracking =
+	!checkoutCancel && Boolean(enrollment) && (!showFunnel || awaitingWebhook);
 
 const steps = enrollment
 	? stepStates(enrollment.status)
@@ -148,7 +153,7 @@ const sectionDescription = 'Suivez votre parcours en temps réel : paiement, sig
 			steps={steps}
 			ndaSignUrl={ndaSignUrl}
 			flash={flash}
-			checkoutCancel={checkout === 'cancel'}
+			checkoutCancel={checkoutCancel}
 			magicLinkFailed={magicLinkFailed}
 			defaultTab={magicLinkFailed ? 'retrouver' : 'nouveau'}
 		/>

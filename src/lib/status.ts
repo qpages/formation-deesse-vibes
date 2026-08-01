@@ -228,7 +228,7 @@ export function primaryAction(
 ): PrimaryAction {
 	switch (status) {
 		case 'paiement_en_attente':
-			return { kind: 'checkout', label: 'Je m’inscris — 320 €' };
+			return { kind: 'checkout', label: 'Je m’inscris' };
 		case 'paiement_confirme':
 		case 'nda_envoye':
 			return ndaSignUrl

@@ -101,7 +101,7 @@ const actions = [
 		<tbody class="divide-y divide-ink/10">
 			{
 				rows.map((row) => (
-					<tr class="align-middle hover:bg-ink/[0.02]">
+					<tr class="align-middle hover:bg-ink/2">
 						<td class="py-3.5 pr-4">
 							<p class="font-medium text-ink">{row.displayName}</p>
 							<p class="text-ink-soft">{row.email}</p>
@@ -136,7 +136,7 @@ const actions = [
 						</td>
 						<td class="py-3.5">
 							<select
-								class="max-w-[9.5rem] cursor-pointer border border-ink/15 bg-transparent py-1 pl-2 pr-1 text-[11px] text-ink-soft outline-none hover:border-ink/30 focus:border-ink/40"
+								class="max-w-38 cursor-pointer border border-ink/15 bg-transparent py-1 pl-2 pr-1 text-[11px] text-ink-soft outline-none hover:border-ink/30 focus:border-ink/40"
 								data-enrollment={row.id}
 								data-name={row.displayName}
 								data-action-select

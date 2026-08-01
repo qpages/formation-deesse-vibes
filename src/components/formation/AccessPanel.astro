@@ -1,7 +1,6 @@
 ---
 import type { Enrollment } from '../../generated/prisma/client';
 import type { StepKey, StepState } from '../../lib/status';
-import Alert from '../ui/Alert.astro';
 import CheckoutForm from './CheckoutForm.astro';
 import ContactAdmin from './ContactAdmin.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
@@ -31,6 +30,7 @@ const {
 } = Astro.props;
 
 const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
+const funnelFlash = showFunnel ? flash : null;
 ---
 
 {
@@ -39,17 +39,6 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 			<div>
 				<Stepper />
 			</div>
-
-			{(flash || checkoutCancel) && (
-				<div class="space-y-3">
-					{flash && (
-						<Alert variant={magicLinkFailed ? 'error' : 'success'}>{flash}</Alert>
-					)}
-					{checkoutCancel && (
-						<Alert variant="info">Paiement annulé. Vous pouvez reprendre quand vous voulez.</Alert>
-					)}
-				</div>
-			)}
 
 			<div class="border-t border-ink/10 pt-8">
 				<h3 class="mb-5 font-display text-3xl text-ink">Démarrer ma formation</h3>
@@ -69,7 +58,7 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 							'access-tab h-10 px-4 text-sm font-medium transition',
 							activeTab === 'nouveau'
 								? 'bg-ink text-mist'
-								: 'text-ink-soft hover:text-ink',
+								: 'text-ink-soft',
 						]}
 					>
 						Nouveau
@@ -85,7 +74,7 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 							'access-tab h-10 px-4 text-sm font-medium transition',
 							activeTab === 'retrouver'
 								? 'bg-ink text-mist'
-								: 'text-ink-soft hover:text-ink',
+								: 'text-ink-soft',
 						]}
 					>
 						Déjà inscrit·e
@@ -158,11 +147,17 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 	)
 }
 
-<script>
-	const tabs = document.querySelectorAll<HTMLButtonElement>('[data-access-tab]');
-	const panels = document.querySelectorAll<HTMLElement>('[data-access-panel]');
+<script
+	define:vars={{
+		funnelFlash,
+		checkoutCancel,
+		magicLinkFailed,
+	}}
+>
+	const tabs = document.querySelectorAll('[data-access-tab]');
+	const panels = document.querySelectorAll('[data-access-panel]');
 
-	function setTab(name: string) {
+	function setTab(name) {
 		tabs.forEach((tab) => {
 			const active = tab.dataset.accessTab === name;
 			tab.setAttribute('aria-selected', active ? 'true' : 'false');
@@ -186,10 +181,28 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 	clearBtn?.addEventListener('click', async () => {
 		clearBtn.setAttribute('disabled', 'true');
 		try {
-			await fetch('/api/session/clear', { method: 'POST' });
+			const response = await fetch('/api/session/clear', { method: 'POST' });
+			if (!response.ok) throw new Error('Session impossible à réinitialiser');
 			window.location.assign('/');
 		} catch {
 			clearBtn.removeAttribute('disabled');
 		}
 	});
+
+	function showFunnelToasts(attempt = 0) {
+		if (typeof window.toast !== 'function') {
+			if (attempt < 20) window.setTimeout(() => showFunnelToasts(attempt + 1), 25);
+			return;
+		}
+		if (funnelFlash) {
+			window.toast(funnelFlash, magicLinkFailed ? 'error' : 'success');
+		}
+		if (checkoutCancel) {
+			window.toast('Paiement annulé. Vous pouvez reprendre quand vous voulez.', 'info');
+		}
+	}
+
+	if (funnelFlash || checkoutCancel) {
+		showFunnelToasts();
+	}
 </script>
