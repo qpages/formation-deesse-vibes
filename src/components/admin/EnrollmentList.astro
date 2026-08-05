@@ -1,9 +1,10 @@
 ---
 import StatusBadge from '../ui/StatusBadge.astro';
 import type { AdminEnrollmentRow } from '../../lib/admin/enrollments';
-import { METIER_ACTIONS, RECOVERY_ACTIONS } from '../../lib/admin/actions';
-import ExternalLinks from './ExternalLinks.astro';
-import PaymentTracking from './PaymentTracking.astro';
+import EnrollmentRowPerson from './EnrollmentRowPerson.astro';
+import EnrollmentRowPayment from './EnrollmentRowPayment.astro';
+import EnrollmentRowBadges from './EnrollmentRowBadges.astro';
+import EnrollmentRowActions from './EnrollmentRowActions.astro';
 
 interface Props {
 	rows: AdminEnrollmentRow[];
@@ -11,161 +12,88 @@ interface Props {
 
 const { rows } = Astro.props;
 
-const linkClass =
-	'text-[11px] text-ink-soft underline underline-offset-2 hover:text-blush-deep';
-const recoveryLinkClass =
-	'text-[11px] text-ink/45 underline underline-offset-2 hover:text-ink-soft';
-const selectClass =
-	'max-w-[10.5rem] cursor-pointer border border-ink/15 bg-transparent py-1 pl-2 pr-1 text-[11px] text-ink-soft outline-none hover:border-ink/30 focus:border-ink/40';
+const rowNavClass =
+	'cursor-pointer transition-colors hover:bg-ink/2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blush/50';
 ---
 
-{/* Mobile: cards */}
+{/* Mobile: cartes cliquables */}
 <ul class="space-y-3 lg:hidden">
 	{
-		rows.map((row) => (
-			<li class="border border-ink/10 bg-mist/40 px-4 py-4">
-				<div class="flex items-start justify-between gap-3">
-					<div class="min-w-0">
-						<p class="truncate font-medium text-ink">{row.displayName}</p>
-						<p class="truncate text-sm text-ink-soft">{row.email}</p>
+		rows.map((row) => {
+			const href = `/admin/enrollments/${row.id}`;
+			return (
+				<li
+					class:list={['border border-ink/10 bg-white/60 px-4 py-4', rowNavClass]}
+					data-enrollment-href={href}
+					tabindex={0}
+					role="link"
+					aria-label={`Ouvrir ${row.displayName}`}
+				>
+					<EnrollmentRowPerson row={row} />
+					<div class="mt-3">
+						<EnrollmentRowBadges row={row} />
 					</div>
-					<p class="shrink-0 text-[11px] text-ink/45">
-						{row.createdAt.toLocaleDateString('fr-FR')}
-					</p>
-				</div>
-
-				<div class="mt-3 space-y-3">
-					<div class="space-y-2">
-						<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Paiement</span>
-						<PaymentTracking
-							summary={row.paymentSummary}
-							enrollmentId={row.id}
-							displayName={row.displayName}
-						/>
+					<div class="mt-3 border-t border-ink/10 pt-3">
+						<EnrollmentRowActions row={row} />
 					</div>
-					<div class="flex items-center justify-between gap-3">
-						<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Signature</span>
-						<StatusBadge tone={row.pipeline.signature.tone}>
-							{row.pipeline.signature.label}
-						</StatusBadge>
-					</div>
-					<div class="flex items-center justify-between gap-3">
-						<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Accès</span>
-						<StatusBadge tone={row.pipeline.acces.tone}>
-							{row.pipeline.acces.label}
-						</StatusBadge>
-					</div>
-				</div>
-
-				<div class="mt-3 border-t border-ink/10 pt-3">
-					<div class="flex items-center gap-1">
-						<ExternalLinks stripeUrl={row.stripeUrl} yousignUrl={row.yousignUrl} />
-					</div>
-
-					<div
-						class="mt-3 space-y-2"
-						data-enrollment={row.id}
-						data-name={row.displayName}
-					>
-						<div class="flex flex-wrap gap-x-3 gap-y-1">
-							{METIER_ACTIONS.map(({ action, label }) => (
-								<button type="button" data-action={action} class={linkClass}>
-									{label}
-								</button>
-							))}
-						</div>
-
-						<details class="group">
-							<summary class="cursor-pointer list-none text-[10px] uppercase tracking-[0.12em] text-ink/40 hover:text-ink/60 [&::-webkit-details-marker]:hidden">
-								<span class="underline underline-offset-2">Recovery</span>
-							</summary>
-							<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-								{RECOVERY_ACTIONS.map(({ action, label }) => (
-									<button type="button" data-action={action} class={recoveryLinkClass}>
-										{label}
-									</button>
-								))}
-							</div>
-						</details>
-					</div>
-				</div>
-			</li>
-		))
+				</li>
+			);
+		})
 	}
 </ul>
 
-{/* Desktop: table */}
+{/* Desktop: table — row cliquable sauf zone actions */}
 <div class="hidden overflow-x-auto lg:block">
 	<table class="w-full text-left text-sm">
 		<thead class="border-b border-ink/15 text-[11px] uppercase tracking-[0.12em] text-ink-soft">
 			<tr>
 				<th class="py-3 pr-4 font-medium">Personne</th>
-				<th class="min-w-[12rem] py-3 pr-3 font-medium">Paiement</th>
+				<th class="py-3 pr-3 font-medium">Paiement</th>
 				<th class="py-3 pr-3 font-medium">Signature</th>
 				<th class="py-3 pr-3 font-medium">Accès</th>
-				<th class="py-3 pr-4 font-medium">Créé</th>
-				<th class="py-3 pr-3 font-medium">Liens</th>
 				<th class="py-3 font-medium">Actions</th>
 			</tr>
 		</thead>
 		<tbody class="divide-y divide-ink/10">
 			{
-				rows.map((row) => (
-					<tr class="align-top hover:bg-ink/[0.02]">
-						<td class="py-3.5 pr-4">
-							<p class="font-medium text-ink">{row.displayName}</p>
-							<p class="text-ink-soft">{row.email}</p>
-						</td>
-						<td class="py-3.5 pr-3">
-							<PaymentTracking
-								summary={row.paymentSummary}
-								enrollmentId={row.id}
-								displayName={row.displayName}
-							/>
-						</td>
-						<td class="py-3.5 pr-3">
-							<StatusBadge tone={row.pipeline.signature.tone}>
-								{row.pipeline.signature.label}
-							</StatusBadge>
-						</td>
-						<td class="py-3.5 pr-3">
-							<StatusBadge tone={row.pipeline.acces.tone}>
-								{row.pipeline.acces.label}
-							</StatusBadge>
-						</td>
-						<td class="whitespace-nowrap py-3.5 pr-4 text-ink-soft">
-							{row.createdAt.toLocaleString('fr-FR', {
-								dateStyle: 'short',
-								timeStyle: 'short',
-							})}
-						</td>
-						<td class="py-3.5 pr-3">
-							<ExternalLinks stripeUrl={row.stripeUrl} yousignUrl={row.yousignUrl} />
-						</td>
-						<td class="py-3.5">
-							<select
-								class={selectClass}
-								data-enrollment={row.id}
-								data-name={row.displayName}
-								data-action-select
-								aria-label={`Actions pour ${row.displayName}`}
-							>
-								<option value="">Actions…</option>
-								<optgroup label="Métier">
-									{METIER_ACTIONS.map(({ action, label }) => (
-										<option value={action}>{label}</option>
-									))}
-								</optgroup>
-								<optgroup label="Recovery">
-									{RECOVERY_ACTIONS.map(({ action, label }) => (
-										<option value={action}>{label}</option>
-									))}
-								</optgroup>
-							</select>
-						</td>
-					</tr>
-				))
+				rows.map((row) => {
+					const href = `/admin/enrollments/${row.id}`;
+					return (
+						<tr
+							class={rowNavClass}
+							data-enrollment-href={href}
+							tabindex={0}
+							role="link"
+							aria-label={`Ouvrir ${row.displayName}`}
+						>
+							<td class="py-3.5 pr-4">
+								<EnrollmentRowPerson row={row} />
+							</td>
+							<td class="py-3.5 pr-3">
+								<EnrollmentRowPayment summary={row.paymentSummary} />
+							</td>
+							<td class="py-3.5 pr-3">
+								<StatusBadge tone={row.pipeline.signature.tone}>
+									{row.pipeline.signature.label}
+								</StatusBadge>
+							</td>
+							<td class="py-3.5 pr-3">
+								<StatusBadge tone={row.pipeline.acces.tone}>
+									{row.pipeline.acces.label}
+								</StatusBadge>
+							</td>
+							<td class="py-3.5">
+								<EnrollmentRowActions row={row} />
+							</td>
+						</tr>
+					);
+				})
 			}
 		</tbody>
 	</table>
 </div>
+
+<script>
+	import { bindEnrollmentListNavigation } from './enrollment-list-client';
+	bindEnrollmentListNavigation();
+</script>

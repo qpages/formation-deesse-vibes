@@ -1,0 +1,118 @@
+---
+import Input from '../ui/Input.astro';
+import Button from '../ui/Button.astro';
+import {
+	ACCESS_FILTER_VALUES,
+	COLLECTION_FILTER_VALUES,
+	CONTRACT_FILTER_VALUES,
+} from '../../lib/admin/actions';
+import {
+	ACCESS_STATUS_LABELS,
+	COLLECTION_STATUS_LABELS,
+	CONTRACT_STATUS_LABELS,
+} from '../../lib/status';
+import ActiveFilterChips from './ActiveFilterChips.astro';
+
+interface Props {
+	q: string;
+	collection: string;
+	contract: string;
+	access: string;
+}
+
+const { q, collection, contract, access } = Astro.props;
+
+const selectClass =
+	'h-10 border border-ink/15 bg-transparent px-2 text-sm text-ink outline-none hover:border-ink/30 focus:border-ink/40';
+---
+
+<div class="flex flex-col gap-3">
+	<form
+		id="admin-list-filters"
+		method="get"
+		action="/admin"
+		class="flex flex-col gap-3"
+		role="search"
+	>
+		<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+			<label class="sr-only" for="admin-search">Rechercher une inscription</label>
+			<Input
+				type="search"
+				name="q"
+				id="admin-search"
+				value={q}
+				placeholder="E-mail, prénom ou nom…"
+				autocomplete="off"
+				class="h-11 sm:max-w-md"
+			/>
+			<Button type="submit" variant="secondary" size="sm" class="h-11 px-5 shrink-0">
+				Rechercher
+			</Button>
+		</div>
+
+		<div class="flex flex-wrap items-end gap-3">
+			<label class="flex min-w-32 flex-1 flex-col gap-1">
+				<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Paiement</span>
+				<select
+					name="collection"
+					class={selectClass}
+					aria-label="Filtrer par paiement"
+					data-filter-auto
+				>
+					<option value="">Tous</option>
+					{
+						COLLECTION_FILTER_VALUES.map((value) => (
+							<option value={value} selected={collection === value}>
+								{COLLECTION_STATUS_LABELS[value]}
+							</option>
+						))
+					}
+				</select>
+			</label>
+
+			<label class="flex min-w-32 flex-1 flex-col gap-1">
+				<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Signature</span>
+				<select
+					name="contract"
+					class={selectClass}
+					aria-label="Filtrer par signature"
+					data-filter-auto
+				>
+					<option value="">Tous</option>
+					{
+						CONTRACT_FILTER_VALUES.map((value) => (
+							<option value={value} selected={contract === value}>
+								{CONTRACT_STATUS_LABELS[value]}
+							</option>
+						))
+					}
+				</select>
+			</label>
+
+			<label class="flex min-w-32 flex-1 flex-col gap-1">
+				<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Accès</span>
+				<select name="access" class={selectClass} aria-label="Filtrer par accès" data-filter-auto>
+					<option value="">Tous</option>
+					{
+						ACCESS_FILTER_VALUES.map((value) => (
+							<option value={value} selected={access === value}>
+								{ACCESS_STATUS_LABELS[value]}
+							</option>
+						))
+					}
+				</select>
+			</label>
+		</div>
+	</form>
+
+	<ActiveFilterChips q={q} collection={collection} contract={contract} access={access} />
+</div>
+
+<script>
+	document.querySelectorAll('[data-filter-auto]').forEach((select) => {
+		select.addEventListener('change', () => {
+			const form = select.closest('form');
+			form?.requestSubmit();
+		});
+	});
+</script>

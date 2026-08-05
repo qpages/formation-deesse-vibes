@@ -171,6 +171,23 @@ export async function retrieveCheckoutSession(sessionId: string) {
 	return getStripe().checkout.sessions.retrieve(sessionId);
 }
 
+/** Expire une session open. No-op si déjà complete / expired. */
+export async function expireCheckoutSession(sessionId: string) {
+	try {
+		return await getStripe().checkout.sessions.expire(sessionId);
+	} catch (error) {
+		if (
+			typeof error === 'object' &&
+			error &&
+			'type' in error &&
+			(error as { type: string }).type === 'StripeInvalidRequestError'
+		) {
+			return null;
+		}
+		throw error;
+	}
+}
+
 export async function retrieveSubscription(subscriptionId: string) {
 	return getStripe().subscriptions.retrieve(subscriptionId);
 }

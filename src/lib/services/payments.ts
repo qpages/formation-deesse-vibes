@@ -15,13 +15,17 @@ import {
 } from '../payment-plans';
 import { applyAccessPolicy } from './access';
 import {
+	attachStripeCheckoutSession,
 	findEnrollmentById,
 	findEnrollmentByIdOrThrow,
 	findEnrollmentByScheduleOrSubscription,
 	findEnrollmentBySubscriptionId,
+	type EnrollmentWithUser,
 } from './enrollment';
 import {
+	createCheckoutSession,
 	ensureSubscriptionSchedule,
+	expireCheckoutSession,
 	getStripe,
 	listSubscriptionInvoices,
 	retrieveCheckoutSession,
@@ -29,6 +33,13 @@ import {
 } from '../stripe';
 
 export { retrieveCheckoutSession } from '../stripe';
+
+export class CheckoutAlreadyPaidError extends Error {
+	constructor() {
+		super('Checkout déjà payé');
+		this.name = 'CheckoutAlreadyPaidError';
+	}
+}
 
 export type ConfirmCheckoutResult =
 	| {
@@ -435,6 +446,54 @@ async function syncSubscriptionCheckout(
 }
 
 /**
+ * Démarre un Checkout : 1 enrollment pending = au plus 1 session open.
+ * Expire l’ancienne session open avant d’en créer une nouvelle.
+ */
+export async function startCheckout(input: {
+	enrollment: EnrollmentWithUser;
+	paymentPlan: PaymentPlanId;
+	successUrl: string;
+	cancelUrl: string;
+}): Promise<{ url: string }> {
+	const { enrollment, paymentPlan, successUrl, cancelUrl } = input;
+	const prev = enrollment.stripeCheckoutSessionId;
+
+	if (prev) {
+		try {
+			const existing = await retrieveCheckoutSession(prev);
+			if (existing.status === 'open') {
+				await expireCheckoutSession(prev);
+			} else if (existing.status === 'complete' && isCheckoutPaid(existing)) {
+				await confirmPaidCheckout(existing);
+				throw new CheckoutAlreadyPaidError();
+			}
+		} catch (error) {
+			if (error instanceof CheckoutAlreadyPaidError) throw error;
+			// Session Stripe introuvable / réseau : on continue et on crée une nouvelle.
+			console.warn('[startCheckout] previous session unreachable', prev, error);
+		}
+	}
+
+	const session = await createCheckoutSession({
+		enrollmentId: enrollment.id,
+		email: enrollment.user.email,
+		firstName: enrollment.user.firstName,
+		lastName: enrollment.user.lastName,
+		paymentPlan,
+		successUrl,
+		cancelUrl,
+	});
+
+	await attachStripeCheckoutSession(enrollment.id, session.id);
+
+	if (!session.url) {
+		throw new Error('Checkout sans url');
+	}
+
+	return { url: session.url };
+}
+
+/**
  * Confirme un Checkout payé : collectionStatus → current (money only).
  * Idempotent. Ne confirme pas si payment_status n’est pas paid.
  * Orchestration NDA = stripe-events / admin retrigger (pas ici).
@@ -469,6 +528,18 @@ export async function confirmPaidCheckout(
 		};
 	}
 
+	// Session stale payée après remplacement : on confirme quand même (argent reçu).
+	if (
+		enrollment.stripeCheckoutSessionId &&
+		enrollment.stripeCheckoutSessionId !== session.id &&
+		enrollment.collectionStatus === 'pending'
+	) {
+		console.warn('[checkout] stale_session_paid', {
+			enrollmentId,
+			stored: enrollment.stripeCheckoutSessionId,
+			paid: session.id,
+		});
+	}
 
 	const paymentIntentId = paymentIntentIdFromSession(session);
 	const subscriptionId = subscriptionIdFromSession(session);

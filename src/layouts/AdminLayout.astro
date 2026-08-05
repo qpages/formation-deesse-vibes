@@ -9,77 +9,62 @@ interface Props {
 }
 
 const { title = 'Admin — Formation', email } = Astro.props;
+const path = Astro.url.pathname;
+const onList = path === '/admin' || path.startsWith('/admin?');
 ---
 
 <BaseLayout title={title} noindex={true}>
-	<div class="flex min-h-screen flex-col">
-		<header class="sticky top-0 z-20 border-b border-mist/10 bg-ink/95 backdrop-blur-md animate-fade">
-			<Container class="flex h-16 items-center justify-between gap-4 sm:h-18">
-				<a href="/" class="shrink-0 font-display text-xl tracking-wide text-mist sm:text-2xl">
-					Déesse Vibes
-				</a>
-
-				<div class="flex min-w-0 items-center gap-3 sm:gap-5">
-					<nav class="hidden items-center gap-5 sm:flex" aria-label="Navigation">
-						<a
-							href="/"
-							class="text-[11px] uppercase tracking-[0.2em] text-mist/60 transition-colors hover:text-mist"
-						>
-							Formation
-						</a>
+	<div class="flex min-h-screen flex-col bg-mist/30">
+		<header class="sticky top-0 z-20 border-b border-ink/10 bg-ink text-mist">
+			<Container class="flex h-14 items-center justify-between gap-4">
+				<div class="flex min-w-0 items-center gap-6">
+					<a href="/admin" class="shrink-0 font-display text-lg tracking-wide text-mist">
+						Admin
+					</a>
+					<nav class="flex items-center gap-4" aria-label="Admin">
 						<a
 							href="/admin"
-							class="text-[11px] uppercase tracking-[0.2em] text-mist transition-colors"
-							aria-current="page"
+							class:list={[
+								'text-[11px] uppercase tracking-[0.16em] transition-colors',
+								onList || path.startsWith('/admin/enrollments')
+									? 'text-mist'
+									: 'text-mist/55 hover:text-mist',
+							]}
+							aria-current={onList || path.startsWith('/admin/enrollments') ? 'page' : undefined}
 						>
-							Admin
+							Inscriptions
 						</a>
 					</nav>
-
-					{email && (
-						<>
-							<span class="hidden h-4 w-px bg-mist/20 sm:block" aria-hidden="true"></span>
-							<form
-								method="post"
-								action="/api/admin/logout"
-								class="flex min-w-0 items-center gap-2.5 sm:gap-3"
-							>
-								<span
-									class="hidden max-w-[14rem] truncate text-[12px] text-mist/55 md:inline"
-									title={email}
-								>
-									{email}
-								</span>
-								<button
-									type="submit"
-									class="shrink-0 rounded-full border border-mist/25 px-3.5 py-1.5 text-[11px] uppercase tracking-[0.16em] text-mist/85 transition-colors hover:border-mist/50 hover:bg-mist/5 hover:text-mist"
-									onclick="event.preventDefault(); fetch('/api/admin/logout',{method:'POST'}).then(()=>location.href='/admin/login')"
-								>
-									Déconnexion
-								</button>
-							</form>
-						</>
-					)}
 				</div>
+
+				{
+					email && (
+						<form method="post" action="/api/admin/logout" class="flex items-center gap-3">
+							<span
+								class="hidden max-w-[14rem] truncate text-[12px] text-mist/55 md:inline"
+								title={email}
+							>
+								{email}
+							</span>
+							<button
+								type="submit"
+								class="shrink-0 border border-mist/25 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-mist/85 transition-colors hover:border-mist/50 hover:text-mist"
+								onclick="event.preventDefault(); fetch('/api/admin/logout',{method:'POST'}).then(()=>location.href='/admin/login')"
+							>
+								Déconnexion
+							</button>
+						</form>
+					)
+				}
 			</Container>
 		</header>
 		<main class="flex-1">
-			<div class="py-10">
+			<div class="py-8">
 				<Container class="max-w-7xl">
 					<slot />
 				</Container>
 			</div>
 		</main>
-		<footer class="border-t border-ink/10 py-10">
-			<Container class="flex flex-col gap-3 text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between">
-				<p>© {new Date().getFullYear()} Déesse Vibes — Formation Matrice Évolution</p>
-				<div class="flex gap-5">
-					<a href="/#faq" class="hover:text-ink">FAQ</a>
-					<a href="/mentions-legales" class="hover:text-ink">Mentions légales</a>
-					<a href="/confidentialite" class="hover:text-ink">Confidentialité</a>
-				</div>
-			</Container>
-		</footer>
 	</div>
 	<Toast />
 </BaseLayout>

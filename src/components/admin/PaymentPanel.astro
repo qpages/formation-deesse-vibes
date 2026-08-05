@@ -1,0 +1,221 @@
+---
+import StatusBadge from '../ui/StatusBadge.astro';
+import {
+	expandAdminInstallments,
+	type AdminPaymentSummary,
+} from '../../lib/admin/payments';
+
+interface Props {
+	summary: AdminPaymentSummary;
+	heading?: string;
+}
+
+const { summary, heading } = Astro.props;
+
+const installments = expandAdminInstallments(summary);
+const total = summary.installmentsTotal ?? 1;
+const collected = new Intl.NumberFormat('fr-FR', {
+	style: 'currency',
+	currency: 'EUR',
+}).format(summary.collectedAmountCents / 100);
+const totalLabel =
+	summary.totalAmountCents != null
+		? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(
+				summary.totalAmountCents / 100,
+			)
+		: null;
+const nextDue = summary.nextInstallmentDueAt
+	? new Date(summary.nextInstallmentDueAt).toLocaleDateString('fr-FR')
+	: null;
+const showNextDue =
+	Boolean(nextDue) &&
+	summary.trackingState !== 'termine' &&
+	summary.trackingState !== 'rembourse';
+
+const statusTone = {
+	paid: 'success',
+	open: 'progress',
+	failed: 'action',
+	uncollectible: 'action',
+	void: 'neutral',
+	draft: 'neutral',
+} as const;
+
+function formatDate(iso: string | null, withTime = false) {
+	if (!iso) return null;
+	return new Date(iso).toLocaleString('fr-FR', {
+		dateStyle: 'short',
+		...(withTime ? { timeStyle: 'short' } : {}),
+	});
+}
+---
+
+<section class="space-y-5" id="paiements">
+	{
+		heading ? (
+			<h2 class="font-display text-2xl text-ink">{heading}</h2>
+		) : null
+	}
+
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0">
+			<p class="text-[10px] uppercase tracking-[0.12em] text-ink/40">{summary.planLabel}</p>
+			<p class="mt-1 font-display text-2xl leading-none tracking-tight text-ink">
+				{collected}
+				{
+					totalLabel ? (
+						<span class="text-base font-sans font-normal text-ink/35"> / {totalLabel}</span>
+					) : null
+				}
+			</p>
+			<p class="mt-2 text-[12px] text-ink-soft">
+				{summary.installmentsPaid}/{total} échéance{total > 1 ? 's' : ''}
+				{showNextDue ? ` · prochaine le ${nextDue}` : ''}
+			</p>
+		</div>
+		<StatusBadge tone={summary.trackingTone}>{summary.trackingLabel}</StatusBadge>
+	</div>
+
+	{
+		summary.stripeSubscriptionUrl || summary.stripeScheduleUrl ? (
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+				<span class="text-[10px] uppercase tracking-[0.12em] text-ink/40">Stripe</span>
+				{summary.stripeSubscriptionUrl ? (
+					<a
+						href={summary.stripeSubscriptionUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-[12px] text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+					>
+						Abonnement
+					</a>
+				) : null}
+				{summary.stripeScheduleUrl ? (
+					<a
+						href={summary.stripeScheduleUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-[12px] text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+					>
+						Schedule
+					</a>
+				) : null}
+			</div>
+		) : null
+	}
+
+	<div>
+		<p class="mb-1 text-[10px] uppercase tracking-[0.12em] text-ink/40">Factures</p>
+		{
+			summary.invoices.length === 0 ? (
+				<p class="border-t border-dashed border-ink/15 py-4 text-[13px] text-ink-soft">
+					Aucune facture disponible pour le moment.
+				</p>
+			) : (
+				<ul class="divide-y divide-ink/10 border-t border-ink/10">
+					{summary.invoices.map((invoice) => {
+						const paid = formatDate(invoice.paidAt, true);
+						return (
+							<li class="flex items-start gap-3 py-3">
+								<span class="mt-0.5 w-5 shrink-0 text-[11px] font-medium text-ink/40">
+									{invoice.installmentNumber}
+								</span>
+								<div class="min-w-0 flex-1">
+									<p class="font-medium text-ink">{invoice.amountLabel}</p>
+									<p class="mt-1 text-[12px] text-ink-soft">
+										{paid ? `Payée le ${paid}` : 'Facture disponible'}
+									</p>
+								</div>
+								<div class="mt-0.5 flex shrink-0 items-center gap-3">
+									{invoice.pdfUrl ? (
+										<a
+											href={invoice.pdfUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="text-[12px] text-ink-soft underline-offset-2 hover:underline"
+										>
+											PDF
+										</a>
+									) : null}
+									{invoice.hostedUrl ? (
+										<a
+											href={invoice.hostedUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="text-[12px] text-ink-soft underline-offset-2 hover:underline"
+										>
+											Voir
+										</a>
+									) : null}
+								</div>
+							</li>
+						);
+					})}
+				</ul>
+			)
+		}
+	</div>
+
+	<div>
+		<p class="mb-1 text-[10px] uppercase tracking-[0.12em] text-ink/40">Échéances</p>
+		{
+			installments.length === 0 ? (
+				<p class="border-t border-dashed border-ink/15 py-6 text-center text-sm text-ink-soft">
+					Aucune échéance.
+				</p>
+			) : (
+				<ul class="divide-y divide-ink/10 border-t border-ink/10">
+					{installments.map((p) => {
+						const paid = formatDate(p.paidAt, true);
+						const due = formatDate(p.dueAt);
+						const meta = paid ? `Payé le ${paid}` : due ? `Échéance ${due}` : 'Date à venir';
+						const tone = statusTone[p.status] ?? 'neutral';
+						const invoiceHref = p.invoicePdfUrl ?? p.hostedInvoiceUrl;
+						return (
+							<li class="flex items-start gap-3 py-3.5">
+								<span class="mt-0.5 w-5 shrink-0 text-[11px] font-medium text-ink/40">
+									{p.installmentNumber}
+								</span>
+								<div class="min-w-0 flex-1">
+									<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+										<span class="font-medium text-ink">{p.amountLabel}</span>
+										<StatusBadge tone={tone}>{p.statusLabel}</StatusBadge>
+									</div>
+									<p class="mt-1 text-[12px] text-ink-soft">{meta}</p>
+									{p.failureReason ? (
+										<p class="mt-1 text-[12px] text-blush-deep">{p.failureReason}</p>
+									) : null}
+									{invoiceHref ? (
+										<p class="mt-1.5">
+											<a
+												href={invoiceHref}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="text-[12px] text-ink-soft underline-offset-2 hover:underline"
+											>
+												Télécharger la facture
+											</a>
+										</p>
+									) : null}
+								</div>
+								{p.stripeUrl ? (
+									<a
+										href={p.stripeUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="mt-0.5 shrink-0 text-[11px] text-ink/40 underline-offset-2 hover:text-ink hover:underline"
+										aria-label={`Ouvrir l’échéance ${p.installmentNumber} dans Stripe`}
+									>
+										Stripe
+									</a>
+								) : (
+									<span class="mt-0.5 shrink-0 text-[11px] text-ink/25">—</span>
+								)}
+							</li>
+						);
+					})}
+				</ul>
+			)
+		}
+	</div>
+</section>

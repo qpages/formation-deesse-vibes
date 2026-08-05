@@ -1,9 +1,5 @@
 import type { APIRoute } from 'astro';
-import {
-	ADMIN_COOKIE,
-	parseCookie,
-	verifyAdminSessionToken,
-} from '../../../lib/auth/session';
+import { requireAdminApi } from '../../../lib/admin/auth';
 import { listEnrollmentsForExport } from '../../../lib/admin/enrollments';
 import {
 	ACCESS_STATUS_LABELS,
@@ -17,10 +13,8 @@ import {
 } from '../../../lib/status';
 
 export const GET: APIRoute = async ({ request }) => {
-	const adminEmail = await verifyAdminSessionToken(
-		parseCookie(request.headers.get('cookie'), ADMIN_COOKIE) ?? '',
-	);
-	if (!adminEmail) {
+	const admin = await requireAdminApi(request);
+	if (admin instanceof Response) {
 		return new Response('Unauthorized', { status: 401 });
 	}
 

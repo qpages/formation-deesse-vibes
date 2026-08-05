@@ -1,17 +1,36 @@
-import type { Enrollment, Payment, Prisma, User } from '../../generated/prisma/client';
+import type {
+	AccessStatus,
+	AdminAction,
+	CollectionStatus,
+	ContractStatus,
+	Enrollment,
+	Payment,
+	Prisma,
+	User,
+} from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
 import { paginate, type Pagination } from '../pagination';
+import { stripeDashboardUrl } from '../stripe';
+import { yousignAppUrl } from '../yousign';
+import { adminPipelineBadges } from '../status';
+import { adminActionLabel } from './action-labels';
+import { visibleActions, type AdminActionKey } from './actions';
 import {
 	buildAdminPaymentSummary,
 	listPaymentsForEnrollments,
 	type AdminPaymentSummary,
 } from './payments';
-import { resolveNdaSignUrl } from '../services/enrollment';
-import { stripeDashboardUrl } from '../stripe';
-import { yousignAppUrl } from '../yousign';
-import { adminPipelineBadges } from '../status';
 
 export const ADMIN_PAGE_SIZE = 25;
+
+export type AdminListFilters = {
+	q: string;
+	page: number;
+	pageSize?: number;
+	collection?: CollectionStatus | '';
+	contract?: ContractStatus | '';
+	access?: AccessStatus | '';
+};
 
 export type AdminEnrollmentRow = Enrollment & {
 	user: User;
@@ -20,13 +39,26 @@ export type AdminEnrollmentRow = Enrollment & {
 	paymentSummary: AdminPaymentSummary;
 	stripeUrl: string | null;
 	yousignUrl: string | null;
-	signUrl: string | null;
 	displayName: string;
+	visibleActions: AdminActionKey[];
 };
 
 export type AdminEnrollmentList = Pagination & {
 	q: string;
+	collection: CollectionStatus | '';
+	contract: ContractStatus | '';
+	access: AccessStatus | '';
 	rows: AdminEnrollmentRow[];
+};
+
+export type AdminEnrollmentDetail = AdminEnrollmentRow & {
+	audit: Array<{
+		id: string;
+		action: string;
+		actionLabel: string;
+		adminEmail: string;
+		createdAt: Date;
+	}>;
 };
 
 /** Tokenized insensitive search on user email / firstName / lastName. */
@@ -50,19 +82,45 @@ export function enrollmentSearchWhere(q: string): Prisma.EnrollmentWhereInput | 
 	};
 }
 
-export function adminListHref(input: { q?: string; page?: number }): string {
+export function adminEnrollmentWhere(
+	input: AdminListFilters,
+): Prisma.EnrollmentWhereInput | undefined {
+	const parts: Prisma.EnrollmentWhereInput[] = [];
+
+	const search = enrollmentSearchWhere(input.q);
+	if (search) parts.push(search);
+
+	if (input.collection) parts.push({ collectionStatus: input.collection });
+	if (input.contract) parts.push({ contractStatus: input.contract });
+	if (input.access) parts.push({ accessStatus: input.access });
+
+	if (parts.length === 0) return undefined;
+	if (parts.length === 1) return parts[0];
+	return { AND: parts };
+}
+
+export function adminListHref(input: {
+	q?: string;
+	page?: number;
+	collection?: string;
+	contract?: string;
+	access?: string;
+}): string {
 	const params = new URLSearchParams();
 	const q = input.q?.trim() ?? '';
 	if (q) params.set('q', q);
+	if (input.collection) params.set('collection', input.collection);
+	if (input.contract) params.set('contract', input.contract);
+	if (input.access) params.set('access', input.access);
 	if (input.page && input.page > 1) params.set('page', String(input.page));
 	const qs = params.toString();
 	return qs ? `/admin?${qs}` : '/admin';
 }
 
-export async function toAdminEnrollmentRow(
+export function toAdminEnrollmentRow(
 	row: Enrollment & { user: User },
 	payments: Payment[],
-): Promise<AdminEnrollmentRow> {
+): AdminEnrollmentRow {
 	const paymentSummary = buildAdminPaymentSummary(row, payments);
 
 	return {
@@ -82,8 +140,8 @@ export async function toAdminEnrollmentRow(
 			scheduleId: row.stripeScheduleId,
 		}),
 		yousignUrl: yousignAppUrl(row.yousignRequestId),
-		signUrl: await resolveNdaSignUrl(row),
 		displayName: `${row.user.firstName} ${row.user.lastName}`,
+		visibleActions: visibleActions(row),
 	};
 }
 
@@ -98,13 +156,20 @@ export async function listEnrollmentsForExport() {
 	});
 }
 
-export async function listAdminEnrollments(input: {
-	q: string;
-	page: number;
-	pageSize?: number;
-}): Promise<AdminEnrollmentList> {
+export async function listAdminEnrollments(
+	input: AdminListFilters,
+): Promise<AdminEnrollmentList> {
 	const q = input.q.trim();
-	const where = enrollmentSearchWhere(q);
+	const collection = input.collection ?? '';
+	const contract = input.contract ?? '';
+	const access = input.access ?? '';
+	const where = adminEnrollmentWhere({
+		q,
+		page: input.page,
+		collection,
+		contract,
+		access,
+	});
 	const prisma = getPrisma();
 	const total = await prisma.enrollment.count({ where });
 	const pagination = paginate({
@@ -121,15 +186,47 @@ export async function listAdminEnrollments(input: {
 		take: pagination.take,
 	});
 
-	const paymentsByEnrollment = await listPaymentsForEnrollments(enrollments.map((e) => e.id));
+	const paymentsByEnrollment = await listPaymentsForEnrollments(
+		enrollments.map((e) => e.id),
+	);
 
 	return {
 		...pagination,
 		q,
-		rows: await Promise.all(
-			enrollments.map((row) =>
-				toAdminEnrollmentRow(row, paymentsByEnrollment.get(row.id) ?? []),
-			),
+		collection,
+		contract,
+		access,
+		rows: enrollments.map((row) =>
+			toAdminEnrollmentRow(row, paymentsByEnrollment.get(row.id) ?? []),
 		),
+	};
+}
+
+export async function getAdminEnrollmentDetail(
+	id: string,
+): Promise<AdminEnrollmentDetail | null> {
+	const prisma = getPrisma();
+	const enrollment = await prisma.enrollment.findUnique({
+		where: { id },
+		include: {
+			user: true,
+			payments: { orderBy: { installmentNumber: 'asc' } },
+			adminActions: { orderBy: { createdAt: 'desc' }, take: 50 },
+		},
+	});
+	if (!enrollment) return null;
+
+	const { adminActions, payments, ...rest } = enrollment;
+	const row = toAdminEnrollmentRow(rest, payments);
+
+	return {
+		...row,
+		audit: adminActions.map((a: AdminAction) => ({
+			id: a.id,
+			action: a.action,
+			actionLabel: adminActionLabel(a.action),
+			adminEmail: a.adminEmail,
+			createdAt: a.createdAt,
+		})),
 	};
 }

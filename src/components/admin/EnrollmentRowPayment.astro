@@ -1,0 +1,28 @@
+---
+import StatusBadge from '../ui/StatusBadge.astro';
+import type { AdminPaymentSummary } from '../../lib/admin/payments';
+
+interface Props {
+	summary: AdminPaymentSummary;
+}
+
+const { summary } = Astro.props;
+
+const meta: string[] = [summary.planLabel];
+if ((summary.installmentsTotal ?? 1) > 1) {
+	meta.push(summary.progressLabel);
+}
+if (
+	summary.trackingState === 'a_jour' &&
+	summary.nextInstallmentDueAt
+) {
+	meta.push(
+		`proch. ${new Date(summary.nextInstallmentDueAt).toLocaleDateString('fr-FR')}`,
+	);
+}
+---
+
+<div class="min-w-0">
+	<StatusBadge tone={summary.trackingTone}>{summary.trackingLabel}</StatusBadge>
+	<p class="mt-1 text-[11px] text-ink/45">{meta.join(' · ')}</p>
+</div>

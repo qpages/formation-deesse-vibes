@@ -1,0 +1,19 @@
+---
+import StatusBadge from '../ui/StatusBadge.astro';
+import type { AdminEnrollmentRow } from '../../lib/admin/enrollments';
+import EnrollmentRowPayment from './EnrollmentRowPayment.astro';
+
+interface Props {
+	row: AdminEnrollmentRow;
+}
+
+const { row } = Astro.props;
+---
+
+<div class="flex flex-wrap items-start gap-3">
+	<EnrollmentRowPayment summary={row.paymentSummary} />
+	<div class="flex flex-wrap items-center gap-2">
+		<StatusBadge tone={row.pipeline.signature.tone}>{row.pipeline.signature.label}</StatusBadge>
+		<StatusBadge tone={row.pipeline.acces.tone}>{row.pipeline.acces.label}</StatusBadge>
+	</div>
+</div>

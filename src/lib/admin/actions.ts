@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import type {
+	AccessStatus,
+	CollectionStatus,
+	ContractStatus,
+	Enrollment,
+} from '../../generated/prisma/client';
 
 export const adminActionZones = ['metier', 'recovery'] as const;
 export type AdminActionZone = (typeof adminActionZones)[number];
@@ -40,7 +46,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Signature',
 		title: 'Relancer le NDA',
 		description:
-			'Renvoyer un e-mail de relance à {name} et réactiver le lien de signature YouSign.',
+			'Envoyer une relance NDA pour {name} via Inngest (réactive le lien Yousign si possible).',
 		confirm: 'Envoyer la relance',
 	},
 	{
@@ -50,7 +56,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Signature',
 		title: 'Recréer le NDA',
 		description:
-			'Créer une nouvelle demande YouSign pour {name} et remplacer le lien actuel. L’ancien lien ne sera plus valide.',
+			'Déclencher via Inngest une nouvelle demande Yousign pour {name}. L’ancien lien ne sera plus valide.',
 		confirm: 'Recréer le NDA',
 		danger: true,
 	},
@@ -61,7 +67,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Accès',
 		title: 'Renvoyer le lien Teachizy',
 		description:
-			'Appeler l’API Teachizy pour renvoyer l’invitation à {name}. Si c’est la 1ère fois : pose le statut « accès envoyés ».',
+			'Déclencher le job Inngest d’invitation / réactivation Teachizy pour {name} (selon la politique d’accès).',
 		confirm: 'Renvoyer le lien',
 	},
 	{
@@ -71,7 +77,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Paiement',
 		title: 'Marquer comme remboursé',
 		description:
-			'Passer {name} en statut « remboursé » dans l’admin. Le remboursement Stripe et l’accès Teachizy restent à traiter manuellement.',
+			'Passer {name} en collectionStatus « remboursé », puis appliquer la politique d’accès (révocation / suspension Teachizy via Inngest si besoin). Le remboursement Stripe reste à faire dans le Dashboard.',
 		confirm: 'Marquer remboursé',
 		danger: true,
 	},
@@ -82,7 +88,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Accès',
 		title: 'Retirer l’accès',
 		description:
-			'Passer {name} en statut « accès retiré ». Retirer l’accès Teachizy reste à faire manuellement dans Teachizy.',
+			'Passer {name} en accessStatus « révoqué », puis appliquer la politique d’accès (suspension Teachizy via Inngest).',
 		confirm: 'Retirer l’accès',
 		danger: true,
 	},
@@ -93,7 +99,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Recovery',
 		title: 'Synchroniser le paiement',
 		description:
-			'Vérifier la session Stripe de {name} et passer le statut à « paiement confirmé » si le paiement est abouti (puis déclencher le NDA).',
+			'Lire la session Stripe de {name}, recalculer la collection, puis réévaluer l’accès. Peut enchaîner la création NDA si éligible.',
 		confirm: 'Synchroniser',
 	},
 	{
@@ -103,7 +109,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Recovery',
 		title: 'Synchroniser Yousign',
 		description:
-			'Lire le statut de la demande Yousign de {name} et aligner yousignStatus en base. Ne change pas le statut métier ni ne déclenche Teachizy.',
+			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus en base (sync lecture).',
 		confirm: 'Synchroniser',
 	},
 	{
@@ -123,7 +129,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Recovery',
 		title: 'Déclencher invitation Teachizy (Inngest)',
 		description:
-			'Envoyer l’event Inngest yousign/signature.done pour {name}. Utile si le job a raté après une signature déjà faite.',
+			'Envoyer l’event Inngest enrollment/access.grant pour {name}. Utile si le grant a raté après une signature.',
 		confirm: 'Déclencher Inngest',
 	},
 	{
@@ -133,7 +139,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Recovery',
 		title: 'Supprimer le NDA',
 		description:
-			'Effacer les IDs YouSign de {name} en base et revenir à « paiement confirmé » si besoin. Ne supprime pas la demande côté Yousign.',
+			'Effacer les IDs YouSign de {name} en base et remettre contractStatus en attente. Ne supprime pas la demande côté Yousign.',
 		confirm: 'Supprimer le NDA',
 		danger: true,
 	},
@@ -167,3 +173,86 @@ export function adminActionMetaForClient(): AdminActionMetaClient {
 		]),
 	) as AdminActionMetaClient;
 }
+
+type VisibilityInput = Pick<
+	Enrollment,
+	| 'collectionStatus'
+	| 'contractStatus'
+	| 'accessStatus'
+	| 'yousignRequestId'
+	| 'stripeCheckoutSessionId'
+>;
+
+/**
+ * Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.).
+ * Garder sync avec `dispatch.ts`.
+ */
+export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boolean {
+	const paidEnough = e.collectionStatus !== 'pending' && e.collectionStatus !== 'canceled';
+
+	switch (action) {
+		case 'relance_nda':
+			return (
+				paidEnough &&
+				(e.contractStatus === 'sent' || e.contractStatus === 'pending') &&
+				e.accessStatus === 'not_eligible' &&
+				Boolean(e.yousignRequestId)
+			);
+		case 'recreate_nda':
+			return paidEnough && e.contractStatus !== 'signed';
+		case 'retrigger_teachizy':
+			return e.accessStatus !== 'revoked' && e.contractStatus === 'signed';
+		case 'mark_refunded':
+			return e.collectionStatus !== 'refunded';
+		case 'revoke_access':
+			return e.accessStatus !== 'revoked' && e.collectionStatus !== 'refunded';
+		case 'sync_payment':
+			return Boolean(e.stripeCheckoutSessionId);
+		case 'sync_yousign':
+			return Boolean(e.yousignRequestId);
+		case 'retrigger_nda':
+			return paidEnough;
+		case 'retrigger_signature':
+			return Boolean(e.yousignRequestId) && e.accessStatus !== 'revoked';
+		case 'delete_nda':
+			return Boolean(e.yousignRequestId) || e.contractStatus !== 'pending';
+		default:
+			return false;
+	}
+}
+
+export function visibleActions(e: VisibilityInput): AdminActionKey[] {
+	return adminActionKeys.filter((action) => isActionVisible(action, e));
+}
+
+export function visibleActionDefs(e: VisibilityInput): AdminActionDef[] {
+	const allowed = new Set(visibleActions(e));
+	return ADMIN_ACTIONS.filter((a) => allowed.has(a.action));
+}
+
+export const COLLECTION_FILTER_VALUES = [
+	'pending',
+	'current',
+	'past_due',
+	'paid',
+	'canceled',
+	'refunded',
+] as const satisfies readonly CollectionStatus[];
+
+export const CONTRACT_FILTER_VALUES = [
+	'pending',
+	'sent',
+	'signed',
+	'expired',
+	'declined',
+	'canceled',
+	'error',
+] as const satisfies readonly ContractStatus[];
+
+export const ACCESS_FILTER_VALUES = [
+	'not_eligible',
+	'pending',
+	'active',
+	'suspended',
+	'revoked',
+] as const satisfies readonly AccessStatus[];

@@ -1,0 +1,61 @@
+---
+import type { AdminEnrollmentRow } from '../../lib/admin/enrollments';
+import { METIER_ACTIONS, RECOVERY_ACTIONS } from '../../lib/admin/actions';
+
+interface Props {
+	row: AdminEnrollmentRow;
+	compact?: boolean;
+}
+
+const { row, compact = true } = Astro.props;
+
+const allowed = new Set(row.visibleActions);
+const metier = METIER_ACTIONS.filter((a) => allowed.has(a.action));
+const recovery = RECOVERY_ACTIONS.filter((a) => allowed.has(a.action));
+
+const linkClass = compact
+	? 'text-[11px] text-ink-soft underline underline-offset-2 hover:text-blush-deep'
+	: 'text-sm text-ink-soft underline underline-offset-2 hover:text-blush-deep';
+const recoveryLinkClass = compact
+	? 'text-[11px] text-ink/45 underline underline-offset-2 hover:text-ink-soft'
+	: 'text-sm text-ink/45 underline underline-offset-2 hover:text-ink-soft';
+const zoneLabelClass = 'text-[10px] uppercase tracking-[0.12em] text-ink/45';
+---
+
+{
+	metier.length + recovery.length === 0 ? (
+		<span class="text-[11px] text-ink/35">—</span>
+	) : (
+		<div
+			class="space-y-2"
+			data-action-zone
+			data-enrollment={row.id}
+			data-name={row.displayName}
+		>
+			{metier.length > 0 ? (
+				<div>
+					{!compact ? <p class:list={['mb-2', zoneLabelClass]}>Métier</p> : null}
+					<div class="flex flex-wrap gap-x-3 gap-y-1">
+						{metier.map(({ action, label }) => (
+							<button type="button" data-action={action} class={linkClass}>
+								{label}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
+			{recovery.length > 0 ? (
+				<div>
+					<p class:list={[compact ? 'mt-1' : 'mb-2', zoneLabelClass]}>Recovery</p>
+					<div class="flex flex-wrap gap-x-3 gap-y-1">
+						{recovery.map(({ action, label }) => (
+							<button type="button" data-action={action} class={recoveryLinkClass}>
+								{label}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
+		</div>
+	)
+}

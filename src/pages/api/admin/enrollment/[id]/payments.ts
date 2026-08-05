@@ -1,18 +1,10 @@
 import type { APIRoute } from 'astro';
-import {
-	ADMIN_COOKIE,
-	parseCookie,
-	verifyAdminSessionToken,
-} from '../../../../../lib/auth/session';
+import { json, requireAdminApi } from '../../../../../lib/admin/auth';
 import { getAdminPaymentSummary } from '../../../../../lib/admin/payments';
 
 export const GET: APIRoute = async ({ params, request }) => {
-	const adminEmail = await verifyAdminSessionToken(
-		parseCookie(request.headers.get('cookie'), ADMIN_COOKIE) ?? '',
-	);
-	if (!adminEmail) {
-		return json({ error: 'Non autorisé.' }, 401);
-	}
+	const admin = await requireAdminApi(request);
+	if (admin instanceof Response) return admin;
 
 	const enrollmentId = params.id;
 	if (!enrollmentId) {
@@ -26,10 +18,3 @@ export const GET: APIRoute = async ({ params, request }) => {
 
 	return json({ summary });
 };
-
-function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { 'Content-Type': 'application/json' },
-	});
-}

@@ -159,6 +159,7 @@ export function buildAdminPaymentSummary(
 	};
 }
 
+/** Detail / dialog path only — may write invoice URLs from Stripe. */
 export async function getAdminPaymentSummary(enrollmentId: string) {
 	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) return null;
@@ -170,6 +171,53 @@ export async function getAdminPaymentSummary(enrollmentId: string) {
 
 	const hydrated = await hydrateInvoiceUrls(payments);
 	return buildAdminPaymentSummary(enrollment, hydrated);
+}
+
+/** Expand known payments with estimated future installments for admin UI. */
+export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaymentRow[] {
+	const total = summary.installmentsTotal ?? Math.max(summary.payments.length, 1);
+	const byNumber = new Map(summary.payments.map((p) => [p.installmentNumber, p]));
+	const remainingCents = Math.max(
+		0,
+		(summary.totalAmountCents ?? summary.collectedAmountCents) - summary.collectedAmountCents,
+	);
+	const remainingSlots = Math.max(0, total - summary.installmentsPaid);
+	const estimatedCents =
+		remainingSlots > 0 ? Math.round(remainingCents / remainingSlots) : 0;
+
+	const rows: AdminPaymentRow[] = [];
+	let assignedNextDue = false;
+
+	for (let n = 1; n <= total; n++) {
+		const existing = byNumber.get(n);
+		if (existing) {
+			rows.push(existing);
+			if (existing.status !== 'paid' && existing.dueAt) assignedNextDue = true;
+			continue;
+		}
+
+		const dueAt =
+			!assignedNextDue && summary.nextInstallmentDueAt
+				? summary.nextInstallmentDueAt
+				: null;
+		if (dueAt) assignedNextDue = true;
+
+		rows.push({
+			id: `estimated-${n}`,
+			installmentNumber: n,
+			amountLabel: formatMoney(estimatedCents),
+			status: 'open',
+			statusLabel: 'À venir',
+			failureReason: null,
+			dueAt,
+			paidAt: null,
+			stripeUrl: null,
+			invoicePdfUrl: null,
+			hostedInvoiceUrl: null,
+		});
+	}
+
+	return rows;
 }
 
 /** Liens facture PDF / page hébergée pour le client (paiements payés uniquement). */

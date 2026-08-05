@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { adminActionKeySchema } from './admin/actions';
+import {
+	ACCESS_FILTER_VALUES,
+	adminActionKeySchema,
+	COLLECTION_FILTER_VALUES,
+	CONTRACT_FILTER_VALUES,
+} from './admin/actions';
 import { paymentPlanIdSchema } from './payment-plans';
 
 export const checkoutSchema = z.object({
@@ -30,12 +35,22 @@ export const adminActionSchema = z.object({
 
 const adminSearchQuerySchema = z.string().trim().max(100);
 const adminPageSchema = z.coerce.number().int().min(1).max(10_000);
+const collectionFilterSchema = z.enum(COLLECTION_FILTER_VALUES);
+const contractFilterSchema = z.enum(CONTRACT_FILTER_VALUES);
+const accessFilterSchema = z.enum(ACCESS_FILTER_VALUES);
 
 export function parseAdminListQuery(params: URLSearchParams) {
 	const q = adminSearchQuerySchema.safeParse(params.get('q') ?? '');
 	const page = adminPageSchema.safeParse(params.get('page') ?? 1);
+	const collection = collectionFilterSchema.safeParse(params.get('collection') ?? '');
+	const contract = contractFilterSchema.safeParse(params.get('contract') ?? '');
+	const access = accessFilterSchema.safeParse(params.get('access') ?? '');
+
 	return {
 		q: q.success ? q.data : '',
 		page: page.success ? page.data : 1,
+		collection: collection.success ? collection.data : ('' as const),
+		contract: contract.success ? contract.data : ('' as const),
+		access: access.success ? access.data : ('' as const),
 	};
 }

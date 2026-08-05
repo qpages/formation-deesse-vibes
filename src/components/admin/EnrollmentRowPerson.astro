@@ -1,0 +1,19 @@
+---
+import type { AdminEnrollmentRow } from '../../lib/admin/enrollments';
+
+interface Props {
+	row: AdminEnrollmentRow;
+}
+
+const { row } = Astro.props;
+const createdLabel = row.createdAt.toLocaleString('fr-FR', {
+	dateStyle: 'short',
+	timeStyle: 'short',
+});
+---
+
+<div class="min-w-0">
+	<p class="font-medium text-ink">{row.displayName}</p>
+	<p class="truncate text-ink-soft">{row.email}</p>
+	<p class="mt-1 text-[11px] text-ink/45">{createdLabel}</p>
+</div>
