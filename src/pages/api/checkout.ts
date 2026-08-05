@@ -30,6 +30,7 @@ export const POST: APIRoute = async ({ request }) => {
 			email: enrollment.email,
 			firstName: enrollment.firstName,
 			lastName: enrollment.lastName,
+			paymentPlan: parsed.data.paymentPlan,
 			successUrl: `${site}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
 			cancelUrl: `${site}/?checkout=cancel`,
 		});

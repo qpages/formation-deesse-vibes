@@ -22,15 +22,11 @@ const { class: className, id, eyebrow, title, description } = Astro.props;
 						{eyebrow}
 					</p>
 				)}
-				{title && (
-					<h2 class="font-display text-3xl text-ink text-balance">
-						{title}
-					</h2>
-				)}
-				{description && (
-					<p class="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
-						{description}
-					</p>
+				{(title || description) && (
+					<div class="space-y-2">
+						{title && <h2 class="font-display text-3xl text-ink">{title}</h2>}
+						{description && <p class="text-ink-soft">{description}</p>}
+					</div>
 				)}
 			</header>
 		)}

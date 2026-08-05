@@ -3,8 +3,7 @@ import StatusBadge from '../ui/StatusBadge.astro';
 import { stepLabel, type StepKey, type StepState } from '../../lib/status';
 
 interface Props {
-	/** Absent = mode marketing (sans badges). Présent = suivi d’inscription. */
-	steps?: Record<StepKey, StepState>;
+	steps: Record<StepKey, StepState>;
 }
 
 const { steps } = Astro.props;
@@ -13,7 +12,7 @@ const showBadges = Boolean(steps);
 const items: Array<{ key: StepKey; title: string; text: string }> = [
 	{
 		key: 'paiement',
-		title: 'Vous payez en ligne',
+		title: 'Vous payez en ligne sur Stripe',
 		text: 'Règlement sécurisé via la plateforme de paiement Stripe.',
 	},
 	{

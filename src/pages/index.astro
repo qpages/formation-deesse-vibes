@@ -22,6 +22,7 @@ import {
 	retrieveCheckoutSession,
 } from '../lib/services/payment';
 import { checkoutSuccessFlash, stepStates } from '../lib/status';
+import { listPaidInvoiceLinks } from '../lib/admin/payments';
 import type { Enrollment } from '../generated/prisma/client';
 
 export const prerender = false;
@@ -133,8 +134,13 @@ if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === '
 	}
 }
 
+const invoiceLinks =
+	enrollment && enrollment.status !== 'paiement_en_attente'
+		? await listPaidInvoiceLinks(enrollment.id)
+		: [];
+
 const magicLinkFailed = Boolean(token && !enrollment);
-const sectionDescription = 'Suivez votre parcours en temps réel : paiement, signature, puis accès à Teachizy.';
+const sectionDescription = 'Suivez votre parcours en temps réel.';
 ---
 
 <MarketingLayout>
@@ -152,6 +158,7 @@ const sectionDescription = 'Suivez votre parcours en temps réel : paiement, sig
 			enrollment={enrollment}
 			steps={steps}
 			ndaSignUrl={ndaSignUrl}
+			invoiceLinks={invoiceLinks}
 			flash={flash}
 			checkoutCancel={checkoutCancel}
 			magicLinkFailed={magicLinkFailed}

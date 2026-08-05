@@ -12,6 +12,7 @@ interface Props {
 	enrollment: Enrollment | null;
 	steps: Record<StepKey, StepState>;
 	ndaSignUrl?: string | null;
+	invoiceLinks?: { installmentNumber: number; url: string }[];
 	flash?: string | null;
 	checkoutCancel?: boolean;
 	magicLinkFailed?: boolean;
@@ -23,6 +24,7 @@ const {
 	enrollment,
 	steps,
 	ndaSignUrl = null,
+	invoiceLinks = [],
 	flash = null,
 	checkoutCancel = false,
 	magicLinkFailed = false,
@@ -116,8 +118,12 @@ const funnelFlash = showFunnel ? flash : null;
 						<Stepper steps={steps} />
 					</div>
 
-					<div class="border-t border-ink/10 pt-8">
-						<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} flash={flash} />
+					<div class="pt-8">
+						<StatusPanel
+							enrollment={enrollment}
+							ndaSignUrl={ndaSignUrl}
+							flash={flash}
+						/>
 						<div class="mt-6">
 							<p class="text-sm text-ink-soft">
 								Connecté·e en tant que{' '}
@@ -126,19 +132,42 @@ const funnelFlash = showFunnel ? flash : null;
 								</span>{' '}
 								({enrollment.email})
 							</p>
-							<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
-								<button
-									type="button"
-									id="clear-session"
-									class="underline-offset-4 hover:text-ink hover:underline"
-								>
-									Ce n’est pas moi
-								</button>
-								<span class="text-ink/25" aria-hidden="true">
-									·
-								</span>
-								<ContactAdmin />
+						</div>
+
+						{invoiceLinks.length > 0 && (
+							<div class="mt-6 space-y-2">
+								<p class="text-[10px] uppercase tracking-[0.12em] text-ink/40">Factures</p>
+								<ul class="space-y-2">
+									{invoiceLinks.map((invoice) => (
+										<li>
+											<a
+												href={invoice.url}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="text-sm text-ink underline underline-offset-2 hover:text-blush-deep"
+											>
+												{invoiceLinks.length === 1
+													? 'Télécharger ma facture'
+													: `Facture échéance ${invoice.installmentNumber}`}
+											</a>
+										</li>
+									))}
+								</ul>
 							</div>
+						)}
+
+						<div class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+							<button
+								type="button"
+								id="clear-session"
+								class="underline-offset-4 hover:text-ink hover:underline"
+							>
+								Ce n’est pas moi
+							</button>
+							<span class="text-ink/25" aria-hidden="true">
+								·
+							</span>
+							<ContactAdmin />
 						</div>
 					</div>
 				</>

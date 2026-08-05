@@ -4,7 +4,12 @@ import {
 	recordProcessedEvent,
 	releaseProcessedEvent,
 } from '../../../lib/services/enrollment';
-import { confirmPaidCheckout } from '../../../lib/services/payment';
+import {
+	confirmPaidCheckout,
+	markSubscriptionScheduleCompleted,
+	syncStripeInvoice,
+	syncSubscriptionState,
+} from '../../../lib/services/payment';
 import { alertFinalFailure } from '../../../lib/services/slack';
 import { constructStripeEvent } from '../../../lib/services/stripe';
 
@@ -36,10 +41,7 @@ export const POST: APIRoute = async ({ request }) => {
 	});
 
 	if (!created) {
-		return new Response(JSON.stringify({ received: true, duplicate: true }), {
-			status: 200,
-			headers: { 'Content-Type': 'application/json' },
-		});
+		return json({ received: true, duplicate: true });
 	}
 
 	try {
@@ -47,12 +49,35 @@ export const POST: APIRoute = async ({ request }) => {
 			const session = event.data.object as Stripe.Checkout.Session;
 			const result = await confirmPaidCheckout(session, { stripeEventId: event.id });
 			if (!result.ok && result.reason.startsWith('payment_status=')) {
-				// Paiement différé — attendre async_payment_succeeded
 				return json({ received: true, deferred: true });
 			}
 			if (!result.ok) {
 				throw new Error(result.reason);
 			}
+		} else if (event.type === 'invoice.paid') {
+			const invoice = event.data.object as Stripe.Invoice;
+			const result = await syncStripeInvoice(invoice, { stripeEventId: event.id });
+			if (!result.ok && result.reason !== 'enrollment_not_found') {
+				throw new Error(result.reason);
+			}
+		} else if (
+			event.type === 'invoice.payment_failed' ||
+			event.type === 'invoice.payment_action_required'
+		) {
+			const invoice = event.data.object as Stripe.Invoice;
+			await syncStripeInvoice(invoice, {
+				stripeEventId: event.id,
+				forceStatus: event.type === 'invoice.payment_failed' ? 'failed' : 'open',
+			});
+		} else if (
+			event.type === 'customer.subscription.updated' ||
+			event.type === 'customer.subscription.deleted'
+		) {
+			const subscription = event.data.object as Stripe.Subscription;
+			await syncSubscriptionState(subscription, { stripeEventId: event.id });
+		} else if (event.type === 'subscription_schedule.completed') {
+			const schedule = event.data.object as Stripe.SubscriptionSchedule;
+			await markSubscriptionScheduleCompleted(schedule, { stripeEventId: event.id });
 		} else if (
 			event.type === 'charge.dispute.created' ||
 			event.type === 'charge.dispute.funds_withdrawn'

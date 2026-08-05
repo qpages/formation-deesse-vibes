@@ -171,6 +171,29 @@ export const POST: APIRoute = async ({ request }) => {
 			}
 		}
 
+		if (action === 'mark_refunded') {
+			if (enrollment.status === 'rembourse') {
+				return json({ error: 'Déjà marqué remboursé.' }, 400);
+			}
+			await prisma.enrollment.update({
+				where: { id: enrollment.id },
+				data: { status: 'rembourse' },
+			});
+		}
+
+		if (action === 'revoke_access') {
+			if (enrollment.status === 'acces_retire') {
+				return json({ error: 'Accès déjà retiré.' }, 400);
+			}
+			if (enrollment.status === 'rembourse') {
+				return json({ error: 'Inscription déjà remboursée.' }, 400);
+			}
+			await prisma.enrollment.update({
+				where: { id: enrollment.id },
+				data: { status: 'acces_retire' },
+			});
+		}
+
 		await prisma.adminAction.create({
 			data: {
 				enrollmentId: enrollment.id,

@@ -12,8 +12,13 @@ function createClient() {
 	return new PrismaClient({ adapter });
 }
 
+/** Drop HMR-cached clients that predate a `prisma generate` (missing new models). */
+function isClientCurrent(client: PrismaClient): boolean {
+	return typeof client.payment?.findMany === 'function';
+}
+
 export function getPrisma(): PrismaClient {
-	if (!globalForPrisma.prisma) {
+	if (!globalForPrisma.prisma || !isClientCurrent(globalForPrisma.prisma)) {
 		globalForPrisma.prisma = createClient();
 	}
 	return globalForPrisma.prisma;

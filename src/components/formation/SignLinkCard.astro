@@ -8,90 +8,39 @@ interface Props {
 const { signUrl } = Astro.props;
 ---
 
-<aside
-	class="sign-link relative overflow-hidden rounded-sm border border-ink/10 bg-surface/80 shadow-soft animate-rise"
-	aria-labelledby="sign-link-title"
->
-	<div
-		class="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-gold to-transparent"
-		aria-hidden="true"
-	></div>
-	<div
-		class="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-blush/10 blur-3xl"
-		aria-hidden="true"
-	></div>
-	<div
-		class="pointer-events-none absolute -bottom-24 -left-10 h-40 w-40 rounded-full bg-gold/15 blur-3xl"
-		aria-hidden="true"
-	></div>
-
-	<div class="relative space-y-6 px-5 py-6 sm:px-7 sm:py-8">
-		<div class="space-y-3">
-			<p
-				class="text-[11px] font-medium uppercase tracking-[0.18em] text-gold"
+<div class="space-y-2">
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+		<div
+			class="flex min-w-0 flex-1 items-stretch overflow-hidden rounded-sm border border-ink/12 transition focus-within:border-gold/50"
+		>
+			<input
+				id="nda-sign-url"
+				type="text"
+				readonly
+				value={signUrl}
+				class="min-w-0 flex-1 bg-transparent px-3.5 py-3 font-sans text-sm text-ink-soft outline-none selection:bg-blush/25"
+			/>
+			<button
+				id="copy-sign-url"
+				type="button"
+				class="shrink-0 border-l border-ink/10 px-4 text-xs font-medium uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-mist"
+				data-copied="false"
 			>
-				Étape signature
-			</p>
-			<div class="space-y-2">
-				<h3
-					id="sign-link-title"
-					class="font-display text-3xl leading-tight text-ink text-balance sm:text-[2rem]"
-				>
-					Votre lien de signature est prêt
-				</h3>
-				<p class="max-w-md text-sm leading-relaxed text-ink-soft">
-					Ouvrez-le ici pour signer votre accord. Aucun e-mail requis pour
-					continuer.
-				</p>
-			</div>
+				<span data-copy-label>Copier</span>
+			</button>
 		</div>
-
-		<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-			<Button
-				href={signUrl}
-				size="lg"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="w-full sm:w-auto"
-			>
-				Signer mon accord
-				<span aria-hidden="true" class="text-gold-soft">→</span>
-			</Button>
-			<p class="text-xs text-ink-soft/80 sm:max-w-56">
-				S’ouvre dans un nouvel onglet · signature sécurisée Yousign
-			</p>
-		</div>
-
-		<div class="space-y-2">
-			<label
-				for="nda-sign-url"
-				class="block text-[11px] font-medium uppercase tracking-[0.14em] text-ink-soft"
-			>
-				Lien direct
-			</label>
-			<div
-				class="flex items-stretch overflow-hidden rounded-sm border border-ink/12 bg-mist/70 transition focus-within:border-gold/50"
-			>
-				<input
-					id="nda-sign-url"
-					type="text"
-					readonly
-					value={signUrl}
-					class="min-w-0 flex-1 bg-transparent px-3.5 py-3 font-sans text-sm text-ink-soft outline-none selection:bg-blush/25"
-				/>
-				<button
-					id="copy-sign-url"
-					type="button"
-					class="shrink-0 border-l border-ink/10 px-4 text-xs font-medium uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-mist"
-					data-copied="false"
-				>
-					<span data-copy-label>Copier</span>
-				</button>
-			</div>
-			<p id="copy-sign-feedback" class="sr-only" aria-live="polite"></p>
-		</div>
+		<Button
+			href={signUrl}
+			size="lg"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="w-full shrink-0 sm:w-auto"
+		>
+			Signer mon accord
+		</Button>
 	</div>
-</aside>
+	<p id="copy-sign-feedback" class="sr-only" aria-live="polite"></p>
+</div>
 
 <script>
 	const input = document.getElementById('nda-sign-url') as HTMLInputElement | null;

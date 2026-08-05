@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { adminActionKeySchema } from './admin/actions';
+import { paymentPlanIdSchema } from './payment-plans';
 
 export const checkoutSchema = z.object({
 	firstName: z.string().trim().min(1, 'Prénom requis').max(80),
 	lastName: z.string().trim().min(1, 'Nom requis').max(80),
 	email: z.string().trim().email('E-mail invalide').max(254),
+	paymentPlan: paymentPlanIdSchema,
 	consentCgv: z.literal(true, { error: 'Acceptation des CGV requise' }),
 	consentNda: z.literal(true, { error: 'Acceptation du NDA requise' }),
 	consentPrivacy: z.literal(true, {
@@ -22,16 +25,7 @@ export const adminLoginSchema = z.object({
 
 export const adminActionSchema = z.object({
 	enrollmentId: z.string().min(1),
-	action: z.enum([
-		'sync_payment',
-		'sync_yousign',
-		'retrigger_nda',
-		'retrigger_signature',
-		'relance_nda',
-		'recreate_nda',
-		'delete_nda',
-		'retrigger_teachizy',
-	]),
+	action: adminActionKeySchema,
 });
 
 const adminSearchQuerySchema = z.string().trim().max(100);

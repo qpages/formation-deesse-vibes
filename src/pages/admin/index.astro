@@ -5,12 +5,14 @@ import Dialog from '../../components/ui/Dialog.astro';
 import SearchBar from '../../components/admin/SearchBar.astro';
 import Pagination from '../../components/admin/Pagination.astro';
 import EnrollmentList from '../../components/admin/EnrollmentList.astro';
+import PaymentDetailDialog from '../../components/admin/PaymentDetailDialog.astro';
 import {
 	ADMIN_COOKIE,
 	parseCookie,
 	verifyAdminSessionToken,
 } from '../../lib/auth/session';
 import { listAdminEnrollments } from '../../lib/admin/enrollments';
+import { adminActionMetaForClient } from '../../lib/admin/actions';
 import { parseAdminListQuery } from '../../lib/validation';
 
 export const prerender = false;
@@ -24,6 +26,7 @@ if (!adminEmail) {
 
 const { q, page } = parseAdminListQuery(Astro.url.searchParams);
 const list = await listAdminEnrollments({ q, page });
+const actionMeta = adminActionMetaForClient();
 
 const summary =
 	list.total === 0
@@ -78,90 +81,20 @@ const summary =
 			Confirmer
 		</Button>
 	</Dialog>
+
+	<PaymentDetailDialog />
 </AdminLayout>
 
-<script>
-	type ActionKey =
-		| 'sync_payment'
-		| 'sync_yousign'
-		| 'retrigger_nda'
-		| 'retrigger_signature'
-		| 'relance_nda'
-		| 'recreate_nda'
-		| 'delete_nda'
-		| 'retrigger_teachizy';
+<script define:vars={{ actionMeta }}>
+	const ACTION_META = actionMeta;
 
-	const ACTION_META: Record<
-		ActionKey,
-		{ eyebrow: string; title: string; description: (name: string) => string; confirm: string; danger?: boolean }
-	> = {
-		sync_payment: {
-			eyebrow: 'Paiement',
-			title: 'Synchroniser le paiement',
-			description: (name) =>
-				`Vérifier la session Stripe de ${name} et passer le statut à « paiement confirmé » si le paiement est bien abouti (puis déclencher le NDA).`,
-			confirm: 'Synchroniser',
-		},
-		sync_yousign: {
-			eyebrow: 'Dev',
-			title: 'Synchroniser Yousign',
-			description: (name) =>
-				`Lire le statut de la demande Yousign de ${name} et aligner yousignStatus en base. Ne change pas le statut métier ni ne déclenche Teachizy.`,
-			confirm: 'Synchroniser',
-		},
-		retrigger_nda: {
-			eyebrow: 'Signature',
-			title: 'Déclencher création NDA (Inngest)',
-			description: (name) =>
-				`Envoyer l’event Inngest stripe/payment.confirmed pour ${name} (création Yousign + e-mail). Utile si le job a raté après un paiement déjà confirmé.`,
-			confirm: 'Déclencher Inngest',
-		},
-		retrigger_signature: {
-			eyebrow: 'Dev',
-			title: 'Déclencher invitation Teachizy (Inngest)',
-			description: (name) =>
-				`Envoyer l’event Inngest yousign/signature.done pour ${name} (invitation Teachizy). Utile si le job a raté après une signature déjà faite.`,
-			confirm: 'Déclencher Inngest',
-		},
-		relance_nda: {
-			eyebrow: 'Signature',
-			title: 'Relancer le NDA',
-			description: (name) =>
-				`Renvoyer un e-mail de relance à ${name} et réactiver le lien de signature YouSign.`,
-			confirm: 'Envoyer la relance',
-		},
-		recreate_nda: {
-			eyebrow: 'Signature',
-			title: 'Recréer le NDA',
-			description: (name) =>
-				`Créer une nouvelle demande YouSign pour ${name} et remplacer le lien actuel. L’ancien lien ne sera plus valide.`,
-			confirm: 'Recréer le NDA',
-			danger: true,
-		},
-		delete_nda: {
-			eyebrow: 'Dev',
-			title: 'Supprimer le NDA',
-			description: (name) =>
-				`Effacer les IDs YouSign de ${name} en base (local uniquement) et revenir à « paiement confirmé ». Permet de retester [dev] Trigger Inngest.`,
-			confirm: 'Supprimer le NDA',
-			danger: true,
-		},
-		retrigger_teachizy: {
-			eyebrow: 'Dev',
-			title: 'Renvoyer le lien Teachizy',
-			description: (name) =>
-				`Appeler l’API Teachizy pour renvoyer l’invitation à ${name}. Si c’est la 1ère fois : pose le statut « accès envoyés ». Sinon : ne touche pas teachizyInvitedAt (audit via AdminAction).`,
-			confirm: 'Renvoyer le lien',
-		},
-	};
-
-	const dialog = document.getElementById('admin-action-dialog') as HTMLDialogElement | null;
-	const eyebrowEl = dialog?.querySelector<HTMLElement>('[data-dialog-eyebrow]');
-	const titleEl = dialog?.querySelector<HTMLElement>('[data-dialog-title]');
-	const descEl = dialog?.querySelector<HTMLElement>('[data-dialog-description]');
-	const confirmBtn = document.getElementById('admin-dialog-confirm') as HTMLButtonElement | null;
-	const cancelBtn = document.getElementById('admin-dialog-cancel') as HTMLButtonElement | null;
-	const closeBtn = dialog?.querySelector<HTMLButtonElement>('[data-dialog-close]');
+	const dialog = document.getElementById('admin-action-dialog');
+	const eyebrowEl = dialog?.querySelector('[data-dialog-eyebrow]');
+	const titleEl = dialog?.querySelector('[data-dialog-title]');
+	const descEl = dialog?.querySelector('[data-dialog-description]');
+	const confirmBtn = document.getElementById('admin-dialog-confirm');
+	const cancelBtn = document.getElementById('admin-dialog-cancel');
+	const closeBtn = dialog?.querySelector('[data-dialog-close]');
 
 	dialog?.addEventListener('cancel', (event) => {
 		if (busy) event.preventDefault();
@@ -175,11 +108,11 @@ const summary =
 	let busy = false;
 	let pendingConfirmLabel = 'Confirmer';
 
-	function toast(message: string, variant: 'success' | 'error' | 'info' = 'info') {
+	function toast(message, variant = 'info') {
 		window.toast?.(message, variant);
 	}
 
-	function setBusy(next: boolean) {
+	function setBusy(next) {
 		busy = next;
 		if (confirmBtn) {
 			confirmBtn.disabled = next;
@@ -194,14 +127,18 @@ const summary =
 		setBusy(false);
 	}
 
-	function askConfirm(action: ActionKey, name: string): Promise<boolean> {
+	function fillDescription(template, name) {
+		return template.replaceAll('{name}', name || 'cette personne');
+	}
+
+	function askConfirm(action, name) {
 		const meta = ACTION_META[action];
 		if (!dialog || !meta) return Promise.resolve(false);
 
 		pendingConfirmLabel = meta.confirm;
 		if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow;
 		if (titleEl) titleEl.textContent = meta.title;
-		if (descEl) descEl.textContent = meta.description(name || 'cette personne');
+		if (descEl) descEl.textContent = fillDescription(meta.description, name);
 		if (confirmBtn) {
 			confirmBtn.textContent = meta.confirm;
 			confirmBtn.className = meta.danger ? confirmBtnDanger : confirmBtnPrimary;
@@ -214,7 +151,7 @@ const summary =
 		return new Promise((resolve) => {
 			let settled = false;
 
-			const finish = (value: boolean) => {
+			const finish = (value) => {
 				if (settled) return;
 				settled = true;
 				cleanup();
@@ -240,7 +177,7 @@ const summary =
 				dialog.removeEventListener('close', onClose);
 			};
 
-			const onBackdrop = (event: MouseEvent) => {
+			const onBackdrop = (event) => {
 				if (busy) return;
 				if (event.target === dialog) finish(false);
 			};
@@ -253,10 +190,10 @@ const summary =
 		});
 	}
 
-	async function runAdminAction(enrollmentId: string, action: string, name: string) {
+	async function runAdminAction(enrollmentId, action, name) {
 		if (!(action in ACTION_META)) return false;
 
-		const confirmed = await askConfirm(action as ActionKey, name);
+		const confirmed = await askConfirm(action, name);
 		if (!confirmed) return false;
 
 		setBusy(true);
@@ -297,7 +234,7 @@ const summary =
 		});
 	});
 
-	document.querySelectorAll<HTMLSelectElement>('[data-action-select]').forEach((select) => {
+	document.querySelectorAll('[data-action-select]').forEach((select) => {
 		select.addEventListener('change', async () => {
 			const action = select.value;
 			const enrollmentId = select.getAttribute('data-enrollment');

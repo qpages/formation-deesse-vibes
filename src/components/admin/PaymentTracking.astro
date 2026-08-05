@@ -1,0 +1,32 @@
+---
+import StatusBadge from '../ui/StatusBadge.astro';
+import type { AdminPaymentSummary } from '../../lib/admin/payments';
+
+interface Props {
+	summary: AdminPaymentSummary;
+	enrollmentId: string;
+	displayName: string;
+}
+
+const { summary, enrollmentId, displayName } = Astro.props;
+---
+
+<div class="payment-tracking space-y-1">
+	<StatusBadge tone={summary.trackingTone}>{summary.trackingLabel}</StatusBadge>
+	{
+		summary.nextInstallmentDueAt && summary.trackingState !== 'termine' && (
+			<p class="text-[10px] text-ink/45">
+				Prochaine échéance{' '}
+				{new Date(summary.nextInstallmentDueAt).toLocaleDateString('fr-FR')}
+			</p>
+		)
+	}
+	<button
+		type="button"
+		class="payment-detail-trigger text-[11px] text-ink-soft underline underline-offset-2 hover:text-blush-deep"
+		data-enrollment={enrollmentId}
+		data-name={displayName}
+	>
+		Voir les paiements
+	</button>
+</div>

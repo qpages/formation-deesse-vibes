@@ -1,6 +1,11 @@
-import type { Enrollment, Prisma } from '../../generated/prisma/client';
+import type { Enrollment, Payment, Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../db';
 import { paginate, type Pagination } from '../pagination';
+import {
+	buildAdminPaymentSummary,
+	listPaymentsForEnrollments,
+	type AdminPaymentSummary,
+} from './payments';
 import { resolveNdaSignUrl } from '../services/enrollment';
 import { stripeDashboardUrl } from '../services/stripe';
 import { yousignAppUrl } from '../services/yousign';
@@ -10,6 +15,7 @@ export const ADMIN_PAGE_SIZE = 25;
 
 export type AdminEnrollmentRow = Enrollment & {
 	pipeline: ReturnType<typeof adminPipelineBadges>;
+	paymentSummary: AdminPaymentSummary;
 	stripeUrl: string | null;
 	yousignUrl: string | null;
 	signUrl: string | null;
@@ -51,16 +57,24 @@ export function adminListHref(input: { q?: string; page?: number }): string {
 	return qs ? `/admin?${qs}` : '/admin';
 }
 
-export async function toAdminEnrollmentRow(row: Enrollment): Promise<AdminEnrollmentRow> {
+export async function toAdminEnrollmentRow(
+	row: Enrollment,
+	payments: Payment[],
+): Promise<AdminEnrollmentRow> {
+	const paymentSummary = buildAdminPaymentSummary(row, payments);
+
 	return {
 		...row,
 		pipeline: adminPipelineBadges({
 			status: row.status,
 			yousignStatus: row.yousignStatus,
 		}),
+		paymentSummary,
 		stripeUrl: stripeDashboardUrl({
 			paymentIntentId: row.stripePaymentIntentId,
 			checkoutSessionId: row.stripeCheckoutSessionId,
+			subscriptionId: row.stripeSubscriptionId,
+			scheduleId: row.stripeScheduleId,
 		}),
 		yousignUrl: yousignAppUrl(row.yousignRequestId),
 		signUrl: await resolveNdaSignUrl(row),
@@ -90,9 +104,15 @@ export async function listAdminEnrollments(input: {
 		take: pagination.take,
 	});
 
+	const paymentsByEnrollment = await listPaymentsForEnrollments(enrollments.map((e) => e.id));
+
 	return {
 		...pagination,
 		q,
-		rows: await Promise.all(enrollments.map(toAdminEnrollmentRow)),
+		rows: await Promise.all(
+			enrollments.map((row) =>
+				toAdminEnrollmentRow(row, paymentsByEnrollment.get(row.id) ?? []),
+			),
+		),
 	};
 }

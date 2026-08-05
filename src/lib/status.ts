@@ -1,7 +1,12 @@
 import type {
 	EnrollmentStatus,
+	Payment,
+	PaymentPlanId,
+	PaymentStatus,
+	SubscriptionStatus,
 	YousignRequestStatus,
 } from '../generated/prisma/client';
+import { formatMoney, PAYMENT_PLANS } from './payment-plans';
 
 export type StepKey = 'paiement' | 'nda' | 'acces';
 export type StepState = 'a_faire' | 'en_cours' | 'termine' | 'action_requise';
@@ -193,11 +198,36 @@ export type PrimaryAction =
 
 export const TEACHIZY_ACADEMY_URL = 'https://jsmatriceacademy.teachizy.fr';
 
+/** Intervalle et plafond du polling client (StatusPanel). */
+export const ENROLLMENT_POLL_INTERVAL_MS = 2_000;
+export const ENROLLMENT_POLL_MAX_MS = 90_000;
+
+/**
+ * Statuts où un process async (webhook / Inngest) peut avancer l’inscription
+ * sans action utilisateur — le client poll jusqu’à changement.
+ */
+export function shouldPollEnrollment(input: {
+	status: EnrollmentStatus;
+	hasCheckoutSession?: boolean;
+	hasNdaSignUrl?: boolean;
+}): boolean {
+	switch (input.status) {
+		case 'paiement_en_attente':
+			return Boolean(input.hasCheckoutSession);
+		case 'paiement_confirme':
+			return !input.hasNdaSignUrl;
+		case 'nda_signe':
+			return true;
+		default:
+			return false;
+	}
+}
+
 /** Bandeau au retour Stripe (`?checkout=success`). Null = laisser le panneau parler. */
 export function checkoutSuccessFlash(status: EnrollmentStatus): string | null {
 	switch (status) {
 		case 'paiement_en_attente':
-			return 'Paiement en cours de confirmation. Rechargez cette page dans un instant.';
+			return 'Paiement en cours de confirmation. Cette page se met à jour automatiquement.';
 		case 'paiement_confirme':
 			return 'Paiement reçu. Nous préparons votre accord de confidentialité.';
 		case 'nda_envoye':
@@ -211,7 +241,7 @@ export function checkoutSuccessFlash(status: EnrollmentStatus): string | null {
 export function statusMessage(status: EnrollmentStatus): string | null {
 	switch (status) {
 		case 'nda_signe':
-			return 'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation à rejoindre la formation.';
+			return 'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation — cette page se met à jour automatiquement.';
 		case 'teachizy_envoye':
 			return 'Un email Teachizy avec vos identifiants vous a été envoyé. Si vous ne le retrouvez pas, cliquez sur « Mot de passe oublié » sur la page de connexion.';
 		case 'rembourse':
@@ -246,3 +276,99 @@ export function primaryAction(
 			return { kind: 'none', label: 'Contacter un administrateur' };
 	}
 }
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+	paid: 'Payé',
+	open: 'En attente',
+	failed: 'Impayé',
+	void: 'Annulé',
+	uncollectible: 'Irrécouvrable',
+	draft: 'Brouillon',
+};
+
+export function paymentPlanLabel(plan: PaymentPlanId | null | undefined): string {
+	if (!plan) return '—';
+	return PAYMENT_PLANS[plan]?.label ?? plan;
+}
+
+export type PaymentTrackingState =
+	| 'en_attente'
+	| 'a_jour'
+	| 'impaye'
+	| 'termine'
+	| 'rembourse';
+
+export function paymentTrackingState(input: {
+	status: EnrollmentStatus;
+	installmentsPaid: number;
+	installmentsTotal: number | null;
+	subscriptionStatus: SubscriptionStatus | null;
+	payments: Pick<Payment, 'status'>[];
+}): PaymentTrackingState {
+	if (input.status === 'rembourse') return 'rembourse';
+	if (input.status === 'paiement_en_attente') return 'en_attente';
+
+	const hasFailed = input.payments.some((p) => p.status === 'failed' || p.status === 'open');
+	const total = input.installmentsTotal ?? 1;
+	const allPaid = input.installmentsPaid >= total;
+
+	if (allPaid || input.subscriptionStatus === 'completed') return 'termine';
+	if (hasFailed && input.installmentsPaid > 0) return 'impaye';
+	if (input.installmentsPaid > 0) return 'a_jour';
+	return 'en_attente';
+}
+
+export function paymentTrackingTone(state: PaymentTrackingState): BadgeTone {
+	switch (state) {
+		case 'en_attente':
+			return 'neutral';
+		case 'a_jour':
+			return 'progress';
+		case 'termine':
+			return 'success';
+		case 'impaye':
+			return 'action';
+		case 'rembourse':
+			return 'neutral';
+	}
+}
+
+export function paymentTrackingLabel(state: PaymentTrackingState): string {
+	switch (state) {
+		case 'en_attente':
+			return 'En attente';
+		case 'a_jour':
+			return 'À jour';
+		case 'termine':
+			return 'Terminé';
+		case 'impaye':
+			return 'Impayé';
+		case 'rembourse':
+			return 'Remboursé';
+	}
+}
+
+export function paymentProgressLabel(input: {
+	installmentsPaid: number;
+	installmentsTotal: number | null;
+}): string {
+	const total = input.installmentsTotal ?? 1;
+	return `${input.installmentsPaid}/${total} échéance${total > 1 ? 's' : ''}`;
+}
+
+export function paymentSummaryLine(input: {
+	installmentsPaid: number;
+	installmentsTotal: number | null;
+	collectedAmountCents: number;
+	totalAmountCents: number | null;
+	currency?: string;
+}): string {
+	const progress = paymentProgressLabel(input);
+	const collected = formatMoney(input.collectedAmountCents, input.currency ?? 'eur');
+	if (input.totalAmountCents) {
+		const total = formatMoney(input.totalAmountCents, input.currency ?? 'eur');
+		return `${progress} · ${collected} / ${total}`;
+	}
+	return `${progress} · ${collected}`;
+}
+

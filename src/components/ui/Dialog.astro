@@ -4,15 +4,16 @@ import { cn } from '../../lib/cn';
 interface Props {
 	id: string;
 	title?: string;
+	size?: 'sm' | 'lg';
 	class?: string;
 }
 
-const { id, title = '', class: className } = Astro.props;
+const { id, title = '', size = 'sm', class: className } = Astro.props;
 ---
 
 <dialog
 	id={id}
-	class={cn('admin-dialog', className)}
+	class={cn('admin-dialog', size === 'lg' && 'admin-dialog--lg', className)}
 	aria-labelledby={`${id}-title`}
 	aria-describedby={`${id}-desc`}
 >
@@ -48,12 +49,15 @@ const { id, title = '', class: className } = Astro.props;
 		<p
 			id={`${id}-desc`}
 			data-dialog-description
-			class="mt-3 text-sm leading-relaxed text-ink-soft"
+			class="mt-3 text-sm leading-relaxed text-ink-soft empty:hidden"
 		>
-			<slot />
 		</p>
 
-		<footer class="mt-8 flex flex-wrap items-center justify-end gap-2.5">
+		<div data-dialog-body class="mt-4 empty:mt-0 empty:hidden">
+			<slot />
+		</div>
+
+		<footer class="mt-8 flex flex-wrap items-center justify-end gap-2.5 empty:hidden">
 			<slot name="footer" />
 		</footer>
 	</div>
@@ -62,12 +66,16 @@ const { id, title = '', class: className } = Astro.props;
 <style>
 	.admin-dialog {
 		margin: auto;
-		max-width: calc(100% - 2rem);
+		max-width: calc(100% - 1.5rem);
 		width: min(100%, 26.5rem);
 		border: 0;
 		background: transparent;
 		padding: 0;
 		color: var(--color-ink);
+	}
+
+	.admin-dialog--lg {
+		width: min(100%, 36rem);
 	}
 
 	.admin-dialog::backdrop {
@@ -79,11 +87,19 @@ const { id, title = '', class: className } = Astro.props;
 	.admin-dialog__panel {
 		border: 1px solid rgb(26 20 16 / 0.1);
 		background: var(--color-surface);
-		padding: 1.75rem 1.75rem 1.5rem;
+		padding: 1.5rem 1.25rem 1.25rem;
 		box-shadow:
 			0 1px 0 rgb(255 255 255 / 0.65) inset,
 			var(--shadow-soft),
 			0 40px 80px rgb(26 20 16 / 0.14);
+		max-height: min(90dvh, 52rem);
+		overflow-y: auto;
+	}
+
+	@media (min-width: 640px) {
+		.admin-dialog__panel {
+			padding: 1.75rem 1.75rem 1.5rem;
+		}
 	}
 
 	.admin-dialog[open] {

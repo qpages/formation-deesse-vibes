@@ -1,7 +1,7 @@
-import type { Enrollment, EnrollmentStatus } from '../../generated/prisma/client';
+import type { Enrollment, EnrollmentStatus, PaymentPlanId } from '../../generated/prisma/client';
 import { encryptPayload, generateToken, hashToken } from '../crypto';
 import { getPrisma } from '../db';
-import { getEnv } from '../env';
+import { getPaymentPlan } from '../payment-plans';
 import { sendMagicLinkEmail } from './resend';
 import { getSignatureLink } from './yousign';
 
@@ -24,10 +24,17 @@ export async function findEnrollmentByCheckoutSession(sessionId: string) {
 	});
 }
 
+export async function findEnrollmentBySubscriptionId(subscriptionId: string) {
+	return getPrisma().enrollment.findUnique({
+		where: { stripeSubscriptionId: subscriptionId },
+	});
+}
+
 export async function createPendingEnrollment(input: {
 	email: string;
 	firstName: string;
 	lastName: string;
+	paymentPlan: PaymentPlanId;
 	consentCgv: boolean;
 	consentNda: boolean;
 	consentPrivacy: boolean;
@@ -38,6 +45,7 @@ export async function createPendingEnrollment(input: {
 		throw new DuplicateEnrollmentError(email);
 	}
 
+	const plan = getPaymentPlan(input.paymentPlan);
 	const now = new Date();
 	const data = {
 		email,
@@ -46,7 +54,10 @@ export async function createPendingEnrollment(input: {
 		consentCgvAt: input.consentCgv ? now : null,
 		consentNdaAt: input.consentNda ? now : null,
 		consentPrivacyAt: input.consentPrivacy ? now : null,
-		amountCents: getEnv().STRIPE_AMOUNT_CENTS,
+		paymentPlan: plan.id,
+		installmentsTotal: plan.installments,
+		totalAmountCents: plan.totalAmountCents,
+		amountCents: plan.installmentAmountCents,
 		status: 'paiement_en_attente' as const,
 	};
 

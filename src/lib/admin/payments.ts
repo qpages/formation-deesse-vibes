@@ -1,0 +1,215 @@
+import type { Enrollment, Payment } from '../../generated/prisma/client';
+import { getPrisma } from '../db';
+import { formatMoney } from '../payment-plans';
+import {
+	paymentPlanLabel,
+	paymentProgressLabel,
+	paymentSummaryLine,
+	paymentTrackingLabel,
+	paymentTrackingState,
+	paymentTrackingTone,
+	PAYMENT_STATUS_LABELS,
+	type PaymentTrackingState,
+} from '../status';
+import { retrieveInvoice, stripeDashboardUrl } from '../services/stripe';
+
+export type AdminPaymentRow = {
+	id: string;
+	installmentNumber: number;
+	amountLabel: string;
+	status: Payment['status'];
+	statusLabel: string;
+	failureReason: string | null;
+	dueAt: string | null;
+	paidAt: string | null;
+	stripeUrl: string | null;
+	invoicePdfUrl: string | null;
+	hostedInvoiceUrl: string | null;
+};
+
+export type AdminInvoiceLink = {
+	installmentNumber: number;
+	amountLabel: string;
+	paidAt: string | null;
+	pdfUrl: string | null;
+	hostedUrl: string | null;
+};
+
+export type AdminPaymentSummary = {
+	planLabel: string;
+	progressLabel: string;
+	summaryLine: string;
+	trackingState: PaymentTrackingState;
+	trackingLabel: string;
+	trackingTone: ReturnType<typeof paymentTrackingTone>;
+	nextInstallmentDueAt: string | null;
+	subscriptionStatus: Enrollment['subscriptionStatus'];
+	collectedAmountCents: number;
+	totalAmountCents: number | null;
+	installmentsPaid: number;
+	installmentsTotal: number | null;
+	stripeSubscriptionUrl: string | null;
+	stripeScheduleUrl: string | null;
+	invoices: AdminInvoiceLink[];
+	payments: AdminPaymentRow[];
+};
+
+async function hydrateInvoiceUrls(payments: Payment[]): Promise<Payment[]> {
+	const missing = payments.filter(
+		(payment) =>
+			payment.stripeInvoiceId &&
+			(!payment.invoicePdfUrl || !payment.hostedInvoiceUrl),
+	);
+	if (missing.length === 0) return payments;
+
+	const prisma = getPrisma();
+	const byId = new Map(payments.map((payment) => [payment.id, payment]));
+
+	await Promise.all(
+		missing.map(async (payment) => {
+			try {
+				const invoice = await retrieveInvoice(payment.stripeInvoiceId!);
+				const invoicePdfUrl = invoice.invoice_pdf ?? payment.invoicePdfUrl;
+				const hostedInvoiceUrl = invoice.hosted_invoice_url ?? payment.hostedInvoiceUrl;
+				if (
+					invoicePdfUrl === payment.invoicePdfUrl &&
+					hostedInvoiceUrl === payment.hostedInvoiceUrl
+				) {
+					return;
+				}
+				const updated = await prisma.payment.update({
+					where: { id: payment.id },
+					data: { invoicePdfUrl, hostedInvoiceUrl },
+				});
+				byId.set(payment.id, updated);
+			} catch (error) {
+				console.error('[admin payments] hydrate invoice', payment.stripeInvoiceId, error);
+			}
+		}),
+	);
+
+	return payments.map((payment) => byId.get(payment.id) ?? payment);
+}
+
+export function buildAdminPaymentSummary(
+	enrollment: Enrollment,
+	payments: Payment[],
+): AdminPaymentSummary {
+	const trackingState = paymentTrackingState({
+		status: enrollment.status,
+		installmentsPaid: enrollment.installmentsPaid,
+		installmentsTotal: enrollment.installmentsTotal,
+		subscriptionStatus: enrollment.subscriptionStatus,
+		payments,
+	});
+
+	const paymentRows: AdminPaymentRow[] = payments.map((payment) => ({
+		id: payment.id,
+		installmentNumber: payment.installmentNumber,
+		amountLabel: formatMoney(payment.amountCents, payment.currency),
+		status: payment.status,
+		statusLabel: PAYMENT_STATUS_LABELS[payment.status],
+		failureReason: payment.failureReason,
+		dueAt: payment.dueAt?.toISOString() ?? null,
+		paidAt: payment.paidAt?.toISOString() ?? null,
+		stripeUrl: stripeDashboardUrl({
+			invoiceId: payment.stripeInvoiceId,
+			paymentIntentId: payment.stripePaymentIntentId,
+		}),
+		invoicePdfUrl: payment.invoicePdfUrl,
+		hostedInvoiceUrl: payment.hostedInvoiceUrl,
+	}));
+
+	return {
+		planLabel: paymentPlanLabel(enrollment.paymentPlan),
+		progressLabel: paymentProgressLabel({
+			installmentsPaid: enrollment.installmentsPaid,
+			installmentsTotal: enrollment.installmentsTotal,
+		}),
+		summaryLine: paymentSummaryLine({
+			installmentsPaid: enrollment.installmentsPaid,
+			installmentsTotal: enrollment.installmentsTotal,
+			collectedAmountCents: enrollment.collectedAmountCents,
+			totalAmountCents: enrollment.totalAmountCents,
+		}),
+		trackingState,
+		trackingLabel: paymentTrackingLabel(trackingState),
+		trackingTone: paymentTrackingTone(trackingState),
+		nextInstallmentDueAt: enrollment.nextInstallmentDueAt?.toISOString() ?? null,
+		subscriptionStatus: enrollment.subscriptionStatus,
+		collectedAmountCents: enrollment.collectedAmountCents,
+		totalAmountCents: enrollment.totalAmountCents,
+		installmentsPaid: enrollment.installmentsPaid,
+		installmentsTotal: enrollment.installmentsTotal,
+		stripeSubscriptionUrl: stripeDashboardUrl({
+			subscriptionId: enrollment.stripeSubscriptionId,
+		}),
+		stripeScheduleUrl: stripeDashboardUrl({ scheduleId: enrollment.stripeScheduleId }),
+		invoices: paymentRows
+			.filter((payment) => payment.invoicePdfUrl || payment.hostedInvoiceUrl)
+			.map((payment) => ({
+				installmentNumber: payment.installmentNumber,
+				amountLabel: payment.amountLabel,
+				paidAt: payment.paidAt,
+				pdfUrl: payment.invoicePdfUrl,
+				hostedUrl: payment.hostedInvoiceUrl,
+			})),
+		payments: paymentRows,
+	};
+}
+
+export async function getAdminPaymentSummary(enrollmentId: string) {
+	const prisma = getPrisma();
+	const enrollment = await prisma.enrollment.findUnique({ where: { id: enrollmentId } });
+	if (!enrollment) return null;
+
+	const payments = await prisma.payment.findMany({
+		where: { enrollmentId },
+		orderBy: { installmentNumber: 'asc' },
+	});
+
+	const hydrated = await hydrateInvoiceUrls(payments);
+	return buildAdminPaymentSummary(enrollment, hydrated);
+}
+
+/** Liens facture PDF / page hébergée pour le client (paiements payés uniquement). */
+export async function listPaidInvoiceLinks(enrollmentId: string) {
+	const payments = await getPrisma().payment.findMany({
+		where: { enrollmentId, status: 'paid' },
+		orderBy: { installmentNumber: 'asc' },
+		select: {
+			installmentNumber: true,
+			invoicePdfUrl: true,
+			hostedInvoiceUrl: true,
+		},
+	});
+
+	return payments
+		.map((payment) => {
+			const url = payment.invoicePdfUrl ?? payment.hostedInvoiceUrl;
+			if (!url) return null;
+			return {
+				installmentNumber: payment.installmentNumber,
+				url,
+			};
+		})
+		.filter((row): row is { installmentNumber: number; url: string } => Boolean(row));
+}
+
+export async function listPaymentsForEnrollments(enrollmentIds: string[]) {
+	if (enrollmentIds.length === 0) return new Map<string, Payment[]>();
+
+	const prisma = getPrisma();
+	const payments = await prisma.payment.findMany({
+		where: { enrollmentId: { in: enrollmentIds } },
+		orderBy: { installmentNumber: 'asc' },
+	});
+
+	const map = new Map<string, Payment[]>();
+	for (const payment of payments) {
+		const list = map.get(payment.enrollmentId) ?? [];
+		list.push(payment);
+		map.set(payment.enrollmentId, list);
+	}
+	return map;
+}
