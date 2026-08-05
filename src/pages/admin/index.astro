@@ -2,9 +2,9 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import Button from '../../components/ui/Button.astro';
 import Dialog from '../../components/ui/Dialog.astro';
-import FilterBar from '../../components/admin/FilterBar.astro';
-import Pagination from '../../components/admin/Pagination.astro';
-import EnrollmentList from '../../components/admin/EnrollmentList.astro';
+import FilterBar from '../../components/admin/list/FilterBar.astro';
+import Pagination from '../../components/admin/list/Pagination.astro';
+import EnrollmentList from '../../components/admin/list/EnrollmentList.astro';
 import { requireAdminPage } from '../../lib/admin/auth';
 import { listAdminEnrollments } from '../../lib/admin/enrollments';
 import { adminActionMetaForClient } from '../../lib/admin/actions';

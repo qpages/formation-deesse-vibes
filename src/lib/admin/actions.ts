@@ -203,9 +203,14 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 		case 'retrigger_teachizy':
 			return e.accessStatus !== 'revoked' && e.contractStatus === 'signed';
 		case 'mark_refunded':
-			return e.collectionStatus !== 'refunded';
+			return e.collectionStatus !== 'refunded' && e.collectionStatus !== 'pending';
 		case 'revoke_access':
-			return e.accessStatus !== 'revoked' && e.collectionStatus !== 'refunded';
+			return (
+				(e.accessStatus === 'active' ||
+					e.accessStatus === 'pending' ||
+					e.accessStatus === 'suspended') &&
+				e.collectionStatus !== 'refunded'
+			);
 		case 'sync_payment':
 			return Boolean(e.stripeCheckoutSessionId);
 		case 'sync_yousign':
@@ -228,6 +233,114 @@ export function visibleActions(e: VisibilityInput): AdminActionKey[] {
 export function visibleActionDefs(e: VisibilityInput): AdminActionDef[] {
 	const allowed = new Set(visibleActions(e));
 	return ADMIN_ACTIONS.filter((a) => allowed.has(a.action));
+}
+
+function actionDef(action: AdminActionKey): AdminActionDef {
+	const def = ADMIN_ACTIONS.find((a) => a.action === action);
+	if (!def) throw new Error(`Unknown admin action: ${action}`);
+	return def;
+}
+
+/** Pipeline-first next step — never a danger action. */
+export function recommendedAction(e: VisibilityInput): AdminActionDef | null {
+	const allowed = new Set(visibleActions(e));
+	const pick = (key: AdminActionKey) => (allowed.has(key) ? actionDef(key) : null);
+
+	if (
+		e.collectionStatus === 'pending' ||
+		e.collectionStatus === 'past_due' ||
+		e.collectionStatus === 'canceled'
+	) {
+		const sync = pick('sync_payment');
+		if (sync) return sync;
+	}
+
+	if (e.contractStatus === 'sent' || e.contractStatus === 'pending') {
+		const relance = pick('relance_nda');
+		if (relance) return relance;
+		const yousign = pick('sync_yousign');
+		if (yousign) return yousign;
+		const nda = pick('retrigger_nda');
+		if (nda) return nda;
+	}
+
+	if (e.contractStatus === 'signed' && e.accessStatus !== 'active') {
+		const teachizy = pick('retrigger_teachizy');
+		if (teachizy) return teachizy;
+		const grant = pick('retrigger_signature');
+		if (grant) return grant;
+	}
+
+	if (e.accessStatus === 'suspended') {
+		const teachizy = pick('retrigger_teachizy');
+		if (teachizy) return teachizy;
+	}
+
+	const fallback: AdminActionKey[] = [
+		'sync_payment',
+		'sync_yousign',
+		'relance_nda',
+		'retrigger_teachizy',
+		'retrigger_nda',
+		'retrigger_signature',
+	];
+	for (const key of fallback) {
+		const hit = pick(key);
+		if (hit) return hit;
+	}
+
+	return null;
+}
+
+export function recommendedActionReason(
+	e: VisibilityInput,
+	action: AdminActionKey,
+): string {
+	switch (action) {
+		case 'sync_payment':
+			if (e.collectionStatus === 'past_due') {
+				return 'Impayé détecté — resynchronisez Stripe pour aligner le dossier.';
+			}
+			if (e.collectionStatus === 'canceled') {
+				return 'Paiement annulé côté collection — vérifiez l’état Stripe.';
+			}
+			return 'Paiement en attente — synchronisez Stripe pour débloquer la signature.';
+		case 'relance_nda':
+			return 'Signature en attente — relancez la participante.';
+		case 'sync_yousign':
+			return 'Statut signature à vérifier — synchronisez Yousign.';
+		case 'retrigger_nda':
+			return 'Paiement OK, NDA absent — rejouez la création NDA.';
+		case 'retrigger_teachizy':
+			return 'NDA signé — renvoyez l’accès Teachizy.';
+		case 'retrigger_signature':
+			return 'Grant Teachizy à rejouer après signature.';
+		default:
+			return 'Prochaine action recommandée pour ce dossier.';
+	}
+}
+
+export type PartitionedAdminActions = {
+	recommended: AdminActionDef | null;
+	reason: string | null;
+	secondary: AdminActionDef[];
+	danger: AdminActionDef[];
+};
+
+/** Detail panel: recommended CTA, other productive actions, danger behind disclosure. */
+export function partitionVisibleActions(e: VisibilityInput): PartitionedAdminActions {
+	const recommended = recommendedAction(e);
+	const all = visibleActionDefs(e);
+	const danger = all.filter((a) => a.danger);
+	const secondary = all.filter(
+		(a) => !a.danger && a.action !== recommended?.action,
+	);
+	return {
+		recommended,
+		reason: recommended ? recommendedActionReason(e, recommended.action) : null,
+		secondary,
+		danger,
+	};
 }
 
 export const COLLECTION_FILTER_VALUES = [

@@ -1,14 +1,14 @@
 ---
-import type { Enrollment } from '../../generated/prisma/client';
+import type { Enrollment } from '../../../generated/prisma/client';
 import {
 	ENROLLMENT_POLL_INTERVAL_MS,
 	ENROLLMENT_POLL_MAX_MS,
 	primaryAction,
 	shouldPollEnrollment,
 	statusMessage,
-} from '../../lib/status';
-import Alert from '../ui/Alert.astro';
-import Button from '../ui/Button.astro';
+} from '../../../lib/status';
+import Alert from '../../ui/Alert.astro';
+import Button from '../../ui/Button.astro';
 import SignLinkCard from './SignLinkCard.astro';
 
 interface Props {

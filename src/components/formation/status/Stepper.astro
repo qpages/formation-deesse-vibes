@@ -1,6 +1,6 @@
 ---
-import StatusBadge from '../ui/StatusBadge.astro';
-import { stepLabel, type StepKey, type StepState } from '../../lib/status';
+import StatusBadge from '../../ui/StatusBadge.astro';
+import { stepLabel, type StepKey, type StepState } from '../../../lib/status';
 
 interface Props {
 	steps: Record<StepKey, StepState>;

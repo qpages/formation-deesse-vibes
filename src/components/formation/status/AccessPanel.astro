@@ -1,11 +1,13 @@
 ---
-import type { StepKey, StepState } from '../../lib/status';
-import type { EnrollmentWithUser } from '../../lib/services/enrollment';
-import CheckoutForm from './CheckoutForm.astro';
-import ContactAdmin from './ContactAdmin.astro';
+import type { StepKey, StepState } from '../../../lib/status';
+import type { EnrollmentWithUser } from '../../../lib/services/enrollment';
+import { getEnv } from '../../../lib/env';
+import CheckoutForm from '../landing/CheckoutForm.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
 import StatusPanel from './StatusPanel.astro';
 import Stepper from './Stepper.astro';
+
+const adminContactEmail = getEnv().PUBLIC_ADMIN_CONTACT_EMAIL;
 
 interface Props {
 	showFunnel: boolean;
@@ -167,7 +169,12 @@ const funnelFlash = showFunnel ? flash : null;
 							<span class="text-ink/25" aria-hidden="true">
 								·
 							</span>
-							<ContactAdmin />
+							<a
+								href={`mailto:${adminContactEmail}?subject=${encodeURIComponent('Formation Matrice Évolution')}`}
+								class="text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+							>
+								Contacter un administrateur
+							</a>
 						</div>
 					</div>
 				</>

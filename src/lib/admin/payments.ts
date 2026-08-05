@@ -173,8 +173,13 @@ export async function getAdminPaymentSummary(enrollmentId: string) {
 	return buildAdminPaymentSummary(enrollment, hydrated);
 }
 
-/** Expand known payments with estimated future installments for admin UI. */
+/**
+ * Expand known payments with estimated future installments for admin UI.
+ * No synthetic rows until Stripe has produced at least one payment record.
+ */
 export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaymentRow[] {
+	if (summary.payments.length === 0) return [];
+
 	const total = summary.installmentsTotal ?? Math.max(summary.payments.length, 1);
 	const byNumber = new Map(summary.payments.map((p) => [p.installmentNumber, p]));
 	const remainingCents = Math.max(

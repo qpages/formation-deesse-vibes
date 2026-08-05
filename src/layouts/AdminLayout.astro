@@ -9,46 +9,31 @@ interface Props {
 }
 
 const { title = 'Admin — Formation', email } = Astro.props;
-const path = Astro.url.pathname;
-const onList = path === '/admin' || path.startsWith('/admin?');
 ---
 
 <BaseLayout title={title} noindex={true}>
 	<div class="flex min-h-screen flex-col bg-mist/30">
 		<header class="sticky top-0 z-20 border-b border-ink/10 bg-ink text-mist">
 			<Container class="flex h-14 items-center justify-between gap-4">
-				<div class="flex min-w-0 items-center gap-6">
-					<a href="/admin" class="shrink-0 font-display text-lg tracking-wide text-mist">
-						Admin
-					</a>
-					<nav class="flex items-center gap-4" aria-label="Admin">
-						<a
-							href="/admin"
-							class:list={[
-								'text-[11px] uppercase tracking-[0.16em] transition-colors',
-								onList || path.startsWith('/admin/enrollments')
-									? 'text-mist'
-									: 'text-mist/55 hover:text-mist',
-							]}
-							aria-current={onList || path.startsWith('/admin/enrollments') ? 'page' : undefined}
-						>
-							Inscriptions
-						</a>
-					</nav>
-				</div>
+				<a
+					href="/"
+					class="shrink-0 font-display text-xl tracking-wide text-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-2xl"
+				>
+					Déesse Vibes
+				</a>
 
 				{
 					email && (
-						<form method="post" action="/api/admin/logout" class="flex items-center gap-3">
+						<form method="post" action="/api/admin/logout" class="flex shrink-0 items-center gap-3">
 							<span
-								class="hidden max-w-[14rem] truncate text-[12px] text-mist/55 md:inline"
+								class="hidden max-w-[14rem] truncate text-xs text-mist/55 md:inline"
 								title={email}
 							>
 								{email}
 							</span>
 							<button
 								type="submit"
-								class="shrink-0 border border-mist/25 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-mist/85 transition-colors hover:border-mist/50 hover:text-mist"
+								class="border border-mist/25 px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-mist/85 transition-colors hover:border-mist/50 hover:text-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
 								onclick="event.preventDefault(); fetch('/api/admin/logout',{method:'POST'}).then(()=>location.href='/admin/login')"
 							>
 								Déconnexion

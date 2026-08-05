@@ -7,7 +7,7 @@ interface Props {
 const { stripeUrl, yousignUrl } = Astro.props;
 
 const iconClass =
-	'inline-flex size-8 items-center justify-center rounded-sm text-ink/55 transition-colors';
+	'inline-flex size-10 items-center justify-center rounded-sm text-ink/55 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
 const activeClass = `${iconClass} hover:bg-ink/5 hover:text-ink`;
 const disabledClass = `${iconClass} cursor-not-allowed opacity-30`;
 ---
@@ -31,7 +31,7 @@ const disabledClass = `${iconClass} cursor-not-allowed opacity-30`;
 				</svg>
 			</a>
 		) : (
-			<span class={disabledClass} aria-disabled="true" title="Pas de Stripe">
+			<span class={disabledClass} aria-label="Pas de lien Stripe" title="Pas de Stripe">
 				<svg class="size-4" viewBox="0 0 24 24" aria-hidden="true">
 					<path
 						fill="currentColor"
@@ -54,16 +54,20 @@ const disabledClass = `${iconClass} cursor-not-allowed opacity-30`;
 				<svg class="size-4" viewBox="0 0 24 24" aria-hidden="true">
 					<path
 						fill="currentColor"
-						d="M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 1 0 0 6h4v2h-4a5 5 0 0 1-5-5zm5.1 1h6v-2h-6v2zm6-6h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 1 0 0-6h-4V7z"
+						d="M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 1 0 0 6h4v2h-4a5 5 0 0 1 5-5zm5.1 1h6v-2h-6v2zm6-6h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 1 0 0-6h-4V7z"
 					/>
 				</svg>
 			</a>
 		) : (
-			<span class={disabledClass} aria-disabled="true" title="Pas de lien de signature">
+			<span
+				class={disabledClass}
+				aria-label="Pas de lien de signature — disponible après confirmation du paiement"
+				title="Pas de lien de signature"
+			>
 				<svg class="size-4" viewBox="0 0 24 24" aria-hidden="true">
 					<path
 						fill="currentColor"
-						d="M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 1 0 0 6h4v2h-4a5 5 0 0 1-5-5zm5.1 1h6v-2h-6v2zm6-6h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 1 0 0-6h-4V7z"
+						d="M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 1 0 0 6h4v2h-4a5 5 0 0 1 5-5zm5.1 1h6v-2h-6v2zm6-6h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 1 0 0-6h-4V7z"
 					/>
 				</svg>
 			</span>

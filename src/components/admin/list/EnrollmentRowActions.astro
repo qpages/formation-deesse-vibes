@@ -1,0 +1,82 @@
+---
+import type { AdminEnrollmentRow } from '../../../lib/admin/enrollments';
+import { METIER_ACTIONS, RECOVERY_ACTIONS } from '../../../lib/admin/actions';
+
+interface Props {
+	row: AdminEnrollmentRow;
+	compact?: boolean;
+}
+
+const { row, compact = true } = Astro.props;
+
+const allowed = new Set(row.visibleActions);
+const metier = METIER_ACTIONS.filter((a) => allowed.has(a.action));
+const recovery = RECOVERY_ACTIONS.filter((a) => allowed.has(a.action));
+const dangerMetier = metier.filter((a) => a.danger);
+const safeMetier = metier.filter((a) => !a.danger);
+
+const linkClass = compact
+	? 'inline-flex min-h-9 items-center text-xs text-ink-soft underline underline-offset-2 transition-colors hover:text-blush-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush'
+	: 'inline-flex min-h-11 items-center text-sm text-ink-soft underline underline-offset-2 transition-colors hover:text-blush-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
+const recoveryLinkClass = compact
+	? 'inline-flex min-h-9 items-center text-xs text-ink/50 underline underline-offset-2 transition-colors hover:text-ink-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush'
+	: 'inline-flex min-h-11 items-center text-sm text-ink/50 underline underline-offset-2 transition-colors hover:text-ink-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
+const dangerLinkClass = compact
+	? 'inline-flex min-h-9 items-center text-xs text-ink/40 underline underline-offset-2 transition-colors hover:text-blush-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush'
+	: 'inline-flex min-h-11 items-center text-sm text-ink/40 underline underline-offset-2 transition-colors hover:text-blush-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
+const zoneLabelClass = 'text-xs font-medium uppercase tracking-[0.12em] text-ink/55';
+---
+
+{
+	metier.length + recovery.length === 0 ? (
+		<span class="text-xs text-ink/35">—</span>
+	) : (
+		<div
+			class="space-y-2"
+			data-action-zone
+			data-enrollment={row.id}
+			data-name={row.displayName}
+		>
+			{safeMetier.length > 0 ? (
+				<div>
+					{!compact ? <p class:list={['mb-2', zoneLabelClass]}>Métier</p> : null}
+					<div class="flex flex-wrap gap-x-3 gap-y-1">
+						{safeMetier.map(({ action, label }) => (
+							<button type="button" data-action={action} class={linkClass}>
+								{label}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
+			{recovery.length > 0 ? (
+				<div>
+					<p class:list={[compact ? 'mt-1' : 'mb-2', zoneLabelClass]}>Réparation</p>
+					<div class="flex flex-wrap gap-x-3 gap-y-1">
+						{recovery.map(({ action, label }) => (
+							<button type="button" data-action={action} class={recoveryLinkClass}>
+								{label}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
+			{dangerMetier.length > 0 ? (
+				<div>
+					{!compact ? (
+						<p class:list={['mb-2', zoneLabelClass]}>Sensible</p>
+					) : (
+						<p class:list={['mt-1', zoneLabelClass]}>Sensible</p>
+					)}
+					<div class="flex flex-wrap gap-x-3 gap-y-1">
+						{dangerMetier.map(({ action, label }) => (
+							<button type="button" data-action={action} class={dangerLinkClass}>
+								{label}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
+		</div>
+	)
+}

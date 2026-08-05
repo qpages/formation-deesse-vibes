@@ -1,0 +1,33 @@
+---
+import StatusBadge from '../../ui/StatusBadge.astro';
+import type { PipelineStageCard } from '../../../lib/admin/pipeline-detail';
+
+interface Props {
+	stages: PipelineStageCard[];
+}
+
+const { stages } = Astro.props;
+---
+
+<section class="mb-8" aria-label="Pipeline inscription">
+	<ul class="grid gap-3 md:grid-cols-3">
+		{
+			stages.map((stage) => (
+				<li>
+					<a
+						href={stage.href}
+						class="block border border-ink/10 bg-white/60 p-4 transition-colors hover:border-ink/25 hover:bg-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+					>
+						<p class="text-xs font-medium uppercase tracking-[0.12em] text-ink/55">
+							{stage.title}
+						</p>
+						<div class="mt-2">
+							<StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>
+						</div>
+						<p class="mt-2.5 text-sm leading-snug text-ink-soft">{stage.hint}</p>
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</section>

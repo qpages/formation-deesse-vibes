@@ -2,15 +2,17 @@
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import Button from '../../../components/ui/Button.astro';
 import Dialog from '../../../components/ui/Dialog.astro';
-import StatusBadge from '../../../components/ui/StatusBadge.astro';
-import ExternalLinks from '../../../components/admin/ExternalLinks.astro';
-import PaymentPanel from '../../../components/admin/PaymentPanel.astro';
-import AuditTimeline from '../../../components/admin/AuditTimeline.astro';
-import EnrollmentRowActions from '../../../components/admin/EnrollmentRowActions.astro';
+import ExternalLinks from '../../../components/admin/detail/ExternalLinks.astro';
+import PaymentPanel from '../../../components/admin/detail/PaymentPanel.astro';
+import AuditTimeline from '../../../components/admin/detail/AuditTimeline.astro';
+import EnrollmentNextAction from '../../../components/admin/detail/EnrollmentNextAction.astro';
+import EnrollmentPipeline from '../../../components/admin/detail/EnrollmentPipeline.astro';
+import EnrollmentActionPanel from '../../../components/admin/detail/EnrollmentActionPanel.astro';
 import { requireAdminPage } from '../../../lib/admin/auth';
 import { getAdminEnrollmentDetail } from '../../../lib/admin/enrollments';
-import { adminActionMetaForClient } from '../../../lib/admin/actions';
+import { adminActionMetaForClient, partitionVisibleActions } from '../../../lib/admin/actions';
 import { getAdminPaymentSummary } from '../../../lib/admin/payments';
+import { buildPipelineStageCards } from '../../../lib/admin/pipeline-detail';
 
 export const prerender = false;
 
@@ -26,18 +28,23 @@ if (!detail) return Astro.redirect('/admin');
 const paymentSummary =
 	(await getAdminPaymentSummary(id)) ?? detail.paymentSummary;
 const actionMeta = adminActionMetaForClient();
+const actionPartition = partitionVisibleActions(detail);
+const pipelineStages = buildPipelineStageCards(detail, paymentSummary);
 ---
 
 <AdminLayout title={`${detail.displayName} — Admin`} email={admin}>
 	<div class="mb-6">
-		<a href="/admin" class="text-sm text-ink-soft underline underline-offset-2 hover:text-ink">
+		<a
+			href="/admin"
+			class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+		>
 			← Inscriptions
 		</a>
 		<div class="mt-4 flex flex-wrap items-start justify-between gap-4">
-			<div>
-				<h1 class="font-display text-4xl text-ink">{detail.displayName}</h1>
-				<p class="mt-1 text-ink-soft">{detail.email}</p>
-				<p class="mt-2 text-[12px] text-ink/45">
+			<div class="min-w-0">
+				<h1 class="font-display text-4xl text-pretty text-ink">{detail.displayName}</h1>
+				<p class="mt-1 break-all text-ink-soft">{detail.email}</p>
+				<p class="mt-2 text-sm text-ink/50">
 					Créé le{' '}
 					{detail.createdAt.toLocaleString('fr-FR', {
 						dateStyle: 'short',
@@ -49,47 +56,31 @@ const actionMeta = adminActionMetaForClient();
 		</div>
 	</div>
 
-	<section class="mb-8 grid gap-4 md:grid-cols-3">
-		<div class="border border-ink/10 bg-white/60 p-4">
-			<p class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Paiement</p>
-			<div class="mt-2">
-				<StatusBadge tone={detail.paymentSummary.trackingTone}>
-					{detail.paymentSummary.trackingLabel}
-				</StatusBadge>
-				<p class="mt-2 text-[11px] text-ink/45">{detail.paymentSummary.planLabel}</p>
-			</div>
-		</div>
-		<div class="border border-ink/10 bg-white/60 p-4">
-			<p class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Signature</p>
-			<div class="mt-2">
-				<StatusBadge tone={detail.pipeline.signature.tone}>
-					{detail.pipeline.signature.label}
-				</StatusBadge>
-			</div>
-		</div>
-		<div class="border border-ink/10 bg-white/60 p-4">
-			<p class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Accès</p>
-			<div class="mt-2">
-				<StatusBadge tone={detail.pipeline.acces.tone}>
-					{detail.pipeline.acces.label}
-				</StatusBadge>
-			</div>
-		</div>
-	</section>
+	{/* Hybrid: recommended CTA first, then dump */}
+	<EnrollmentNextAction
+		enrollmentId={detail.id}
+		displayName={detail.displayName}
+		partition={actionPartition}
+	/>
 
-	<section class="mb-8 border border-ink/10 bg-white/60 p-4">
-		<h2 class="font-display text-2xl text-ink">Actions</h2>
-		<div class="mt-4">
-			<EnrollmentRowActions row={detail} compact={false} />
-		</div>
-	</section>
+	<EnrollmentPipeline stages={pipelineStages} />
 
-	<div class="mb-8 border border-ink/10 bg-white/60 p-4">
+	{
+		actionPartition.secondary.length > 0 || actionPartition.danger.length > 0 ? (
+			<EnrollmentActionPanel
+				enrollmentId={detail.id}
+				displayName={detail.displayName}
+				partition={actionPartition}
+			/>
+		) : null
+	}
+
+	<div class="mb-8 scroll-mt-20 border border-ink/10 bg-white/60 p-4 sm:p-5">
 		<PaymentPanel summary={paymentSummary} heading="Paiements" />
 	</div>
 
 	<div class="mb-8">
-		<AuditTimeline items={detail.audit} />
+		<AuditTimeline items={detail.audit} collapsed />
 	</div>
 
 	<Dialog id="admin-action-dialog" title="Confirmer l’action">
