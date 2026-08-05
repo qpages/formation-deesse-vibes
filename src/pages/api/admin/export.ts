@@ -4,14 +4,16 @@ import {
 	parseCookie,
 	verifyAdminSessionToken,
 } from '../../../lib/auth/session';
-import { getPrisma } from '../../../lib/db';
+import { listEnrollmentsForExport } from '../../../lib/admin/enrollments';
 import {
+	ACCESS_STATUS_LABELS,
+	COLLECTION_STATUS_LABELS,
+	CONTRACT_STATUS_LABELS,
 	paymentPlanLabel,
 	paymentProgressLabel,
 	paymentTrackingLabel,
 	paymentTrackingState,
 	PAYMENT_STATUS_LABELS,
-	STATUS_LABELS,
 } from '../../../lib/status';
 
 export const GET: APIRoute = async ({ request }) => {
@@ -22,20 +24,19 @@ export const GET: APIRoute = async ({ request }) => {
 		return new Response('Unauthorized', { status: 401 });
 	}
 
-	const rows = await getPrisma().enrollment.findMany({
-		orderBy: { createdAt: 'desc' },
-		include: {
-			payments: { orderBy: { installmentNumber: 'asc' } },
-		},
-	});
+	const rows = await listEnrollmentsForExport();
 
 	const header = [
 		'id',
 		'email',
 		'firstName',
 		'lastName',
-		'status',
-		'statusLabel',
+		'collectionStatus',
+		'collectionStatusLabel',
+		'contractStatus',
+		'contractStatusLabel',
+		'accessStatus',
+		'accessStatusLabel',
 		'yousignStatus',
 		'paymentPlan',
 		'paymentPlanLabel',
@@ -60,7 +61,7 @@ export const GET: APIRoute = async ({ request }) => {
 		header.join(','),
 		...rows.map((r) => {
 			const tracking = paymentTrackingState({
-				status: r.status,
+				collectionStatus: r.collectionStatus,
 				installmentsPaid: r.installmentsPaid,
 				installmentsTotal: r.installmentsTotal,
 				subscriptionStatus: r.subscriptionStatus,
@@ -70,11 +71,15 @@ export const GET: APIRoute = async ({ request }) => {
 
 			return [
 				r.id,
-				r.email,
-				csv(r.firstName),
-				csv(r.lastName),
-				r.status,
-				csv(STATUS_LABELS[r.status]),
+				r.user.email,
+				csv(r.user.firstName),
+				csv(r.user.lastName),
+				r.collectionStatus,
+				csv(COLLECTION_STATUS_LABELS[r.collectionStatus]),
+				r.contractStatus,
+				csv(CONTRACT_STATUS_LABELS[r.contractStatus]),
+				r.accessStatus,
+				csv(ACCESS_STATUS_LABELS[r.accessStatus]),
 				r.yousignStatus ?? '',
 				r.paymentPlan ?? '',
 				csv(paymentPlanLabel(r.paymentPlan)),

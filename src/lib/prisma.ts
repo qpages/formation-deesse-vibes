@@ -14,7 +14,11 @@ function createClient() {
 
 /** Drop HMR-cached clients that predate a `prisma generate` (missing new models). */
 function isClientCurrent(client: PrismaClient): boolean {
-	return typeof client.payment?.findMany === 'function';
+	return (
+		typeof client.payment?.findMany === 'function' &&
+		typeof client.user?.findMany === 'function' &&
+		typeof client.providerEvent?.findMany === 'function'
+	);
 }
 
 export function getPrisma(): PrismaClient {
@@ -24,4 +28,4 @@ export function getPrisma(): PrismaClient {
 	return globalForPrisma.prisma;
 }
 
-export type { Enrollment, EnrollmentStatus } from '../generated/prisma/client';
+export type { Enrollment } from '../generated/prisma/client';

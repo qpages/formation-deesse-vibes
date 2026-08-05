@@ -1,6 +1,7 @@
 import type { Enrollment, Payment } from '../../generated/prisma/client';
-import { getPrisma } from '../db';
+import { getPrisma } from '../prisma';
 import { formatMoney } from '../payment-plans';
+import { findEnrollmentById } from '../services/enrollment';
 import {
 	paymentPlanLabel,
 	paymentProgressLabel,
@@ -11,7 +12,7 @@ import {
 	PAYMENT_STATUS_LABELS,
 	type PaymentTrackingState,
 } from '../status';
-import { retrieveInvoice, stripeDashboardUrl } from '../services/stripe';
+import { retrieveInvoice, stripeDashboardUrl } from '../stripe';
 
 export type AdminPaymentRow = {
 	id: string;
@@ -96,7 +97,7 @@ export function buildAdminPaymentSummary(
 	payments: Payment[],
 ): AdminPaymentSummary {
 	const trackingState = paymentTrackingState({
-		status: enrollment.status,
+		collectionStatus: enrollment.collectionStatus,
 		installmentsPaid: enrollment.installmentsPaid,
 		installmentsTotal: enrollment.installmentsTotal,
 		subscriptionStatus: enrollment.subscriptionStatus,
@@ -159,11 +160,10 @@ export function buildAdminPaymentSummary(
 }
 
 export async function getAdminPaymentSummary(enrollmentId: string) {
-	const prisma = getPrisma();
-	const enrollment = await prisma.enrollment.findUnique({ where: { id: enrollmentId } });
+	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) return null;
 
-	const payments = await prisma.payment.findMany({
+	const payments = await getPrisma().payment.findMany({
 		where: { enrollmentId },
 		orderBy: { installmentNumber: 'asc' },
 	});

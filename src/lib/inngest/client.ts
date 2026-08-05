@@ -13,8 +13,6 @@ import { env } from '../env';
  * - Se connecte à Inngest Cloud
  * - Requiert INNGEST_EVENT_KEY
  * - Auto-découverte via l'endpoint /api/inngest
- *
- * @see docs/overview.md#inngest
  */
 const isDev = env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.MODE === 'development';
 
@@ -25,23 +23,35 @@ export const inngest = new Inngest({
 	isDev,
 });
 
-/**
- * Types TypeScript pour tous les événements Inngest de l'application
- *
- * Ces types garantissent la cohérence des payloads entre l'envoi
- * (inngest.send) et la réception (fonction handler).
- */
 export type AppEvents = {
-	/** Déclenché après confirmation d'un paiement Stripe */
 	'stripe/payment.confirmed': {
 		data: { enrollmentId: string; stripeEventId: string };
 	};
-	/** Déclenché après signature d'un NDA Yousign */
 	'yousign/signature.done': {
 		data: { enrollmentId: string; yousignEventId: string; requestId: string };
 	};
-	/** Événement cron pour la purge des anciens webhooks (interne) */
+	'provider/stripe-event.received': {
+		data: { providerEventId: string };
+	};
+	'provider/yousign-event.received': {
+		data: { providerEventId: string };
+	};
+	'enrollment/access.grant': {
+		data: { enrollmentId: string };
+	};
+	'enrollment/access.suspend': {
+		data: { enrollmentId: string; revoke?: boolean };
+	};
+	'admin/relance-nda': {
+		data: { enrollmentId: string };
+	};
+	'admin/recreate-nda': {
+		data: { enrollmentId: string };
+	};
 	'ops/purge-webhook-payloads': {
 		data: Record<string, never>;
+	};
+	'ops/reconcile-enrollments': {
+		data: { enrollmentId?: string };
 	};
 };

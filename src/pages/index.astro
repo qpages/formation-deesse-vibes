@@ -20,10 +20,10 @@ import {
 import {
 	confirmPaidCheckout,
 	retrieveCheckoutSession,
-} from '../lib/services/payment';
+} from '../lib/services/payments';
 import { checkoutSuccessFlash, stepStates } from '../lib/status';
 import { listPaidInvoiceLinks } from '../lib/admin/payments';
-import type { Enrollment } from '../generated/prisma/client';
+import type { EnrollmentWithUser } from '../lib/services/enrollment';
 
 export const prerender = false;
 
@@ -32,7 +32,7 @@ const token = url.searchParams.get('token');
 const sessionId = url.searchParams.get('session_id');
 const checkout = url.searchParams.get('checkout');
 
-let enrollment: Enrollment | null = null;
+let enrollment: EnrollmentWithUser | null = null;
 let flash: string | null = null;
 let setCookie: string | null = null;
 
@@ -69,12 +69,12 @@ try {
 	// Filet de sécurité : si Stripe a encaissé mais le webhook a loupé
 	const checkoutToSync =
 		sessionId ??
-		(enrollment?.status === 'paiement_en_attente'
+		(enrollment?.collectionStatus === 'pending'
 			? enrollment.stripeCheckoutSessionId
 			: null);
 	if (
 		checkoutToSync &&
-		(!enrollment || enrollment.status === 'paiement_en_attente')
+		(!enrollment || enrollment.collectionStatus === 'pending')
 	) {
 		try {
 			const stripeSession = await retrieveCheckoutSession(checkoutToSync);
@@ -95,7 +95,11 @@ try {
 	}
 
 	if (checkout === 'success' && enrollment) {
-		flash = checkoutSuccessFlash(enrollment.status);
+		flash = checkoutSuccessFlash({
+			collectionStatus: enrollment.collectionStatus,
+			contractStatus: enrollment.contractStatus,
+			accessStatus: enrollment.accessStatus,
+		});
 	}
 } catch (error) {
 	console.error('[index] enrollment lookup', error);
@@ -109,24 +113,32 @@ const checkoutCancel = checkout === 'cancel';
 
 const awaitingWebhook =
 	!checkoutCancel &&
-	enrollment?.status === 'paiement_en_attente' &&
+	enrollment?.collectionStatus === 'pending' &&
 	Boolean(enrollment.stripeCheckoutSessionId);
 
 const showFunnel =
 	!enrollment ||
-	enrollment.status === 'rembourse' ||
-	enrollment.status === 'acces_retire' ||
-	(enrollment.status === 'paiement_en_attente' && !enrollment.stripeCheckoutSessionId);
+	enrollment.collectionStatus === 'refunded' ||
+	enrollment.accessStatus === 'revoked' ||
+	(enrollment.collectionStatus === 'pending' && !enrollment.stripeCheckoutSessionId);
 
 const showTracking =
 	!checkoutCancel && Boolean(enrollment) && (!showFunnel || awaitingWebhook);
 
 const steps = enrollment
-	? stepStates(enrollment.status)
+	? stepStates({
+			collectionStatus: enrollment.collectionStatus,
+			contractStatus: enrollment.contractStatus,
+			accessStatus: enrollment.accessStatus,
+		})
 	: { paiement: 'a_faire' as const, nda: 'a_faire' as const, acces: 'a_faire' as const };
 
 let ndaSignUrl: string | null = null;
-if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === 'paiement_confirme')) {
+if (
+	enrollment &&
+	enrollment.collectionStatus !== 'pending' &&
+	(enrollment.contractStatus === 'pending' || enrollment.contractStatus === 'sent')
+) {
 	try {
 		ndaSignUrl = await resolveNdaSignUrl(enrollment);
 	} catch {
@@ -135,7 +147,7 @@ if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === '
 }
 
 const invoiceLinks =
-	enrollment && enrollment.status !== 'paiement_en_attente'
+	enrollment && enrollment.collectionStatus !== 'pending'
 		? await listPaidInvoiceLinks(enrollment.id)
 		: [];
 

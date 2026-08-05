@@ -1,32 +1,58 @@
 import type Stripe from 'stripe';
 import type {
+	CollectionStatus,
+	ContractStatus,
 	Enrollment,
 	PaymentStatus,
 	SubscriptionStatus,
 } from '../../generated/prisma/client';
-import { inngest } from '../inngest/client';
-import { getPrisma } from '../db';
+import { getPrisma } from '../prisma';
 import {
 	getPaymentPlan,
 	resolvePaymentPlan,
 	stripePriceIdForPlan,
 	type PaymentPlanId,
 } from '../payment-plans';
-import { recordProcessedEvent, transitionStatus } from './enrollment';
+import { applyAccessPolicy } from './access';
+import {
+	findEnrollmentById,
+	findEnrollmentByIdOrThrow,
+	findEnrollmentByScheduleOrSubscription,
+	findEnrollmentBySubscriptionId,
+} from './enrollment';
 import {
 	ensureSubscriptionSchedule,
 	getStripe,
 	listSubscriptionInvoices,
 	retrieveCheckoutSession,
 	retrieveSubscription,
-} from './stripe';
-import { isNdaFullyProvisioned } from './yousign';
+} from '../stripe';
 
-export { retrieveCheckoutSession } from './stripe';
+export { retrieveCheckoutSession } from '../stripe';
 
 export type ConfirmCheckoutResult =
-	| { ok: true; enrollmentId: string; alreadyConfirmed: boolean }
+	| {
+			ok: true;
+			enrollmentId: string;
+			alreadyConfirmed: boolean;
+			contractStatus: ContractStatus;
+	  }
 	| { ok: false; reason: string };
+
+/** Mark enrollment paid when still pending collection; returns false if already confirmed. */
+async function updateEnrollmentPaymentConfirmed(
+	enrollmentId: string,
+	extra: Record<string, unknown> = {},
+): Promise<boolean> {
+	const result = await getPrisma().enrollment.updateMany({
+		where: { id: enrollmentId, collectionStatus: 'pending' },
+		data: {
+			collectionStatus: 'current',
+			...extra,
+		},
+	});
+	return result.count > 0;
+}
 
 /** Promo codes autorisés → amount_total peut être < prix attendu pour le plan. */
 export function assertCheckoutAmountAcceptable(
@@ -55,10 +81,23 @@ function subscriptionIdFromSession(session: Stripe.Checkout.Session): string | u
 		: session.subscription.id;
 }
 
+/** Stripe SDK typings omit some Invoice fields depending on API version. */
+type InvoiceExtras = Stripe.Invoice & {
+	payment_intent?: string | { id: string } | null;
+	subscription?: string | { id: string } | null;
+	subscription_details?: { metadata?: Stripe.Metadata | null } | null;
+};
+
 function paymentIntentIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
-	const pi = invoice.payment_intent;
+	const pi = (invoice as InvoiceExtras).payment_intent;
 	if (!pi) return undefined;
 	return typeof pi === 'string' ? pi : pi.id;
+}
+
+function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
+	const sub = (invoice as InvoiceExtras).subscription;
+	if (!sub) return undefined;
+	return typeof sub === 'string' ? sub : sub.id;
 }
 
 function paymentIntentIdFromSession(session: Stripe.Checkout.Session): string | undefined {
@@ -122,10 +161,7 @@ async function resolveInstallmentNumber(
 		: null;
 	if (existing) return existing.installmentNumber;
 
-	const subscriptionId =
-		typeof invoice.subscription === 'string'
-			? invoice.subscription
-			: invoice.subscription?.id;
+	const subscriptionId = subscriptionIdFromInvoice(invoice);
 
 	if (subscriptionId) {
 		const invoices = await listSubscriptionInvoices(subscriptionId);
@@ -140,8 +176,13 @@ async function resolveInstallmentNumber(
 	return count + 1;
 }
 
-export async function recalculateEnrollmentPaymentAggregates(enrollmentId: string) {
+/**
+ * Recalcule agrégats Payment + collectionStatus (source de vérité = lignes Payment).
+ * Règles : refunded/canceled explicites → past_due si failed/open → paid → current → pending.
+ */
+export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 	const prisma = getPrisma();
+	const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
 	const payments = await prisma.payment.findMany({
 		where: { enrollmentId },
 		orderBy: { installmentNumber: 'asc' },
@@ -151,11 +192,46 @@ export async function recalculateEnrollmentPaymentAggregates(enrollmentId: strin
 	const failedOrOpen = payments.filter((p) => p.status === 'open' || p.status === 'failed');
 	const collectedAmountCents = paid.reduce((sum, p) => sum + p.amountCents, 0);
 	const installmentsPaid = paid.length;
+	const installmentsTotal = enrollment.installmentsTotal ?? 1;
 
 	const nextDue = failedOrOpen
 		.map((p) => p.dueAt)
 		.filter(Boolean)
 		.sort((a, b) => a!.getTime() - b!.getTime())[0];
+
+	const firstPaidAt =
+		paid
+			.map((p) => p.paidAt)
+			.filter(Boolean)
+			.sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
+
+	let collectionStatus: CollectionStatus;
+	if (
+		enrollment.collectionStatus === 'refunded' ||
+		enrollment.collectionStatus === 'canceled'
+	) {
+		collectionStatus = enrollment.collectionStatus;
+	} else if (failedOrOpen.length > 0 && installmentsPaid >= 1) {
+		collectionStatus = 'past_due';
+	} else if (failedOrOpen.some((p) => p.status === 'failed')) {
+		collectionStatus = 'past_due';
+	} else if (installmentsPaid >= installmentsTotal && installmentsPaid > 0) {
+		collectionStatus = 'paid';
+	} else if (installmentsPaid >= 1) {
+		collectionStatus = 'current';
+	} else {
+		collectionStatus = 'pending';
+	}
+
+	const fullyPaidAt =
+		collectionStatus === 'paid'
+			? (enrollment.fullyPaidAt ??
+				paid
+					.map((p) => p.paidAt)
+					.filter(Boolean)
+					.sort((a, b) => b!.getTime() - a!.getTime())[0] ??
+				new Date())
+			: null;
 
 	await prisma.enrollment.update({
 		where: { id: enrollmentId },
@@ -163,9 +239,17 @@ export async function recalculateEnrollmentPaymentAggregates(enrollmentId: strin
 			installmentsPaid,
 			collectedAmountCents,
 			nextInstallmentDueAt: nextDue ?? null,
+			collectionStatus,
+			firstPaymentPaidAt: firstPaidAt ?? enrollment.firstPaymentPaidAt,
+			fullyPaidAt,
 		},
 	});
+
+	await applyAccessPolicy(enrollmentId);
 }
+
+/** @deprecated Use recomputeEnrollmentCollectionState */
+export const recalculateEnrollmentPaymentAggregates = recomputeEnrollmentCollectionState;
 
 export async function syncStripeInvoice(
 	invoice: Stripe.Invoice,
@@ -175,28 +259,23 @@ export async function syncStripeInvoice(
 		forceStatus?: PaymentStatus;
 	} = {},
 ) {
-	const subscriptionId =
-		typeof invoice.subscription === 'string'
-			? invoice.subscription
-			: invoice.subscription?.id;
+	const subscriptionId = subscriptionIdFromInvoice(invoice);
 
 	const prisma = getPrisma();
 	let enrollment: Enrollment | null = null;
 
 	if (options.enrollmentId) {
-		enrollment = await prisma.enrollment.findUnique({ where: { id: options.enrollmentId } });
+		enrollment = await findEnrollmentById(options.enrollmentId);
 	} else if (subscriptionId) {
-		enrollment = await prisma.enrollment.findUnique({
-			where: { stripeSubscriptionId: subscriptionId },
-		});
+		enrollment = await findEnrollmentBySubscriptionId(subscriptionId);
 	}
 
 	if (!enrollment) {
 		const metaId =
 			invoice.metadata?.enrollmentId ??
-			invoice.subscription_details?.metadata?.enrollmentId;
+			(invoice as InvoiceExtras).subscription_details?.metadata?.enrollmentId;
 		if (metaId) {
-			enrollment = await prisma.enrollment.findUnique({ where: { id: metaId } });
+			enrollment = await findEnrollmentById(metaId);
 		}
 	}
 
@@ -263,16 +342,8 @@ export async function syncStripeInvoice(
 		},
 	});
 
-	await recalculateEnrollmentPaymentAggregates(enrollment.id);
+	await recomputeEnrollmentCollectionState(enrollment.id);
 
-	if (options.stripeEventId) {
-		await recordProcessedEvent({
-			provider: 'stripe',
-			eventId: `${options.stripeEventId}:invoice:${invoice.id}`,
-			enrollmentId: enrollment.id,
-			payload: { invoiceId: invoice.id, status: invoice.status },
-		});
-	}
 
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
@@ -319,7 +390,7 @@ async function syncOneTimePaymentFromCheckout(
 		},
 	});
 
-	await recalculateEnrollmentPaymentAggregates(enrollment.id);
+	await recomputeEnrollmentCollectionState(enrollment.id);
 }
 
 async function syncSubscriptionCheckout(
@@ -364,12 +435,13 @@ async function syncSubscriptionCheckout(
 }
 
 /**
- * Confirme un Checkout payé : statut → paiement_confirme + event Inngest NDA.
+ * Confirme un Checkout payé : collectionStatus → current (money only).
  * Idempotent. Ne confirme pas si payment_status n’est pas paid.
+ * Orchestration NDA = stripe-events / admin retrigger (pas ici).
  */
 export async function confirmPaidCheckout(
 	session: Stripe.Checkout.Session,
-	options: { stripeEventId?: string } = {},
+	_options: { stripeEventId?: string } = {},
 ): Promise<ConfirmCheckoutResult> {
 	const enrollmentId =
 		session.metadata?.enrollmentId ?? session.client_reference_id ?? undefined;
@@ -378,7 +450,7 @@ export async function confirmPaidCheckout(
 	}
 
 	const prisma = getPrisma();
-	const enrollment = await prisma.enrollment.findUnique({ where: { id: enrollmentId } });
+	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) {
 		throw new Error(`Enrollment introuvable: ${enrollmentId}`);
 	}
@@ -397,41 +469,34 @@ export async function confirmPaidCheckout(
 		};
 	}
 
-	if (options.stripeEventId) {
-		await recordProcessedEvent({
-			provider: 'stripe',
-			eventId: `${options.stripeEventId}:link`,
-			enrollmentId,
-			payload: { sessionId: session.id },
-		});
-	}
 
 	const paymentIntentId = paymentIntentIdFromSession(session);
 	const subscriptionId = subscriptionIdFromSession(session);
 	const customerId =
 		typeof session.customer === 'string' ? session.customer : session.customer?.id;
 
-	const transitioned = await transitionStatus(
-		enrollmentId,
-		'paiement_en_attente',
-		'paiement_confirme',
-		{
-			stripeCheckoutSessionId: session.id,
-			stripePaymentIntentId: paymentIntentId,
-			stripeCustomerId: customerId,
-			stripeSubscriptionId: subscriptionId,
-			amountCents: session.amount_total ?? enrollment.amountCents,
-			...(plan
-				? {
-						paymentPlan: plan.id,
-						installmentsTotal: plan.installments,
-						totalAmountCents: plan.totalAmountCents,
-					}
-				: {}),
-		},
-	);
+	if (customerId) {
+		await prisma.user.update({
+			where: { id: enrollment.userId },
+			data: { stripeCustomerId: customerId },
+		});
+	}
 
-	const fresh = await prisma.enrollment.findUniqueOrThrow({ where: { id: enrollmentId } });
+	const transitioned = await updateEnrollmentPaymentConfirmed(enrollmentId, {
+		stripeCheckoutSessionId: session.id,
+		stripePaymentIntentId: paymentIntentId,
+		stripeSubscriptionId: subscriptionId,
+		amountCents: session.amount_total ?? enrollment.amountCents,
+		...(plan
+			? {
+					paymentPlan: plan.id,
+					installmentsTotal: plan.installments,
+					totalAmountCents: plan.totalAmountCents,
+				}
+			: {}),
+	});
+
+	const fresh = await findEnrollmentByIdOrThrow(enrollmentId);
 
 	if (session.mode === 'subscription' && plan?.mode === 'subscription') {
 		await syncSubscriptionCheckout(fresh, session, plan.id);
@@ -439,36 +504,28 @@ export async function confirmPaidCheckout(
 		await syncOneTimePaymentFromCheckout(fresh, session);
 	}
 
-	if (
-		!isNdaFullyProvisioned(fresh) &&
-		(fresh.status === 'paiement_confirme' || fresh.status === 'nda_envoye')
-	) {
-		await inngest.send({
-			name: 'stripe/payment.confirmed',
-			data: {
-				enrollmentId,
-				stripeEventId: options.stripeEventId ?? `reconcile:${session.id}`,
-			},
-		});
-	}
+	await applyAccessPolicy(enrollmentId);
 
-	return { ok: true, enrollmentId, alreadyConfirmed: !transitioned };
+	return {
+		ok: true,
+		enrollmentId,
+		alreadyConfirmed: !transitioned,
+		contractStatus: fresh.contractStatus,
+	};
 }
 
 export async function syncSubscriptionState(
 	subscription: Stripe.Subscription,
-	options: { stripeEventId?: string } = {},
+	_options: { stripeEventId?: string } = {},
 ) {
 	const subscriptionId = subscription.id;
 	const prisma = getPrisma();
-	const enrollment = await prisma.enrollment.findUnique({
-		where: { stripeSubscriptionId: subscriptionId },
-	});
+	const enrollment = await findEnrollmentBySubscriptionId(subscriptionId);
 
 	if (!enrollment) {
 		const metaId = subscription.metadata?.enrollmentId;
 		if (!metaId) return { ok: false as const, reason: 'enrollment_not_found' };
-		const byMeta = await prisma.enrollment.findUnique({ where: { id: metaId } });
+		const byMeta = await findEnrollmentById(metaId);
 		if (!byMeta) return { ok: false as const, reason: 'enrollment_not_found' };
 		await prisma.enrollment.update({
 			where: { id: byMeta.id },
@@ -496,14 +553,6 @@ export async function syncSubscriptionState(
 		},
 	});
 
-	if (options.stripeEventId) {
-		await recordProcessedEvent({
-			provider: 'stripe',
-			eventId: `${options.stripeEventId}:subscription:${subscriptionId}`,
-			enrollmentId: enrollment.id,
-			payload: { subscriptionId, status: subscription.status },
-		});
-	}
 
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
@@ -522,11 +571,7 @@ export async function markSubscriptionScheduleCompleted(
 	}
 
 	const prisma = getPrisma();
-	const enrollment = await prisma.enrollment.findFirst({
-		where: {
-			OR: [{ stripeScheduleId: schedule.id }, { stripeSubscriptionId: subscriptionId }],
-		},
-	});
+	const enrollment = await findEnrollmentByScheduleOrSubscription(schedule.id, subscriptionId);
 
 	if (!enrollment) {
 		return { ok: false as const, reason: 'enrollment_not_found' };
@@ -540,20 +585,12 @@ export async function markSubscriptionScheduleCompleted(
 		},
 	});
 
-	if (options.stripeEventId) {
-		await recordProcessedEvent({
-			provider: 'stripe',
-			eventId: `${options.stripeEventId}:schedule:${schedule.id}`,
-			enrollmentId: enrollment.id,
-			payload: { scheduleId: schedule.id, status: schedule.status },
-		});
-	}
 
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
 
 export async function syncAllSubscriptionInvoices(enrollmentId: string) {
-	const enrollment = await getPrisma().enrollment.findUnique({ where: { id: enrollmentId } });
+	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment?.stripeSubscriptionId) {
 		return { ok: false as const, reason: 'no_subscription' };
 	}
@@ -570,61 +607,27 @@ export async function syncAllSubscriptionInvoices(enrollmentId: string) {
 }
 
 /**
- * Déclenche manuellement la création NDA via Inngest
- */
-export async function triggerNdaAfterPayment(enrollmentId: string): Promise<
-	| { ok: true }
-	| { ok: false; reason: 'enrollment_not_found' | 'status_incompatible' | 'nda_already_created' }
-> {
-	const enrollment = await getPrisma().enrollment.findUnique({ where: { id: enrollmentId } });
-	if (!enrollment) {
-		return { ok: false, reason: 'enrollment_not_found' };
-	}
-	if (
-		enrollment.status !== 'paiement_confirme' &&
-		enrollment.status !== 'nda_envoye'
-	) {
-		return { ok: false, reason: 'status_incompatible' };
-	}
-	if (isNdaFullyProvisioned(enrollment)) {
-		return { ok: false, reason: 'nda_already_created' };
-	}
-
-	await inngest.send({
-		name: 'stripe/payment.confirmed',
-		data: {
-			enrollmentId,
-			stripeEventId: `admin-retrigger-nda:${enrollmentId}:${Date.now()}`,
-		},
-	});
-	return { ok: true };
-}
-
-/**
- * Répare une inscription bloquée en vérifiant la session Stripe
+ * Répare une inscription bloquée en vérifiant la session Stripe (money only).
+ * NDA / Teachizy = jobs Inngest séparés (admin retrigger_nda, etc.).
  */
 export async function syncPaymentFromStripe(enrollmentId: string): Promise<ConfirmCheckoutResult> {
-	const enrollment = await getPrisma().enrollment.findUnique({ where: { id: enrollmentId } });
+	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) {
 		return { ok: false, reason: 'enrollment_not_found' };
 	}
 
-	if (
-		!isNdaFullyProvisioned(enrollment) &&
-		(enrollment.status === 'paiement_confirme' || enrollment.status === 'nda_envoye')
-	) {
+	if (enrollment.collectionStatus !== 'pending') {
 		if (enrollment.stripeSubscriptionId) {
 			await syncAllSubscriptionInvoices(enrollmentId);
+		} else {
+			await recomputeEnrollmentCollectionState(enrollmentId);
 		}
-		await triggerNdaAfterPayment(enrollmentId);
-		return { ok: true, enrollmentId, alreadyConfirmed: true };
-	}
-
-	if (enrollment.status !== 'paiement_en_attente') {
-		if (enrollment.stripeSubscriptionId) {
-			await syncAllSubscriptionInvoices(enrollmentId);
-		}
-		return { ok: true, enrollmentId, alreadyConfirmed: true };
+		return {
+			ok: true,
+			enrollmentId,
+			alreadyConfirmed: true,
+			contractStatus: enrollment.contractStatus,
+		};
 	}
 	if (!enrollment.stripeCheckoutSessionId) {
 		return { ok: false, reason: 'no_checkout_session' };

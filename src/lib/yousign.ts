@@ -1,8 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { YousignRequestStatus } from '../../generated/prisma/client';
-import { getPrisma } from '../db';
-import { getEnv, requireEnv } from '../env';
-import { mapYousignApiStatus } from '../status';
+import { getEnv, requireEnv } from './env';
 
 export type YousignSignatureRequest = {
 	id: string;
@@ -19,14 +16,6 @@ export type ActivatedNda = {
 	signerId: string;
 	signatureLink?: string;
 };
-
-export type SyncYousignStatusResult =
-	| { ok: true; yousignStatus: YousignRequestStatus }
-	| {
-			ok: false;
-			reason: 'enrollment_not_found' | 'no_yousign_request' | 'unmapped_status';
-			detail?: string;
-	  };
 
 async function yousignFetch<T>(path: string, init?: RequestInit): Promise<T> {
 	const env = getEnv();
@@ -50,36 +39,6 @@ async function yousignFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function getSignatureRequest(requestId: string) {
 	return yousignFetch<YousignSignatureRequest>(`/signature_requests/${requestId}`);
-}
-
-/**
- * Aligne `yousignStatus` sur l’API Yousign (source of truth).
- * Ne touche pas au status métier ni aux side-effects (Inngest / Teachizy).
- */
-export async function syncYousignStatus(
-	enrollmentId: string,
-): Promise<SyncYousignStatusResult> {
-	const prisma = getPrisma();
-	const enrollment = await prisma.enrollment.findUnique({ where: { id: enrollmentId } });
-	if (!enrollment) {
-		return { ok: false, reason: 'enrollment_not_found' };
-	}
-	if (!enrollment.yousignRequestId) {
-		return { ok: false, reason: 'no_yousign_request' };
-	}
-
-	const remote = await getSignatureRequest(enrollment.yousignRequestId);
-	const yousignStatus = mapYousignApiStatus(remote.status);
-	if (!yousignStatus) {
-		return { ok: false, reason: 'unmapped_status', detail: remote.status };
-	}
-
-	await prisma.enrollment.update({
-		where: { id: enrollmentId },
-		data: { yousignStatus },
-	});
-
-	return { ok: true, yousignStatus };
 }
 
 /** Crée un brouillon Yousign depuis le template (sans activer / sans e-mail). */
@@ -148,17 +107,6 @@ export async function activateNdaRequest(requestId: string): Promise<ActivatedNd
 		signerId: signer.id,
 		signatureLink: signer.signature_link,
 	};
-}
-
-/** Crée + active (admin recreate). Préférer createNdaDraft/activateNdaRequest dans Inngest. */
-export async function createNdaFromTemplate(input: {
-	enrollmentId: string;
-	email: string;
-	firstName: string;
-	lastName: string;
-}): Promise<ActivatedNda> {
-	const draft = await createNdaDraft(input);
-	return activateNdaRequest(draft.requestId);
 }
 
 export async function reactivateNda(requestId: string) {

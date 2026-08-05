@@ -29,5 +29,5 @@ const isDev = env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.
 export const { GET, POST, PUT } = serve({
 	client: inngest,
 	functions: inngestFunctions,
-	signingKey: isDev ? undefined : env.INNGEST_SIGNING_KEY,
-});
+	...(isDev ? {} : { signingKey: env.INNGEST_SIGNING_KEY }),
+} as Parameters<typeof serve>[0]);

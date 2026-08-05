@@ -1,6 +1,6 @@
 ---
-import type { Enrollment } from '../../generated/prisma/client';
 import type { StepKey, StepState } from '../../lib/status';
+import type { EnrollmentWithUser } from '../../lib/services/enrollment';
 import CheckoutForm from './CheckoutForm.astro';
 import ContactAdmin from './ContactAdmin.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
@@ -9,7 +9,7 @@ import Stepper from './Stepper.astro';
 
 interface Props {
 	showFunnel: boolean;
-	enrollment: Enrollment | null;
+	enrollment: EnrollmentWithUser | null;
 	steps: Record<StepKey, StepState>;
 	ndaSignUrl?: string | null;
 	invoiceLinks?: { installmentNumber: number; url: string }[];
@@ -128,9 +128,9 @@ const funnelFlash = showFunnel ? flash : null;
 							<p class="text-sm text-ink-soft">
 								Connecté·e en tant que{' '}
 								<span class="font-medium text-ink">
-									{enrollment.firstName} {enrollment.lastName}
+									{enrollment.user.firstName} {enrollment.user.lastName}
 								</span>{' '}
-								({enrollment.email})
+								({enrollment.user.email})
 							</p>
 						</div>
 

@@ -18,22 +18,30 @@ interface Props {
 }
 
 const { enrollment, ndaSignUrl, flash } = Astro.props;
-const action = primaryAction(enrollment.status, ndaSignUrl);
-const message = statusMessage(enrollment.status);
+const orthogonal = {
+	collectionStatus: enrollment.collectionStatus,
+	contractStatus: enrollment.contractStatus,
+	accessStatus: enrollment.accessStatus,
+};
+const action = primaryAction(orthogonal, ndaSignUrl);
+const message = statusMessage(orthogonal);
 const panelTitle =
-	enrollment.status === 'teachizy_envoye' ? 'Accès prêt' : 'Votre inscription';
+	enrollment.accessStatus === 'active' ? 'Accès prêt' : 'Votre inscription';
 const showSignCard = Boolean(ndaSignUrl);
 const poll = shouldPollEnrollment({
-	status: enrollment.status,
+	...orthogonal,
 	hasCheckoutSession: Boolean(enrollment.stripeCheckoutSessionId),
 	hasNdaSignUrl: showSignCard,
 });
+const closed =
+	enrollment.accessStatus === 'revoked' || enrollment.collectionStatus === 'refunded';
+const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractStatus}|${enrollment.accessStatus}`;
 ---
 
 <div
 	class="space-y-6"
 	id="status-panel"
-	data-status={enrollment.status}
+	data-fingerprint={pollFingerprint}
 	data-poll={poll ? 'true' : 'false'}
 	data-poll-interval={ENROLLMENT_POLL_INTERVAL_MS}
 	data-poll-max={ENROLLMENT_POLL_MAX_MS}
@@ -52,21 +60,23 @@ const poll = shouldPollEnrollment({
 	}
 
 	{
-		enrollment.status === 'paiement_en_attente' && enrollment.stripeCheckoutSessionId && (
+		enrollment.collectionStatus === 'pending' && enrollment.stripeCheckoutSessionId && (
 			<p class="text-ink-soft">
 				Paiement en cours de confirmation. Cette page se met à jour automatiquement.
 			</p>
 		)
 	}
 	{
-		enrollment.status === 'paiement_confirme' && !showSignCard && (
+		enrollment.collectionStatus !== 'pending' &&
+			enrollment.contractStatus === 'pending' &&
+			!showSignCard && (
 			<p class="text-ink-soft">
 				Paiement confirmé. Votre lien de signature apparaît ici dès qu’il est prêt.
 			</p>
 		)
 	}
 	{
-		enrollment.status === 'nda_envoye' && !showSignCard && (
+		enrollment.contractStatus === 'sent' && !showSignCard && (
 			<p class="text-ink-soft">
 				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page
 				ou contactez un administrateur.
@@ -75,7 +85,7 @@ const poll = shouldPollEnrollment({
 	}
 	{message && <p class="text-ink-soft">{message}</p>}
 	{
-		(enrollment.status === 'rembourse' || enrollment.status === 'acces_retire') && (
+		closed && (
 			<Alert variant="info">
 				Cette inscription est clôturée. Contactez un administrateur si besoin.
 			</Alert>
@@ -111,7 +121,7 @@ const poll = shouldPollEnrollment({
 <script>
 	const panel = document.getElementById('status-panel');
 	if (panel?.dataset.poll === 'true') {
-		const initialStatus = panel.dataset.status ?? '';
+		const initialFingerprint = panel.dataset.fingerprint ?? '';
 		const intervalMs = Number(panel.dataset.pollInterval) || 2000;
 		const maxMs = Number(panel.dataset.pollMax) || 90_000;
 		const startedAt = Date.now();
@@ -143,8 +153,13 @@ const poll = shouldPollEnrollment({
 					credentials: 'same-origin',
 				});
 				if (res.ok) {
-					const data = (await res.json()) as { status?: string };
-					if (data.status && data.status !== initialStatus) {
+					const data = (await res.json()) as {
+						collectionStatus?: string;
+						contractStatus?: string;
+						accessStatus?: string;
+					};
+					const next = `${data.collectionStatus ?? ''}|${data.contractStatus ?? ''}|${data.accessStatus ?? ''}`;
+					if (next && next !== initialFingerprint) {
 						stop();
 						window.location.reload();
 						return;

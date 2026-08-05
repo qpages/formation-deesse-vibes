@@ -1,12 +1,12 @@
 import type { APIRoute } from 'astro';
 import {
+	attachStripeCheckoutSession,
 	createPendingEnrollment,
 	DuplicateEnrollmentError,
 } from '../../lib/services/enrollment';
-import { createCheckoutSession } from '../../lib/services/stripe';
+import { createCheckoutSession } from '../../lib/stripe';
 import { getEnv } from '../../lib/env';
 import { checkoutSchema } from '../../lib/validation';
-import { getPrisma } from '../../lib/db';
 
 export const POST: APIRoute = async ({ request }) => {
 	try {
@@ -27,18 +27,15 @@ export const POST: APIRoute = async ({ request }) => {
 
 		const session = await createCheckoutSession({
 			enrollmentId: enrollment.id,
-			email: enrollment.email,
-			firstName: enrollment.firstName,
-			lastName: enrollment.lastName,
+			email: enrollment.user.email,
+			firstName: enrollment.user.firstName,
+			lastName: enrollment.user.lastName,
 			paymentPlan: parsed.data.paymentPlan,
 			successUrl: `${site}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
 			cancelUrl: `${site}/?checkout=cancel`,
 		});
 
-		await getPrisma().enrollment.update({
-			where: { id: enrollment.id },
-			data: { stripeCheckoutSessionId: session.id },
-		});
+		await attachStripeCheckoutSession(enrollment.id, session.id);
 
 		if (!session.url) {
 			return json({ error: 'Impossible de créer la session de paiement.' }, 500);

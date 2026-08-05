@@ -6,12 +6,11 @@ import {
 	verifyAdminSessionToken,
 	verifyEnrollmentSessionToken,
 } from '../../../lib/auth/session';
-import { getPrisma } from '../../../lib/db';
+import { inngest } from '../../../lib/inngest/client';
 import {
 	canResendNda,
-	markNdaResent,
+	findEnrollmentById,
 } from '../../../lib/services/enrollment';
-import { reactivateNda } from '../../../lib/services/yousign';
 
 export const POST: APIRoute = async ({ request }) => {
 	try {
@@ -39,9 +38,7 @@ export const POST: APIRoute = async ({ request }) => {
 			return json({ error: 'Non autorisé.' }, 403);
 		}
 
-		const enrollment = await getPrisma().enrollment.findUnique({
-			where: { id: enrollmentId },
-		});
+		const enrollment = await findEnrollmentById(enrollmentId);
 		if (!enrollment) {
 			return json({ error: 'Inscription introuvable.' }, 404);
 		}
@@ -51,8 +48,10 @@ export const POST: APIRoute = async ({ request }) => {
 			return json({ error: allowed.reason }, 429);
 		}
 
-		await reactivateNda(enrollment.yousignRequestId!);
-		await markNdaResent(enrollment);
+		await inngest.send({
+			name: 'admin/relance-nda',
+			data: { enrollmentId: enrollment.id },
+		});
 
 		return json({ ok: true, message: 'L’accord a été renvoyé par e-mail (Yousign).' });
 	} catch (error) {

@@ -1,5 +1,5 @@
-import type { Enrollment, Payment, Prisma } from '../../generated/prisma/client';
-import { getPrisma } from '../db';
+import type { Enrollment, Payment, Prisma, User } from '../../generated/prisma/client';
+import { getPrisma } from '../prisma';
 import { paginate, type Pagination } from '../pagination';
 import {
 	buildAdminPaymentSummary,
@@ -7,13 +7,15 @@ import {
 	type AdminPaymentSummary,
 } from './payments';
 import { resolveNdaSignUrl } from '../services/enrollment';
-import { stripeDashboardUrl } from '../services/stripe';
-import { yousignAppUrl } from '../services/yousign';
+import { stripeDashboardUrl } from '../stripe';
+import { yousignAppUrl } from '../yousign';
 import { adminPipelineBadges } from '../status';
 
 export const ADMIN_PAGE_SIZE = 25;
 
 export type AdminEnrollmentRow = Enrollment & {
+	user: User;
+	email: string;
 	pipeline: ReturnType<typeof adminPipelineBadges>;
 	paymentSummary: AdminPaymentSummary;
 	stripeUrl: string | null;
@@ -27,7 +29,7 @@ export type AdminEnrollmentList = Pagination & {
 	rows: AdminEnrollmentRow[];
 };
 
-/** Tokenized insensitive search on email / firstName / lastName. */
+/** Tokenized insensitive search on user email / firstName / lastName. */
 export function enrollmentSearchWhere(q: string): Prisma.EnrollmentWhereInput | undefined {
 	const tokens = q
 		.trim()
@@ -40,9 +42,9 @@ export function enrollmentSearchWhere(q: string): Prisma.EnrollmentWhereInput | 
 	return {
 		AND: tokens.map((token) => ({
 			OR: [
-				{ email: { contains: token, mode: 'insensitive' } },
-				{ firstName: { contains: token, mode: 'insensitive' } },
-				{ lastName: { contains: token, mode: 'insensitive' } },
+				{ user: { email: { contains: token, mode: 'insensitive' } } },
+				{ user: { firstName: { contains: token, mode: 'insensitive' } } },
+				{ user: { lastName: { contains: token, mode: 'insensitive' } } },
 			],
 		})),
 	};
@@ -58,15 +60,18 @@ export function adminListHref(input: { q?: string; page?: number }): string {
 }
 
 export async function toAdminEnrollmentRow(
-	row: Enrollment,
+	row: Enrollment & { user: User },
 	payments: Payment[],
 ): Promise<AdminEnrollmentRow> {
 	const paymentSummary = buildAdminPaymentSummary(row, payments);
 
 	return {
 		...row,
+		email: row.user.email,
 		pipeline: adminPipelineBadges({
-			status: row.status,
+			collectionStatus: row.collectionStatus,
+			contractStatus: row.contractStatus,
+			accessStatus: row.accessStatus,
 			yousignStatus: row.yousignStatus,
 		}),
 		paymentSummary,
@@ -78,8 +83,19 @@ export async function toAdminEnrollmentRow(
 		}),
 		yousignUrl: yousignAppUrl(row.yousignRequestId),
 		signUrl: await resolveNdaSignUrl(row),
-		displayName: `${row.firstName} ${row.lastName}`,
+		displayName: `${row.user.firstName} ${row.user.lastName}`,
 	};
+}
+
+/** Full export rows (admin CSV). Catalog query — not a keyed enrollment lookup. */
+export async function listEnrollmentsForExport() {
+	return getPrisma().enrollment.findMany({
+		orderBy: { createdAt: 'desc' },
+		include: {
+			user: true,
+			payments: { orderBy: { installmentNumber: 'asc' } },
+		},
+	});
 }
 
 export async function listAdminEnrollments(input: {
@@ -99,6 +115,7 @@ export async function listAdminEnrollments(input: {
 
 	const enrollments = await prisma.enrollment.findMany({
 		where,
+		include: { user: true },
 		orderBy: { createdAt: 'desc' },
 		skip: pagination.skip,
 		take: pagination.take,

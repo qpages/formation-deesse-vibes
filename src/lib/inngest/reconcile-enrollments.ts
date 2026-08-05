@@ -1,0 +1,51 @@
+import { getPrisma } from '../prisma';
+import { applyAccessPolicy } from '../services/access';
+import { inngest } from './client';
+
+/** Command: ré-applique applyAccessPolicy (cron léger ou admin). */
+export const reconcileEnrollments = inngest.createFunction(
+	{
+		id: 'reconcile-enrollments',
+		retries: 2,
+		triggers: [
+			{ cron: '0 4 * * *' },
+			{ event: 'ops/reconcile-enrollments' },
+		],
+	},
+	async ({ event, step }) => {
+		const enrollmentId =
+			event.name === 'ops/reconcile-enrollments'
+				? (event.data as { enrollmentId?: string }).enrollmentId
+				: undefined;
+
+		if (enrollmentId) {
+			await step.run('reconcile-one', () => applyAccessPolicy(enrollmentId));
+			return { ok: true, count: 1 };
+		}
+
+		const ids = await step.run('find-incoherent', async () => {
+			const rows = await getPrisma().enrollment.findMany({
+				where: {
+					OR: [
+						{ accessStatus: 'active', collectionStatus: 'past_due' },
+						{ accessStatus: 'suspended', collectionStatus: { in: ['current', 'paid'] } },
+						{
+							accessStatus: 'not_eligible',
+							contractStatus: 'signed',
+							collectionStatus: { in: ['current', 'paid'] },
+						},
+					],
+				},
+				select: { id: true },
+				take: 100,
+			});
+			return rows.map((r) => r.id);
+		});
+
+		for (const id of ids) {
+			await step.run(`reconcile-${id}`, () => applyAccessPolicy(id));
+		}
+
+		return { ok: true, count: ids.length };
+	},
+);

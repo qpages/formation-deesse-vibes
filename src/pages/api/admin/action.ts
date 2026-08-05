@@ -4,26 +4,24 @@ import {
 	parseCookie,
 	verifyAdminSessionToken,
 } from '../../../lib/auth/session';
-import { getPrisma } from '../../../lib/db';
+import { inngest } from '../../../lib/inngest/client';
+import { getPrisma } from '../../../lib/prisma';
+import { applyAccessPolicy } from '../../../lib/services/access';
 import {
 	canResendNda,
-	markNdaResent,
+	clearNdaFields,
+	findEnrollmentById,
+	markEnrollmentAccessRevoked,
+	markEnrollmentRefunded,
 } from '../../../lib/services/enrollment';
-import {
-	inviteToTeachizy,
-	triggerInviteAfterSignature,
-} from '../../../lib/services/teachizy';
-import {
-	syncPaymentFromStripe,
-	triggerNdaAfterPayment,
-} from '../../../lib/services/payment';
-import {
-	createNdaFromTemplate,
-	reactivateNda,
-	syncYousignStatus,
-} from '../../../lib/services/yousign';
+import { syncPaymentFromStripe } from '../../../lib/services/payments';
+import { syncYousignStatus } from '../../../lib/services/yousign-events';
 import { adminActionSchema } from '../../../lib/validation';
 
+/**
+ * Admin = auth + validate + inngest.send (+ sync lecture Stripe/Yousign).
+ * Zéro invite/NDA/Yousign sync side-effect inline (sauf sync lecture via service).
+ */
 export const POST: APIRoute = async ({ request }) => {
 	const adminEmail = await verifyAdminSessionToken(
 		parseCookie(request.headers.get('cookie'), ADMIN_COOKIE) ?? '',
@@ -38,10 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
 			return json({ error: 'Action invalide.' }, 400);
 		}
 
-		const prisma = getPrisma();
-		const enrollment = await prisma.enrollment.findUnique({
-			where: { id: parsed.data.enrollmentId },
-		});
+		const enrollment = await findEnrollmentById(parsed.data.enrollmentId);
 		if (!enrollment) {
 			return json({ error: 'Inscription introuvable.' }, 404);
 		}
@@ -58,6 +53,7 @@ export const POST: APIRoute = async ({ request }) => {
 				const detail = messages[result.reason] ?? result.reason;
 				return json({ error: `Paiement non confirmable : ${detail}` }, 400);
 			}
+			await applyAccessPolicy(enrollment.id);
 		}
 
 		if (action === 'sync_yousign') {
@@ -75,126 +71,74 @@ export const POST: APIRoute = async ({ request }) => {
 		}
 
 		if (action === 'retrigger_nda') {
-			const result = await triggerNdaAfterPayment(enrollment.id);
-			if (!result.ok) {
-				const messages: Record<string, string> = {
-					enrollment_not_found: 'Inscription introuvable.',
-					status_incompatible:
-						'Statut incompatible (besoin paiement confirmé ou NDA envoyé).',
-					nda_already_created:
-						'NDA déjà créé. Utilisez Relancer ou Recréer NDA.',
-				};
-				return json({ error: messages[result.reason] ?? result.reason }, 400);
+			if (enrollment.collectionStatus === 'pending') {
+				return json(
+					{ error: 'Statut incompatible (besoin paiement confirmé).' },
+					400,
+				);
 			}
+			await inngest.send({
+				name: 'stripe/payment.confirmed',
+				data: {
+					enrollmentId: enrollment.id,
+					stripeEventId: `admin-retrigger-nda:${enrollment.id}:${Date.now()}`,
+				},
+			});
 		}
 
-		if (action === 'retrigger_signature') {
-			const result = await triggerInviteAfterSignature(enrollment.id);
-			if (!result.ok) {
-				const messages: Record<string, string> = {
-					enrollment_not_found: 'Inscription introuvable.',
-					no_yousign_request: 'Aucune demande Yousign associée.',
-					status_incompatible:
-						'Statut incompatible (besoin NDA envoyé ou signé).',
-					already_invited: 'Invitation Teachizy déjà envoyée.',
-				};
-				return json({ error: messages[result.reason] ?? result.reason }, 400);
+		if (action === 'retrigger_signature' || action === 'retrigger_teachizy') {
+			if (!enrollment.yousignRequestId && action === 'retrigger_signature') {
+				return json({ error: 'Aucune demande Yousign associée.' }, 400);
 			}
+			if (enrollment.accessStatus === 'revoked') {
+				return json({ error: 'Accès révoqué — impossible de rejouer Teachizy.' }, 400);
+			}
+			await inngest.send({
+				name: 'enrollment/access.grant',
+				data: { enrollmentId: enrollment.id },
+			});
 		}
 
 		if (action === 'relance_nda') {
 			const allowed = await canResendNda(enrollment);
 			if (!allowed.ok) return json({ error: allowed.reason }, 429);
-			await reactivateNda(enrollment.yousignRequestId!);
-			await markNdaResent(enrollment);
+			await inngest.send({
+				name: 'admin/relance-nda',
+				data: { enrollmentId: enrollment.id },
+			});
 		}
 
 		if (action === 'recreate_nda') {
-			const nda = await createNdaFromTemplate({
-				enrollmentId: enrollment.id,
-				email: enrollment.email,
-				firstName: enrollment.firstName,
-				lastName: enrollment.lastName,
-			});
-			await prisma.enrollment.update({
-				where: { id: enrollment.id },
-				data: {
-					yousignRequestId: nda.requestId,
-					yousignSignerId: nda.signerId,
-					yousignStatus: 'ongoing',
-					status: 'nda_envoye',
-				},
+			await inngest.send({
+				name: 'admin/recreate-nda',
+				data: { enrollmentId: enrollment.id },
 			});
 		}
 
 		if (action === 'delete_nda') {
-			const resetStatus =
-				enrollment.status === 'nda_envoye' ||
-				enrollment.status === 'nda_signe' ||
-				enrollment.status === 'teachizy_envoye';
-
-			await prisma.enrollment.update({
-				where: { id: enrollment.id },
-				data: {
-					yousignRequestId: null,
-					yousignSignerId: null,
-					yousignStatus: null,
-					ndaResendCount: 0,
-					ndaResendDay: null,
-					ndaLastResendAt: null,
-					...(resetStatus ? { status: 'paiement_confirme' as const } : {}),
-				},
-			});
-		}
-
-		if (action === 'retrigger_teachizy') {
-			await inviteToTeachizy({
-				enrollmentId: enrollment.id,
-				email: enrollment.email,
-				firstName: enrollment.firstName,
-				lastName: enrollment.lastName,
-			});
-			// Première invite : pose la source of truth. Resend : API only (audit via AdminAction).
-			if (!enrollment.teachizyInvitedAt) {
-				await prisma.enrollment.update({
-					where: { id: enrollment.id },
-					data: {
-						status: 'teachizy_envoye',
-						teachizyInvitedAt: new Date(),
-					},
-				});
-			} else if (enrollment.status !== 'teachizy_envoye') {
-				await prisma.enrollment.update({
-					where: { id: enrollment.id },
-					data: { status: 'teachizy_envoye' },
-				});
-			}
+			await clearNdaFields(enrollment.id);
 		}
 
 		if (action === 'mark_refunded') {
-			if (enrollment.status === 'rembourse') {
+			if (enrollment.collectionStatus === 'refunded') {
 				return json({ error: 'Déjà marqué remboursé.' }, 400);
 			}
-			await prisma.enrollment.update({
-				where: { id: enrollment.id },
-				data: { status: 'rembourse' },
-			});
+			await markEnrollmentRefunded(enrollment.id);
+			await applyAccessPolicy(enrollment.id);
 		}
 
 		if (action === 'revoke_access') {
-			if (enrollment.status === 'acces_retire') {
+			if (enrollment.accessStatus === 'revoked') {
 				return json({ error: 'Accès déjà retiré.' }, 400);
 			}
-			if (enrollment.status === 'rembourse') {
+			if (enrollment.collectionStatus === 'refunded') {
 				return json({ error: 'Inscription déjà remboursée.' }, 400);
 			}
-			await prisma.enrollment.update({
-				where: { id: enrollment.id },
-				data: { status: 'acces_retire' },
-			});
+			await markEnrollmentAccessRevoked(enrollment.id);
+			await applyAccessPolicy(enrollment.id);
 		}
 
-		await prisma.adminAction.create({
+		await getPrisma().adminAction.create({
 			data: {
 				enrollmentId: enrollment.id,
 				adminEmail,

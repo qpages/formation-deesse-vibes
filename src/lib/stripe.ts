@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
-import { getEnv, requireEnv } from '../env';
-import { getPaymentPlan, type PaymentPlanId, stripePriceIdForPlan } from '../payment-plans';
+import { getEnv, requireEnv } from './env';
+import { getPaymentPlan, type PaymentPlanId, stripePriceIdForPlan } from './payment-plans';
 
 let stripe: Stripe | null = null;
 
@@ -117,7 +117,7 @@ export async function ensureSubscriptionSchedule(input: {
 				items: [{ price: input.priceId, quantity: 1 }],
 				iterations: input.installments,
 				start_date: currentPhase.start_date,
-			},
+			} as Stripe.SubscriptionScheduleUpdateParams.Phase,
 		],
 	});
 

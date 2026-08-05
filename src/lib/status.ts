@@ -1,5 +1,7 @@
 import type {
-	EnrollmentStatus,
+	AccessStatus,
+	CollectionStatus,
+	ContractStatus,
 	Payment,
 	PaymentPlanId,
 	PaymentStatus,
@@ -12,14 +14,38 @@ export type StepKey = 'paiement' | 'nda' | 'acces';
 export type StepState = 'a_faire' | 'en_cours' | 'termine' | 'action_requise';
 export type BadgeTone = 'neutral' | 'progress' | 'success' | 'action';
 
-export const STATUS_LABELS: Record<EnrollmentStatus, string> = {
-	paiement_en_attente: 'Paiement en attente',
-	paiement_confirme: 'Paiement confirmé',
-	nda_envoye: 'Accord à signer',
-	nda_signe: 'Accord signé',
-	teachizy_envoye: 'Accès envoyés',
-	rembourse: 'Remboursé',
-	acces_retire: 'Accès retiré',
+/** Projection UI — uniquement les 3 enums orthogonaux. */
+export type OrthogonalStatuses = {
+	collectionStatus: CollectionStatus;
+	contractStatus: ContractStatus;
+	accessStatus: AccessStatus;
+};
+
+export const COLLECTION_STATUS_LABELS: Record<CollectionStatus, string> = {
+	pending: 'En attente',
+	current: 'À jour',
+	past_due: 'Impayé',
+	paid: 'Soldé',
+	canceled: 'Annulé',
+	refunded: 'Remboursé',
+};
+
+export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
+	pending: 'En attente',
+	sent: 'Envoyé',
+	signed: 'Signé',
+	expired: 'Expiré',
+	declined: 'Refusé',
+	canceled: 'Annulé',
+	error: 'Erreur',
+};
+
+export const ACCESS_STATUS_LABELS: Record<AccessStatus, string> = {
+	not_eligible: 'Non éligible',
+	pending: 'Provisionnement',
+	active: 'Actif',
+	suspended: 'Suspendu',
+	revoked: 'Révoqué',
 };
 
 export const YOUSIGN_STATUS_LABELS: Record<YousignRequestStatus, string> = {
@@ -53,30 +79,35 @@ export function stepTone(state: StepState): BadgeTone {
 	}
 }
 
-/** Colonnes admin : Paiement / Signature / Accès (pas un seul statut global). */
-export function adminPipelineBadges(input: {
-	status: EnrollmentStatus;
+/** Colonnes admin : Paiement / Signature / Accès depuis les 3 enums. */
+export function adminPipelineBadges(input: OrthogonalStatuses & {
 	yousignStatus?: YousignRequestStatus | null;
 }): {
 	paiement: { label: string; tone: BadgeTone };
 	signature: { label: string; tone: BadgeTone };
 	acces: { label: string; tone: BadgeTone };
 } {
-	const steps = stepStates(input.status);
+	const steps = stepStates(input);
 
-	if (input.status === 'rembourse' || input.status === 'acces_retire') {
+	if (
+		input.collectionStatus === 'refunded' ||
+		input.accessStatus === 'revoked'
+	) {
 		return {
 			paiement: {
-				label: STATUS_LABELS[input.status],
+				label: COLLECTION_STATUS_LABELS[input.collectionStatus],
 				tone: 'neutral',
 			},
 			signature: {
 				label: input.yousignStatus
 					? YOUSIGN_STATUS_LABELS[input.yousignStatus]
-					: '—',
+					: CONTRACT_STATUS_LABELS[input.contractStatus],
 				tone: 'neutral',
 			},
-			acces: { label: STATUS_LABELS[input.status], tone: 'neutral' },
+			acces: {
+				label: ACCESS_STATUS_LABELS[input.accessStatus],
+				tone: 'neutral',
+			},
 		};
 	}
 
@@ -90,9 +121,9 @@ export function adminPipelineBadges(input: {
 			label: YOUSIGN_STATUS_LABELS[input.yousignStatus],
 			tone: 'action',
 		};
-	} else if (input.yousignStatus === 'done' || steps.nda === 'termine') {
+	} else if (input.yousignStatus === 'done' || input.contractStatus === 'signed') {
 		signature = { label: 'Signé', tone: 'success' };
-	} else if (input.yousignStatus === 'ongoing' || steps.nda === 'action_requise') {
+	} else if (input.yousignStatus === 'ongoing' || input.contractStatus === 'sent') {
 		signature = { label: 'En attente', tone: 'action' };
 	} else if (steps.nda === 'en_cours') {
 		signature = { label: 'En cours', tone: 'progress' };
@@ -156,24 +187,37 @@ export function mapYousignApiStatus(
 	}
 }
 
-export function stepStates(status: EnrollmentStatus): Record<StepKey, StepState> {
-	switch (status) {
-		case 'paiement_en_attente':
-			return { paiement: 'en_cours', nda: 'a_faire', acces: 'a_faire' };
-		case 'paiement_confirme':
-			return { paiement: 'termine', nda: 'en_cours', acces: 'a_faire' };
-		case 'nda_envoye':
-			return { paiement: 'termine', nda: 'action_requise', acces: 'a_faire' };
-		case 'nda_signe':
-			return { paiement: 'termine', nda: 'termine', acces: 'en_cours' };
-		case 'teachizy_envoye':
-			return { paiement: 'termine', nda: 'termine', acces: 'termine' };
-		case 'rembourse':
-		case 'acces_retire':
-			return { paiement: 'termine', nda: 'a_faire', acces: 'a_faire' };
-		default:
-			return { paiement: 'a_faire', nda: 'a_faire', acces: 'a_faire' };
+export function stepStates(input: OrthogonalStatuses): Record<StepKey, StepState> {
+	if (input.collectionStatus === 'refunded' || input.accessStatus === 'revoked') {
+		return { paiement: 'termine', nda: 'a_faire', acces: 'a_faire' };
 	}
+
+	let paiement: StepState = 'a_faire';
+	if (input.collectionStatus === 'pending') {
+		paiement = 'en_cours';
+	} else if (input.collectionStatus === 'past_due') {
+		paiement = 'action_requise';
+	} else {
+		paiement = 'termine';
+	}
+
+	let nda: StepState = 'a_faire';
+	if (input.contractStatus === 'signed') {
+		nda = 'termine';
+	} else if (input.contractStatus === 'sent') {
+		nda = 'action_requise';
+	} else if (input.collectionStatus !== 'pending') {
+		nda = 'en_cours';
+	}
+
+	let acces: StepState = 'a_faire';
+	if (input.accessStatus === 'active') {
+		acces = 'termine';
+	} else if (input.accessStatus === 'pending' || input.accessStatus === 'suspended') {
+		acces = input.accessStatus === 'suspended' ? 'action_requise' : 'en_cours';
+	}
+
+	return { paiement, nda, acces };
 }
 
 export function stepLabel(state: StepState): string {
@@ -198,83 +242,80 @@ export type PrimaryAction =
 
 export const TEACHIZY_ACADEMY_URL = 'https://jsmatriceacademy.teachizy.fr';
 
-/** Intervalle et plafond du polling client (StatusPanel). */
 export const ENROLLMENT_POLL_INTERVAL_MS = 2_000;
 export const ENROLLMENT_POLL_MAX_MS = 90_000;
 
-/**
- * Statuts où un process async (webhook / Inngest) peut avancer l’inscription
- * sans action utilisateur — le client poll jusqu’à changement.
- */
-export function shouldPollEnrollment(input: {
-	status: EnrollmentStatus;
+export function shouldPollEnrollment(input: OrthogonalStatuses & {
 	hasCheckoutSession?: boolean;
 	hasNdaSignUrl?: boolean;
 }): boolean {
-	switch (input.status) {
-		case 'paiement_en_attente':
-			return Boolean(input.hasCheckoutSession);
-		case 'paiement_confirme':
-			return !input.hasNdaSignUrl;
-		case 'nda_signe':
-			return true;
-		default:
-			return false;
+	if (input.collectionStatus === 'pending' && input.hasCheckoutSession) return true;
+	if (
+		input.collectionStatus !== 'pending' &&
+		input.contractStatus === 'pending' &&
+		!input.hasNdaSignUrl
+	) {
+		return true;
 	}
+	if (input.accessStatus === 'pending') return true;
+	return false;
 }
 
-/** Bandeau au retour Stripe (`?checkout=success`). Null = laisser le panneau parler. */
-export function checkoutSuccessFlash(status: EnrollmentStatus): string | null {
-	switch (status) {
-		case 'paiement_en_attente':
-			return 'Paiement en cours de confirmation. Cette page se met à jour automatiquement.';
-		case 'paiement_confirme':
-			return 'Paiement reçu. Nous préparons votre accord de confidentialité.';
-		case 'nda_envoye':
-			return 'Paiement reçu. Signez votre accord de confidentialité pour continuer.';
-		default:
-			return null;
+export function checkoutSuccessFlash(input: OrthogonalStatuses): string | null {
+	if (input.collectionStatus === 'pending') {
+		return 'Paiement en cours de confirmation. Cette page se met à jour automatiquement.';
 	}
+	if (input.contractStatus === 'sent') {
+		return 'Paiement reçu. Signez votre accord de confidentialité pour continuer.';
+	}
+	if (input.contractStatus === 'pending') {
+		return 'Paiement reçu. Nous préparons votre accord de confidentialité.';
+	}
+	return null;
 }
 
-/** Message principal sous « Votre inscription ». */
-export function statusMessage(status: EnrollmentStatus): string | null {
-	switch (status) {
-		case 'nda_signe':
-			return 'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation — cette page se met à jour automatiquement.';
-		case 'teachizy_envoye':
-			return 'Un email Teachizy avec vos identifiants vous a été envoyé. Si vous ne le retrouvez pas, cliquez sur « Mot de passe oublié » sur la page de connexion.';
-		case 'rembourse':
-		case 'acces_retire':
-			return null;
-		default:
-			return null;
+export function statusMessage(input: OrthogonalStatuses): string | null {
+	if (input.accessStatus === 'active') {
+		return 'Un email Teachizy avec vos identifiants vous a été envoyé. Si vous ne le retrouvez pas, cliquez sur « Mot de passe oublié » sur la page de connexion.';
 	}
+	if (input.accessStatus === 'pending' && input.contractStatus === 'signed') {
+		return 'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation — cette page se met à jour automatiquement.';
+	}
+	if (input.accessStatus === 'suspended') {
+		return 'Votre accès est temporairement suspendu suite à un impayé. Régularisez pour le rétablir.';
+	}
+	if (input.accessStatus === 'revoked' || input.collectionStatus === 'refunded') {
+		return null;
+	}
+	return null;
 }
 
 export function primaryAction(
-	status: EnrollmentStatus,
+	input: OrthogonalStatuses,
 	ndaSignUrl?: string | null,
 ): PrimaryAction {
-	switch (status) {
-		case 'paiement_en_attente':
-			return { kind: 'checkout', label: 'Je m’inscris' };
-		case 'paiement_confirme':
-		case 'nda_envoye':
-			return ndaSignUrl
-				? { kind: 'sign_nda', label: 'Signer mon accord', href: ndaSignUrl }
-				: { kind: 'refresh', label: 'Actualiser' };
-		case 'nda_signe':
-			return { kind: 'refresh', label: 'Actualiser' };
-		case 'teachizy_envoye':
-			return {
-				kind: 'open_platform',
-				label: 'Entrer dans la formation',
-				href: TEACHIZY_ACADEMY_URL,
-			};
-		default:
-			return { kind: 'none', label: 'Contacter un administrateur' };
+	if (input.accessStatus === 'revoked' || input.collectionStatus === 'refunded') {
+		return { kind: 'none', label: 'Contacter un administrateur' };
 	}
+	if (input.collectionStatus === 'pending') {
+		return { kind: 'checkout', label: 'Je m’inscris' };
+	}
+	if (input.contractStatus === 'pending' || input.contractStatus === 'sent') {
+		return ndaSignUrl
+			? { kind: 'sign_nda', label: 'Signer mon accord', href: ndaSignUrl }
+			: { kind: 'refresh', label: 'Actualiser' };
+	}
+	if (input.accessStatus === 'pending' || input.accessStatus === 'not_eligible') {
+		return { kind: 'refresh', label: 'Actualiser' };
+	}
+	if (input.accessStatus === 'active') {
+		return {
+			kind: 'open_platform',
+			label: 'Entrer dans la formation',
+			href: TEACHIZY_ACADEMY_URL,
+		};
+	}
+	return { kind: 'none', label: 'Contacter un administrateur' };
 }
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -299,14 +340,16 @@ export type PaymentTrackingState =
 	| 'rembourse';
 
 export function paymentTrackingState(input: {
-	status: EnrollmentStatus;
+	collectionStatus: CollectionStatus;
 	installmentsPaid: number;
 	installmentsTotal: number | null;
 	subscriptionStatus: SubscriptionStatus | null;
 	payments: Pick<Payment, 'status'>[];
 }): PaymentTrackingState {
-	if (input.status === 'rembourse') return 'rembourse';
-	if (input.status === 'paiement_en_attente') return 'en_attente';
+	if (input.collectionStatus === 'refunded') return 'rembourse';
+	if (input.collectionStatus === 'pending') return 'en_attente';
+	if (input.collectionStatus === 'past_due') return 'impaye';
+	if (input.collectionStatus === 'paid') return 'termine';
 
 	const hasFailed = input.payments.some((p) => p.status === 'failed' || p.status === 'open');
 	const total = input.installmentsTotal ?? 1;
@@ -371,4 +414,3 @@ export function paymentSummaryLine(input: {
 	}
 	return `${progress} · ${collected}`;
 }
-

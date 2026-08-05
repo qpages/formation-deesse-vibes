@@ -22,7 +22,11 @@ export const GET: APIRoute = async ({ request }) => {
 		return json({ error: 'Inscription introuvable.' }, 404);
 	}
 
-	return json({ status: enrollment.status });
+	return json({
+		collectionStatus: enrollment.collectionStatus,
+		contractStatus: enrollment.contractStatus,
+		accessStatus: enrollment.accessStatus,
+	});
 };
 
 function json(data: unknown, status = 200) {
