@@ -23,6 +23,7 @@ import {
 	findEnrollmentBySubscriptionId,
 	type EnrollmentWithUser,
 } from './enrollment';
+import { notifyOps, type OpsKind, type OpsSeverity } from './slack';
 import {
 	createCheckoutSession,
 	ensureSubscriptionSchedule,
@@ -32,6 +33,26 @@ import {
 	retrieveCheckoutSession,
 	retrieveSubscription,
 } from '../stripe';
+
+const COLLECTION_NOTIFY: Partial<
+	Record<CollectionStatus, { kind: OpsKind; severity: OpsSeverity; title: string }>
+> = {
+	past_due: {
+		kind: 'collection.past_due',
+		severity: 'warn',
+		title: 'Collection en retard',
+	},
+	paid: {
+		kind: 'collection.paid',
+		severity: 'info',
+		title: 'Collection soldée',
+	},
+	refunded: {
+		kind: 'collection.refunded',
+		severity: 'warn',
+		title: 'Collection remboursée',
+	},
+};
 
 export { retrieveCheckoutSession } from '../stripe';
 
@@ -211,12 +232,10 @@ export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 			.filter(Boolean)
 			.sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
 
+	const previous = enrollment.collectionStatus;
 	let collectionStatus: CollectionStatus;
-	if (
-		enrollment.collectionStatus === 'refunded' ||
-		enrollment.collectionStatus === 'canceled'
-	) {
-		collectionStatus = enrollment.collectionStatus;
+	if (previous === 'refunded' || previous === 'canceled') {
+		collectionStatus = previous;
 	} else if (hasOpenOrFailedPayments(payments) && installmentsPaid >= 1) {
 		collectionStatus = 'past_due';
 	} else if (failedOrOpen.some((p) => p.status === 'failed')) {
@@ -250,6 +269,18 @@ export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 			fullyPaidAt,
 		},
 	});
+
+	if (previous !== collectionStatus) {
+		const notify = COLLECTION_NOTIFY[collectionStatus];
+		if (notify) {
+			await notifyOps({
+				...notify,
+				enrollmentId,
+				email: enrollment.user.email,
+				detail: `${previous} → ${collectionStatus}`,
+			});
+		}
+	}
 
 	await applyAccessPolicy(enrollmentId);
 }
@@ -470,6 +501,18 @@ export async function startCheckout(input: {
 
 	await attachStripeCheckoutSession(enrollment.id, session.id);
 
+	if (!prev) {
+		const { user } = enrollment;
+		await notifyOps({
+			kind: 'checkout.created',
+			severity: 'info',
+			title: 'Checkout ouvert',
+			enrollmentId: enrollment.id,
+			email: user.email,
+			detail: `${user.firstName} ${user.lastName} | plan=${paymentPlan}`,
+		});
+	}
+
 	if (!session.url) {
 		throw new Error('Checkout sans url');
 	}
@@ -559,6 +602,22 @@ export async function confirmPaidCheckout(
 	}
 
 	await applyAccessPolicy(enrollmentId);
+
+	if (transitioned) {
+		await notifyOps({
+			kind: 'payment.first_confirmed',
+			severity: 'info',
+			title: 'Premier paiement confirmé',
+			enrollmentId,
+			email: fresh.user.email,
+			detail: [
+				`${fresh.user.firstName} ${fresh.user.lastName}`,
+				fresh.paymentPlan ? `plan=${fresh.paymentPlan}` : null,
+			]
+				.filter(Boolean)
+				.join(' | '),
+		});
+	}
 
 	return {
 		ok: true,

@@ -1,7 +1,8 @@
 import type { Enrollment } from '../../generated/prisma/client';
 import { inngest } from '../inngest/client';
-import { canResendNda } from '../services/enrollment';
+import { canResendNda, findEnrollmentById } from '../services/enrollment';
 import { syncPaymentFromStripe } from '../services/payments';
+import { notifyOps } from '../services/slack';
 import { syncYousignStatus } from '../services/yousign-events';
 import type { AdminActionKey } from './actions';
 
@@ -86,6 +87,15 @@ const handlers = {
 		await inngest.send({
 			name: 'admin/recreate-nda',
 			data: { enrollmentId: enrollment.id },
+		});
+		const withUser = await findEnrollmentById(enrollment.id);
+		await notifyOps({
+			kind: 'admin.action',
+			severity: 'warn',
+			title: 'Admin: recréer NDA',
+			enrollmentId: enrollment.id,
+			email: withUser?.user.email,
+			detail: 'action=recreate_nda',
 		});
 		return { ok: true };
 	},

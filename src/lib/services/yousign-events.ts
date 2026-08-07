@@ -9,7 +9,7 @@ import {
 	findEnrollmentByYousignRequestOrExternalId,
 	updateEnrollmentYousignMirror,
 } from './enrollment';
-import { alertFinalFailure } from './slack';
+import { notifyOps } from './slack';
 
 const MONITOR_EVENTS = new Set([
 	'signature_request.declined',
@@ -90,12 +90,23 @@ export async function syncYousignStatus(
 		return { ok: false, reason: 'unmapped_status', detail: remote.status };
 	}
 
+	const becameSigned =
+		yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
+
 	await updateEnrollmentYousignMirror(enrollmentId, {
 		yousignStatus,
 		...(yousignStatus === 'done' ? { contractStatus: 'signed' as const } : {}),
 	});
 
-	if (yousignStatus === 'done') {
+	if (becameSigned) {
+		await notifyOps({
+			kind: 'nda.signed',
+			severity: 'info',
+			title: 'NDA signé',
+			enrollmentId,
+			email: enrollment.user.email,
+			detail: `sync Yousign → ${yousignStatus}`,
+		});
 		await applyAccessPolicy(enrollmentId);
 	}
 
@@ -126,12 +137,24 @@ export async function handleYousignProviderEvent(input: {
 			throw new Error(`Enrollment introuvable pour Yousign ${requestId}`);
 		}
 
+		const becameSigned = enrollment.contractStatus !== 'signed';
+
 		await updateEnrollmentYousignMirror(enrollment.id, {
 			yousignStatus: 'done',
 			contractStatus: 'signed',
 		});
 
 		await applyAccessPolicy(enrollment.id);
+
+		if (becameSigned) {
+			await notifyOps({
+				kind: 'nda.signed',
+				severity: 'info',
+				title: 'NDA signé',
+				enrollmentId: enrollment.id,
+				email: enrollment.user.email,
+			});
+		}
 
 		await inngest.send({
 			name: 'yousign/signature.done',
@@ -174,11 +197,15 @@ export async function handleYousignProviderEvent(input: {
 					? 'Action admin: Recréer un lien Yousign ou rembourser'
 					: 'Action admin: Renvoyer le lien Yousign (si expiré) ou Recréer un lien Yousign / rembourser';
 
-		await alertFinalFailure({
+		await notifyOps({
+			kind: 'nda.monitor',
+			severity: eventName.includes('error') || eventName.includes('deleted')
+				? 'critical'
+				: 'warn',
 			title: `Yousign ${eventName}`,
 			enrollmentId: enrollment?.id,
 			email: enrollment?.user.email,
-			error: [
+			detail: [
 				requestId ? `requestId=${requestId}` : 'requestId manquant',
 				reason ? `raison=${reason}` : null,
 				actionHint,

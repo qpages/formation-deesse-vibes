@@ -16,7 +16,8 @@ Landing → Stripe Checkout → NDA Yousign → Teachizy (API)
 4. Retour plus tard : e-mail → lien magique Resend → même page
 
 **États :** `Payment.status` (chaque échéance) + sur l’inscription `collectionStatus` / `contractStatus` / `accessStatus`.  
-Détail : [`docs/statuts.md`](./statuts.md).
+Détail : [`docs/statuts.md`](./statuts.md).  
+**Ops Slack :** catalogue des notifs → [`docs/ops-notifications.md`](./ops-notifications.md).
 
 ## Stack
 
@@ -28,7 +29,7 @@ Admin `/admin` : `ADMIN_EMAIL` / `ADMIN_PASSWORD` + JWT
 | Fonction | Event | Rôle |
 | --- | --- | --- |
 | `createNdaAfterPayment` | `stripe/payment.confirmed` | Crée / active le NDA (5 retries, alerte Slack) |
-| `inviteAfterNdaSigned` | `yousign/signature.done` | Invite Teachizy (5 retries, alerte Slack) |
+| `grantTeachizyAccess` | `yousign/signature.done` / `enrollment/access.grant` | Invite Teachizy (5 retries, alerte Slack) |
 | `purgeWebhookPayloads` | cron `0 3 * * *` | Efface les payloads chiffrés > 30 j |
 
 Local : `npm run dev` + `npm run inngest:dev` → dashboard http://localhost:8288  
