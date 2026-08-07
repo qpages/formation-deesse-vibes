@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { json } from '../../../lib/http';
 import { requestMagicLink } from '../../../lib/services/enrollment';
 import { magicLinkSchema } from '../../../lib/validation';
 
@@ -21,10 +22,3 @@ export const POST: APIRoute = async ({ request }) => {
 		return json({ error: 'Impossible d’envoyer le lien pour le moment.' }, 500);
 	}
 };
-
-function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { 'Content-Type': 'application/json' },
-	});
-}

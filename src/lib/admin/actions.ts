@@ -5,12 +5,13 @@ import type {
 	ContractStatus,
 	Enrollment,
 } from '../../generated/prisma/client';
+import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
 
 export const adminActionZones = ['metier', 'recovery'] as const;
 export type AdminActionZone = (typeof adminActionZones)[number];
 
 export const adminActionKeys = [
-	'relance_nda',
+	'resend_nda',
 	'recreate_nda',
 	'retrigger_teachizy',
 	'mark_refunded',
@@ -40,7 +41,7 @@ export interface AdminActionDef {
 /** Descriptions use `{name}` — remplacé côté client. */
 export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
-		action: 'relance_nda',
+		action: 'resend_nda',
 		label: 'Relancer la signature',
 		zone: 'metier',
 		eyebrow: 'Signature',
@@ -77,7 +78,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Paiement',
 		title: 'Marquer comme remboursé',
 		description:
-			'Passer {name} en collectionStatus « remboursé », puis appliquer la politique d’accès (révocation / suspension Teachizy via Inngest si besoin). Le remboursement Stripe reste à faire dans le Dashboard.',
+			'Passer {name} en collectionStatus « remboursé », puis appliquer la politique d’accès (révocation). Le remboursement Stripe reste à faire dans le Dashboard.',
 		confirm: 'Marquer remboursé',
 		danger: true,
 	},
@@ -88,7 +89,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Accès',
 		title: 'Retirer l’accès',
 		description:
-			'Passer {name} en accessStatus « révoqué », puis appliquer la politique d’accès (suspension Teachizy via Inngest).',
+			'Passer {name} en accessStatus « révoqué », puis appliquer la politique d’accès (timestamps de révocation).',
 		confirm: 'Retirer l’accès',
 		danger: true,
 	},
@@ -124,12 +125,12 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 	},
 	{
 		action: 'retrigger_signature',
-		label: 'Rejouer Inngest Teachizy',
+		label: 'Rejouer grant accès',
 		zone: 'recovery',
 		eyebrow: 'Recovery',
-		title: 'Déclencher invitation Teachizy (Inngest)',
+		title: 'Déclencher grant accès (Inngest)',
 		description:
-			'Envoyer l’event Inngest enrollment/access.grant pour {name}. Utile si le grant a raté après une signature.',
+			'Envoyer l’event Inngest enrollment/access.grant pour {name} (même job que « Renvoyer Teachizy », gate Yousign). Utile si le grant a raté après une signature.',
 		confirm: 'Déclencher Inngest',
 	},
 	{
@@ -183,21 +184,13 @@ type VisibilityInput = Pick<
 	| 'stripeCheckoutSessionId'
 >;
 
-/**
- * Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.).
- * Garder sync avec `dispatch.ts`.
- */
+/** Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.). */
 export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boolean {
-	const paidEnough = e.collectionStatus !== 'pending' && e.collectionStatus !== 'canceled';
+	const paidEnough = isPaidEnough(e.collectionStatus);
 
 	switch (action) {
-		case 'relance_nda':
-			return (
-				paidEnough &&
-				(e.contractStatus === 'sent' || e.contractStatus === 'pending') &&
-				e.accessStatus === 'not_eligible' &&
-				Boolean(e.yousignRequestId)
-			);
+		case 'resend_nda':
+			return isAwaitingNda(e) && Boolean(e.yousignRequestId);
 		case 'recreate_nda':
 			return paidEnough && e.contractStatus !== 'signed';
 		case 'retrigger_teachizy':
@@ -256,8 +249,8 @@ export function recommendedAction(e: VisibilityInput): AdminActionDef | null {
 	}
 
 	if (e.contractStatus === 'sent' || e.contractStatus === 'pending') {
-		const relance = pick('relance_nda');
-		if (relance) return relance;
+		const resend = pick('resend_nda');
+		if (resend) return resend;
 		const yousign = pick('sync_yousign');
 		if (yousign) return yousign;
 		const nda = pick('retrigger_nda');
@@ -279,7 +272,7 @@ export function recommendedAction(e: VisibilityInput): AdminActionDef | null {
 	const fallback: AdminActionKey[] = [
 		'sync_payment',
 		'sync_yousign',
-		'relance_nda',
+		'resend_nda',
 		'retrigger_teachizy',
 		'retrigger_nda',
 		'retrigger_signature',
@@ -305,7 +298,7 @@ export function recommendedActionReason(
 				return 'Paiement annulé côté collection — vérifiez l’état Stripe.';
 			}
 			return 'Paiement en attente — synchronisez Stripe pour débloquer la signature.';
-		case 'relance_nda':
+		case 'resend_nda':
 			return 'Signature en attente — relancez la participante.';
 		case 'sync_yousign':
 			return 'Statut signature à vérifier — synchronisez Yousign.';
@@ -314,7 +307,7 @@ export function recommendedActionReason(
 		case 'retrigger_teachizy':
 			return 'NDA signé — renvoyez l’accès Teachizy.';
 		case 'retrigger_signature':
-			return 'Grant Teachizy à rejouer après signature.';
+			return 'Grant accès à rejouer (même job Teachizy, via Yousign).';
 		default:
 			return 'Prochaine action recommandée pour ce dossier.';
 	}

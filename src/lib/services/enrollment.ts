@@ -2,113 +2,44 @@ import type {
 	ContractStatus,
 	Enrollment,
 	PaymentPlanId,
-	User,
 	YousignRequestStatus,
 } from '../../generated/prisma/client';
-import { encryptPayload, generateToken, hashToken } from '../crypto';
-import { getPrisma } from '../prisma';
+import { generateToken, hashToken } from '../crypto';
+import { isAwaitingNda } from '../enrollment-gates';
 import { getEnv } from '../env';
 import { getPaymentPlan } from '../payment-plans';
-import { sendMagicLinkEmail } from './resend';
+import { getPrisma } from '../prisma';
 import { getSignatureLink } from '../yousign';
+import { sendMagicLinkEmail } from './resend';
+import {
+	findEnrollmentByEmail,
+	withUser,
+} from './enrollment-queries';
+
+export type { EnrollmentWithUser } from './enrollment-queries';
+export {
+	findEnrollmentByCheckoutSession,
+	findEnrollmentByEmail,
+	findEnrollmentById,
+	findEnrollmentByIdOrThrow,
+	findEnrollmentByScheduleId,
+	findEnrollmentByScheduleOrSubscription,
+	findEnrollmentBySubscriptionId,
+	findEnrollmentByYousignRequestId,
+	findEnrollmentByYousignRequestOrExternalId,
+	findEnrollmentForAccessPolicy,
+	findEnrollmentIdByStripeInvoiceId,
+} from './enrollment-queries';
+export {
+	markProviderEventFailed,
+	markProviderEventIgnored,
+	markProviderEventProcessed,
+	purgeOldWebhookPayloads,
+	recordProviderEvent,
+} from './provider-events';
 
 const NDA_RESEND_COOLDOWN_MS = 15 * 60 * 1000;
 const NDA_RESEND_MAX_PER_DAY = 5;
-
-export type EnrollmentWithUser = Enrollment & { user: User };
-
-const withUser = { include: { user: true } } as const;
-
-export async function findEnrollmentByEmail(email: string) {
-	return getPrisma().enrollment.findFirst({
-		where: { user: { email: email.trim().toLowerCase() } },
-		orderBy: { createdAt: 'desc' },
-		...withUser,
-	});
-}
-
-export async function findEnrollmentById(id: string) {
-	return getPrisma().enrollment.findUnique({ where: { id }, ...withUser });
-}
-
-export async function findEnrollmentByIdOrThrow(id: string) {
-	return getPrisma().enrollment.findUniqueOrThrow({ where: { id }, ...withUser });
-}
-
-export async function findEnrollmentByCheckoutSession(sessionId: string) {
-	return getPrisma().enrollment.findUnique({
-		where: { stripeCheckoutSessionId: sessionId },
-		...withUser,
-	});
-}
-
-export async function findEnrollmentBySubscriptionId(subscriptionId: string) {
-	return getPrisma().enrollment.findUnique({
-		where: { stripeSubscriptionId: subscriptionId },
-		...withUser,
-	});
-}
-
-export async function findEnrollmentByScheduleId(scheduleId: string) {
-	return getPrisma().enrollment.findFirst({
-		where: { stripeScheduleId: scheduleId },
-		...withUser,
-	});
-}
-
-export async function findEnrollmentByScheduleOrSubscription(
-	scheduleId: string,
-	subscriptionId: string,
-) {
-	return getPrisma().enrollment.findFirst({
-		where: {
-			OR: [{ stripeScheduleId: scheduleId }, { stripeSubscriptionId: subscriptionId }],
-		},
-		...withUser,
-	});
-}
-
-export async function findEnrollmentByYousignRequestId(requestId: string) {
-	return getPrisma().enrollment.findUnique({
-		where: { yousignRequestId: requestId },
-		...withUser,
-	});
-}
-
-/** Resolve enrollment from Yousign request id, falling back to external_id (= enrollment id). */
-export async function findEnrollmentByYousignRequestOrExternalId(
-	requestId: string,
-	externalId?: string,
-) {
-	return getPrisma().enrollment.findFirst({
-		where: {
-			OR: [
-				{ yousignRequestId: requestId },
-				...(externalId ? [{ id: externalId }] : []),
-			],
-		},
-		...withUser,
-	});
-}
-
-export async function findEnrollmentIdByStripeInvoiceId(invoiceId: string) {
-	const payment = await getPrisma().payment.findUnique({
-		where: { stripeInvoiceId: invoiceId },
-		select: { enrollmentId: true },
-	});
-	return payment?.enrollmentId ?? null;
-}
-
-/** Load enrollment + payment statuses for access policy evaluation. */
-export async function findEnrollmentForAccessPolicy(enrollmentId: string) {
-	return getPrisma().enrollment.findUniqueOrThrow({
-		where: { id: enrollmentId },
-		include: {
-			payments: { select: { status: true } },
-			user: true,
-		},
-	});
-}
 
 export async function attachStripeCheckoutSession(enrollmentId: string, sessionId: string) {
 	return getPrisma().enrollment.update({
@@ -239,82 +170,6 @@ export class DuplicateEnrollmentError extends Error {
 	}
 }
 
-/** Insert inbox event (status=received). Duplicate unique → created:false. */
-export async function recordProviderEvent(input: {
-	provider: string;
-	providerEventId: string;
-	eventType: string;
-	enrollmentId?: string;
-	payload: unknown;
-}): Promise<{ created: boolean; id?: string }> {
-	const prisma = getPrisma();
-	try {
-		const row = await prisma.providerEvent.create({
-			data: {
-				provider: input.provider,
-				providerEventId: input.providerEventId,
-				eventType: input.eventType,
-				status: 'received',
-				enrollmentId: input.enrollmentId,
-				payloadCipherText: encryptPayload(JSON.stringify(input.payload)),
-			},
-		});
-		return { created: true, id: row.id };
-	} catch (error) {
-		if (
-			typeof error === 'object' &&
-			error &&
-			'code' in error &&
-			(error as { code: string }).code === 'P2002'
-		) {
-			return { created: false };
-		}
-		throw error;
-	}
-}
-
-export async function markProviderEventProcessed(id: string, enrollmentId?: string | null) {
-	await getPrisma().providerEvent.update({
-		where: { id },
-		data: {
-			status: 'processed',
-			processedAt: new Date(),
-			lastError: null,
-			...(enrollmentId ? { enrollmentId } : {}),
-		},
-	});
-}
-
-export async function markProviderEventIgnored(id: string) {
-	await getPrisma().providerEvent.update({
-		where: { id },
-		data: { status: 'ignored', processedAt: new Date(), lastError: null },
-	});
-}
-
-export async function markProviderEventFailed(id: string, error: string) {
-	await getPrisma().providerEvent.update({
-		where: { id },
-		data: { status: 'failed', lastError: error.slice(0, 2000) },
-	});
-}
-
-/** @deprecated Use recordProviderEvent */
-export const recordProcessedEvent = async (input: {
-	provider: string;
-	eventId: string;
-	enrollmentId?: string;
-	payload: unknown;
-	eventType?: string;
-}) =>
-	recordProviderEvent({
-		provider: input.provider,
-		providerEventId: input.eventId,
-		eventType: input.eventType ?? 'unknown',
-		enrollmentId: input.enrollmentId,
-		payload: input.payload,
-	});
-
 export async function requestMagicLink(email: string) {
 	const enrollment = await findEnrollmentByEmail(email);
 	if (!enrollment || enrollment.collectionStatus === 'pending') {
@@ -367,15 +222,7 @@ export async function canResendNda(enrollment: Enrollment): Promise<
 	| { ok: true }
 	| { ok: false; reason: string }
 > {
-	const awaiting =
-		(enrollment.contractStatus === 'sent' || enrollment.contractStatus === 'pending') &&
-		enrollment.collectionStatus !== 'pending' &&
-		enrollment.collectionStatus !== 'canceled' &&
-		enrollment.accessStatus === 'not_eligible';
-	if (!awaiting) {
-		return { ok: false, reason: 'Le NDA n’est pas en attente de signature.' };
-	}
-	if (enrollment.contractStatus === 'signed') {
+	if (!isAwaitingNda(enrollment)) {
 		return { ok: false, reason: 'Le NDA n’est pas en attente de signature.' };
 	}
 	if (!enrollment.yousignRequestId) {
@@ -431,15 +278,6 @@ export async function resolveNdaSignUrl(enrollment: Enrollment): Promise<string 
 
 function startOfUtcDay(d: Date) {
 	return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-/** Purge des payloads webhook > 30 jours */
-export async function purgeOldWebhookPayloads() {
-	const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-	await getPrisma().providerEvent.updateMany({
-		where: { receivedAt: { lt: cutoff }, payloadCipherText: { not: null } },
-		data: { payloadCipherText: null },
-	});
 }
 
 /** Clear Yousign ids without calling provider cancel (admin delete_nda). */

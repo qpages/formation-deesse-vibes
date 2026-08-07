@@ -1,4 +1,5 @@
 import type { Enrollment } from '../../generated/prisma/client';
+import { isPaidEnough } from '../enrollment-gates';
 import { inngest } from '../inngest/client';
 import { applyAccessPolicy } from '../services/access';
 import {
@@ -17,6 +18,21 @@ export type AdminDispatchResult =
 
 type Handler = (enrollment: Enrollment) => Promise<AdminDispatchResult>;
 
+async function enqueueAccessGrant(enrollment: Enrollment): Promise<AdminDispatchResult> {
+	if (enrollment.accessStatus === 'revoked') {
+		return {
+			ok: false,
+			error: 'Accès révoqué — impossible de rejouer Teachizy.',
+			status: 400,
+		};
+	}
+	await inngest.send({
+		name: 'enrollment/access.grant',
+		data: { enrollmentId: enrollment.id },
+	});
+	return { ok: true };
+}
+
 const handlers = {
 	async sync_payment(enrollment) {
 		const result = await syncPaymentFromStripe(enrollment.id);
@@ -31,7 +47,7 @@ const handlers = {
 				status: 400,
 			};
 		}
-		await applyAccessPolicy(enrollment.id);
+		// syncPaymentFromStripe / confirmPaidCheckout déjà appellent applyAccessPolicy
 		return { ok: true };
 	},
 
@@ -55,7 +71,7 @@ const handlers = {
 	},
 
 	async retrigger_nda(enrollment) {
-		if (enrollment.collectionStatus === 'pending') {
+		if (!isPaidEnough(enrollment.collectionStatus)) {
 			return {
 				ok: false,
 				error: 'Statut incompatible (besoin paiement confirmé).',
@@ -76,42 +92,20 @@ const handlers = {
 		if (!enrollment.yousignRequestId) {
 			return { ok: false, error: 'Aucune demande Yousign associée.', status: 400 };
 		}
-		if (enrollment.accessStatus === 'revoked') {
-			return {
-				ok: false,
-				error: 'Accès révoqué — impossible de rejouer Teachizy.',
-				status: 400,
-			};
-		}
-		await inngest.send({
-			name: 'enrollment/access.grant',
-			data: { enrollmentId: enrollment.id },
-		});
-		return { ok: true };
+		return enqueueAccessGrant(enrollment);
 	},
 
 	async retrigger_teachizy(enrollment) {
-		if (enrollment.accessStatus === 'revoked') {
-			return {
-				ok: false,
-				error: 'Accès révoqué — impossible de rejouer Teachizy.',
-				status: 400,
-			};
-		}
-		await inngest.send({
-			name: 'enrollment/access.grant',
-			data: { enrollmentId: enrollment.id },
-		});
-		return { ok: true };
+		return enqueueAccessGrant(enrollment);
 	},
 
-	async relance_nda(enrollment) {
+	async resend_nda(enrollment) {
 		const allowed = await canResendNda(enrollment);
 		if (!allowed.ok) {
 			return { ok: false, error: allowed.reason, status: 429 };
 		}
 		await inngest.send({
-			name: 'admin/relance-nda',
+			name: 'admin/resend-nda',
 			data: { enrollmentId: enrollment.id },
 		});
 		return { ok: true };

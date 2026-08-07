@@ -4,13 +4,9 @@ import {
 	parseCookie,
 	verifyAdminSessionToken,
 } from '../auth/session';
+import { json } from '../http';
 
-export function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { 'Content-Type': 'application/json' },
-	});
-}
+export { json };
 
 /** API routes: returns admin email or a 401 Response. */
 export async function requireAdminApi(

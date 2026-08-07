@@ -1,9 +1,5 @@
-import type {
-	CollectionStatus,
-	Payment,
-	PaymentPlanId,
-	SubscriptionStatus,
-} from '../../generated/prisma/client';
+import type { CollectionStatus, Payment, PaymentPlanId } from '../../generated/prisma/client';
+import { hasFailedPayments, isOverdueForAccess } from '../enrollment-gates';
 import { formatMoney, PAYMENT_PLANS } from '../payment-plans';
 import type { BadgeTone, PaymentTrackingState } from './types';
 
@@ -16,20 +12,17 @@ export function paymentTrackingState(input: {
 	collectionStatus: CollectionStatus;
 	installmentsPaid: number;
 	installmentsTotal: number | null;
-	subscriptionStatus: SubscriptionStatus | null;
 	payments: Pick<Payment, 'status'>[];
 }): PaymentTrackingState {
 	if (input.collectionStatus === 'refunded') return 'rembourse';
 	if (input.collectionStatus === 'pending') return 'en_attente';
-	if (input.collectionStatus === 'past_due') return 'impaye';
+	if (isOverdueForAccess(input.collectionStatus)) return 'impaye';
 	if (input.collectionStatus === 'paid') return 'termine';
 
-	const hasFailed = input.payments.some((p) => p.status === 'failed' || p.status === 'open');
 	const total = input.installmentsTotal ?? 1;
-	const allPaid = input.installmentsPaid >= total;
-
-	if (allPaid || input.subscriptionStatus === 'completed') return 'termine';
-	if (hasFailed && input.installmentsPaid > 0) return 'impaye';
+	if (input.installmentsPaid >= total) return 'termine';
+	// Safety net si recompute n’a pas encore posé past_due (failed only, pas open à venir)
+	if (hasFailedPayments(input.payments) && input.installmentsPaid > 0) return 'impaye';
 	if (input.installmentsPaid > 0) return 'a_jour';
 	return 'en_attente';
 }

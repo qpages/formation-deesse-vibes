@@ -1,5 +1,6 @@
 ---
 import type { Enrollment } from '../../../generated/prisma/client';
+import { isPaidEnough } from '../../../lib/enrollment-gates';
 import {
 	ENROLLMENT_POLL_INTERVAL_MS,
 	ENROLLMENT_POLL_MAX_MS,
@@ -67,7 +68,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		)
 	}
 	{
-		enrollment.collectionStatus !== 'pending' &&
+		isPaidEnough(enrollment.collectionStatus) &&
 			enrollment.contractStatus === 'pending' &&
 			!showSignCard && (
 			<p class="text-ink-soft">

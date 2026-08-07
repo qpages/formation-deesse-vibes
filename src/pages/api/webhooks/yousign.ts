@@ -1,15 +1,9 @@
 import type { APIRoute } from 'astro';
 import { inngest } from '../../../lib/inngest/client';
+import { json } from '../../../lib/http';
 import { recordProviderEvent } from '../../../lib/services/enrollment';
+import type { YousignWebhookPayload } from '../../../lib/services/yousign-events';
 import { verifyYousignSignature } from '../../../lib/yousign';
-
-type YousignWebhookPayload = {
-	event_id?: string;
-	event_name?: string;
-	data?: {
-		signature_request?: { id?: string };
-	};
-};
 
 /**
  * Template Method webhook Yousign: verify → record → enqueue → 200.
@@ -43,10 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
 	});
 
 	if (!created || !id) {
-		return new Response(JSON.stringify({ received: true, duplicate: true }), {
-			status: 200,
-			headers: { 'Content-Type': 'application/json' },
-		});
+		return json({ received: true, duplicate: true });
 	}
 
 	await inngest.send({
@@ -54,8 +45,5 @@ export const POST: APIRoute = async ({ request }) => {
 		data: { providerEventId: id },
 	});
 
-	return new Response(JSON.stringify({ received: true }), {
-		status: 200,
-		headers: { 'Content-Type': 'application/json' },
-	});
+	return json({ received: true });
 };

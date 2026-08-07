@@ -7,6 +7,7 @@ import {
 	verifyEnrollmentSessionToken,
 } from '../../../lib/auth/session';
 import { inngest } from '../../../lib/inngest/client';
+import { json } from '../../../lib/http';
 import {
 	canResendNda,
 	findEnrollmentById,
@@ -49,7 +50,7 @@ export const POST: APIRoute = async ({ request }) => {
 		}
 
 		await inngest.send({
-			name: 'admin/relance-nda',
+			name: 'admin/resend-nda',
 			data: { enrollmentId: enrollment.id },
 		});
 
@@ -59,10 +60,3 @@ export const POST: APIRoute = async ({ request }) => {
 		return json({ error: 'Échec du renvoi du NDA.' }, 500);
 	}
 };
-
-function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { 'Content-Type': 'application/json' },
-	});
-}

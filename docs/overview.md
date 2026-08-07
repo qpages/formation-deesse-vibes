@@ -15,8 +15,8 @@ Landing → Stripe Checkout → NDA Yousign → Teachizy (API)
 3. Signature NDA → webhook Yousign → Inngest `inviteAfterNdaSigned` → API Teachizy
 4. Retour plus tard : e-mail → lien magique Resend → même page
 
-**États :** `paiement_en_attente` → `paiement_confirme` → `nda_envoye` → `nda_signe` → `teachizy_envoye`  
-(+ terminaux : `rembourse`, `acces_retire`)
+**États :** `Payment.status` (chaque échéance) + sur l’inscription `collectionStatus` / `contractStatus` / `accessStatus`.  
+Détail : [`docs/statuts.md`](./statuts.md).
 
 ## Stack
 

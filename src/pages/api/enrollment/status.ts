@@ -4,6 +4,7 @@ import {
 	TRACKING_COOKIE,
 	verifyEnrollmentSessionToken,
 } from '../../../lib/auth/session';
+import { json } from '../../../lib/http';
 import { findEnrollmentById } from '../../../lib/services/enrollment';
 
 export const GET: APIRoute = async ({ request }) => {
@@ -22,19 +23,13 @@ export const GET: APIRoute = async ({ request }) => {
 		return json({ error: 'Inscription introuvable.' }, 404);
 	}
 
-	return json({
-		collectionStatus: enrollment.collectionStatus,
-		contractStatus: enrollment.contractStatus,
-		accessStatus: enrollment.accessStatus,
-	});
-};
-
-function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: {
-			'Content-Type': 'application/json',
-			'Cache-Control': 'no-store',
+	return json(
+		{
+			collectionStatus: enrollment.collectionStatus,
+			contractStatus: enrollment.contractStatus,
+			accessStatus: enrollment.accessStatus,
 		},
-	});
-}
+		200,
+		{ 'Cache-Control': 'no-store' },
+	);
+};

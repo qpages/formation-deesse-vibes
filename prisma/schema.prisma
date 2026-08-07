@@ -9,6 +9,7 @@ datasource db {
   provider = "postgresql"
 }
 
+// État de l'encaissement, pas de chaque paiement, mais de l'ensemble des paiements.
 enum CollectionStatus {
   pending
   current
@@ -36,7 +37,7 @@ enum AccessStatus {
   revoked
 }
 
-/// État de la demande Yousign (indépendant du statut métier).
+// État de la demande Yousign (indépendant du statut métier).
 enum YousignRequestStatus {
   ongoing
   done
@@ -63,15 +64,29 @@ enum PaymentStatus {
   draft
 }
 
+/// Miroir 1:1 de Stripe Subscription.status (pas de sémantique métier).
+/// @see https://docs.stripe.com/api/subscriptions/object#subscription_object-status
 enum SubscriptionStatus {
-  active
-  past_due
-  canceled
   incomplete
   incomplete_expired
   trialing
+  active
+  past_due
+  canceled
+  unpaid
   paused
-  completed
+}
+
+enum Provider {
+  stripe
+  yousign
+}
+
+enum ProviderEventStatus {
+  received
+  processed
+  ignored
+  failed
 }
 
 model User {
@@ -102,13 +117,13 @@ model Enrollment {
   consentNdaAt     DateTime?
   consentPrivacyAt DateTime?
 
-  currency             String               @default("eur")
-  amountCents          Int                  @default(184900)
+  currency             String              @default("eur")
+  amountCents          Int                 @default(184900)
   paymentPlan          PaymentPlanId?
   installmentsTotal    Int?
-  installmentsPaid     Int                  @default(0)
+  installmentsPaid     Int                 @default(0)
   totalAmountCents     Int?
-  collectedAmountCents Int                  @default(0)
+  collectedAmountCents Int                 @default(0)
   firstPaymentPaidAt   DateTime?
   fullyPaidAt          DateTime?
   nextInstallmentDueAt DateTime?
@@ -175,15 +190,15 @@ model Payment {
 }
 
 model ProviderEvent {
-  id                String      @id @default(cuid())
-  provider          String
+  id                String              @id @default(cuid())
+  provider          Provider
   providerEventId   String
   eventType         String
-  status            String      @default("received") // received | processed | ignored | failed
+  status            ProviderEventStatus @default(received)
   enrollmentId      String?
-  enrollment        Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  enrollment        Enrollment?         @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
   payloadCipherText String?
-  receivedAt        DateTime    @default(now())
+  receivedAt        DateTime            @default(now())
   processedAt       DateTime?
   lastError         String?
 

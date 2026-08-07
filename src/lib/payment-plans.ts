@@ -1,8 +1,12 @@
 import { z } from 'zod';
+import type { PaymentPlanId as PrismaPaymentPlanId } from '../generated/prisma/client';
 import { getEnv } from './env';
 
-export const paymentPlanIdSchema = z.enum(['unique', 'x2', 'x4', 'x6']);
-export type PaymentPlanId = z.infer<typeof paymentPlanIdSchema>;
+/** Aligné sur l’enum Prisma `PaymentPlanId`. */
+export const PAYMENT_PLAN_IDS = ['unique', 'x2', 'x4', 'x6'] as const satisfies readonly PrismaPaymentPlanId[];
+
+export const paymentPlanIdSchema = z.enum(PAYMENT_PLAN_IDS);
+export type PaymentPlanId = (typeof PAYMENT_PLAN_IDS)[number];
 
 export type PaymentPlanMode = 'payment' | 'subscription';
 

@@ -27,7 +27,8 @@ npm run dev
 
 Scripts utiles : `npm test`, `npm run build`, `npm run db:deploy`.
 
-Vue d’ensemble (parcours, Inngest, webhooks, consoles) : [`docs/overview.md`](./docs/overview.md).
+Vue d’ensemble (parcours, Inngest, webhooks, consoles) : [`docs/overview.md`](./docs/overview.md).  
+Statuts (`collection` / `contract` / `access`) : [`docs/statuts.md`](./docs/statuts.md).
 
 ## Flow
 

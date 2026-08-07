@@ -100,7 +100,6 @@ export function buildAdminPaymentSummary(
 		collectionStatus: enrollment.collectionStatus,
 		installmentsPaid: enrollment.installmentsPaid,
 		installmentsTotal: enrollment.installmentsTotal,
-		subscriptionStatus: enrollment.subscriptionStatus,
 		payments,
 	});
 
@@ -225,29 +224,7 @@ export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaym
 	return rows;
 }
 
-/** Liens facture PDF / page hébergée pour le client (paiements payés uniquement). */
-export async function listPaidInvoiceLinks(enrollmentId: string) {
-	const payments = await getPrisma().payment.findMany({
-		where: { enrollmentId, status: 'paid' },
-		orderBy: { installmentNumber: 'asc' },
-		select: {
-			installmentNumber: true,
-			invoicePdfUrl: true,
-			hostedInvoiceUrl: true,
-		},
-	});
-
-	return payments
-		.map((payment) => {
-			const url = payment.invoicePdfUrl ?? payment.hostedInvoiceUrl;
-			if (!url) return null;
-			return {
-				installmentNumber: payment.installmentNumber,
-				url,
-			};
-		})
-		.filter((row): row is { installmentNumber: number; url: string } => Boolean(row));
-}
+export { listPaidInvoiceLinks } from '../services/payments';
 
 export async function listPaymentsForEnrollments(enrollmentIds: string[]) {
 	if (enrollmentIds.length === 0) return new Map<string, Payment[]>();

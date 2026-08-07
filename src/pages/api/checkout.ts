@@ -8,6 +8,7 @@ import {
 	startCheckout,
 } from '../../lib/services/payments';
 import { getEnv } from '../../lib/env';
+import { json } from '../../lib/http';
 import { checkoutSchema } from '../../lib/validation';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -52,10 +53,3 @@ export const POST: APIRoute = async ({ request }) => {
 		return json({ error: 'Erreur lors de la création du paiement.' }, 500);
 	}
 };
-
-function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { 'Content-Type': 'application/json' },
-	});
-}

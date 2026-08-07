@@ -39,10 +39,7 @@ export type AppEvents = {
 	'enrollment/access.grant': {
 		data: { enrollmentId: string };
 	};
-	'enrollment/access.suspend': {
-		data: { enrollmentId: string; revoke?: boolean };
-	};
-	'admin/relance-nda': {
+	'admin/resend-nda': {
 		data: { enrollmentId: string };
 	};
 	'admin/recreate-nda': {

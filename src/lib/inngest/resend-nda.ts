@@ -3,16 +3,16 @@ import { alertFinalFailure } from '../services/slack';
 import { reactivateNda } from '../yousign';
 import { inngest } from './client';
 
-/** Command: relance Yousign (admin relance_nda / api nda/resend). */
-export const relanceNda = inngest.createFunction(
+/** Command: resend Yousign NDA (admin resend_nda / api nda/resend). */
+export const resendNda = inngest.createFunction(
 	{
-		id: 'relance-nda',
+		id: 'resend-nda',
 		retries: 3,
-		triggers: [{ event: 'admin/relance-nda' }],
+		triggers: [{ event: 'admin/resend-nda' }],
 		onFailure: async ({ event, error }) => {
 			const original = event.data as { event?: { data?: { enrollmentId?: string } } };
 			await alertFinalFailure({
-				title: 'Échec relance NDA',
+				title: 'Échec renvoi NDA',
 				enrollmentId: original.event?.data?.enrollmentId,
 				error: error.message,
 			});

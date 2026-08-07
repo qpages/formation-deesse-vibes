@@ -5,16 +5,14 @@ import { inngest } from './client';
 import { processStripeWebhook } from './process-stripe-webhook';
 import { processYousignWebhook } from './process-yousign-webhook';
 import { reconcileEnrollments } from './reconcile-enrollments';
-import { relanceNda } from './relance-nda';
-import { suspendTeachizyAccess } from './suspend-teachizy-access';
+import { resendNda } from './resend-nda';
 
 export { createNdaAfterPayment } from './create-nda-after-payment';
 export { grantTeachizyAccess } from './grant-teachizy-access';
 export { processStripeWebhook } from './process-stripe-webhook';
 export { processYousignWebhook } from './process-yousign-webhook';
 export { reconcileEnrollments } from './reconcile-enrollments';
-export { relanceNda } from './relance-nda';
-export { suspendTeachizyAccess } from './suspend-teachizy-access';
+export { resendNda } from './resend-nda';
 
 export const purgeWebhookPayloads = inngest.createFunction(
 	{
@@ -32,8 +30,7 @@ export const inngestFunctions = [
 	processYousignWebhook,
 	createNdaAfterPayment,
 	grantTeachizyAccess,
-	relanceNda,
-	suspendTeachizyAccess,
+	resendNda,
 	reconcileEnrollments,
 	purgeWebhookPayloads,
 ];

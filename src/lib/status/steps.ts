@@ -1,4 +1,5 @@
 import type { YousignRequestStatus } from '../../generated/prisma/client';
+import { isPaidEnough } from '../enrollment-gates';
 import {
 	ACCESS_STATUS_LABELS,
 	COLLECTION_STATUS_LABELS,
@@ -51,7 +52,7 @@ export function stepStates(input: OrthogonalStatuses): Record<StepKey, StepState
 		nda = 'termine';
 	} else if (input.contractStatus === 'sent') {
 		nda = 'action_requise';
-	} else if (input.collectionStatus !== 'pending') {
+	} else if (isPaidEnough(input.collectionStatus)) {
 		nda = 'en_cours';
 	}
 
@@ -141,7 +142,7 @@ export function shouldPollEnrollment(input: OrthogonalStatuses & {
 }): boolean {
 	if (input.collectionStatus === 'pending' && input.hasCheckoutSession) return true;
 	if (
-		input.collectionStatus !== 'pending' &&
+		isPaidEnough(input.collectionStatus) &&
 		input.contractStatus === 'pending' &&
 		!input.hasNdaSignUrl
 	) {

@@ -22,7 +22,7 @@ const MONITOR_EVENTS = new Set([
 	'signer.notification_delivery_failed',
 ]);
 
-type YousignWebhookPayload = {
+export type YousignWebhookPayload = {
 	event_id?: string;
 	event_name?: string;
 	data?: {

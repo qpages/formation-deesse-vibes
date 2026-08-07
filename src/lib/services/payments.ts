@@ -13,6 +13,7 @@ import {
 	stripePriceIdForPlan,
 	type PaymentPlanId,
 } from '../payment-plans';
+import { hasOpenOrFailedPayments } from '../enrollment-gates';
 import { applyAccessPolicy } from './access';
 import {
 	attachStripeCheckoutSession,
@@ -85,11 +86,14 @@ export function isCheckoutPaid(session: Stripe.Checkout.Session) {
 	);
 }
 
+/** Expand Stripe string | { id } unions. */
+function stripeId(ref: string | { id: string } | null | undefined): string | undefined {
+	if (!ref) return undefined;
+	return typeof ref === 'string' ? ref : ref.id;
+}
+
 function subscriptionIdFromSession(session: Stripe.Checkout.Session): string | undefined {
-	if (!session.subscription) return undefined;
-	return typeof session.subscription === 'string'
-		? session.subscription
-		: session.subscription.id;
+	return stripeId(session.subscription);
 }
 
 /** Stripe SDK typings omit some Invoice fields depending on API version. */
@@ -100,22 +104,15 @@ type InvoiceExtras = Stripe.Invoice & {
 };
 
 function paymentIntentIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
-	const pi = (invoice as InvoiceExtras).payment_intent;
-	if (!pi) return undefined;
-	return typeof pi === 'string' ? pi : pi.id;
+	return stripeId((invoice as InvoiceExtras).payment_intent);
 }
 
 function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
-	const sub = (invoice as InvoiceExtras).subscription;
-	if (!sub) return undefined;
-	return typeof sub === 'string' ? sub : sub.id;
+	return stripeId((invoice as InvoiceExtras).subscription);
 }
 
 function paymentIntentIdFromSession(session: Stripe.Checkout.Session): string | undefined {
-	if (!session.payment_intent) return undefined;
-	return typeof session.payment_intent === 'string'
-		? session.payment_intent
-		: session.payment_intent.id;
+	return stripeId(session.payment_intent);
 }
 
 function mapInvoiceStatus(status: Stripe.Invoice.Status | null): PaymentStatus {
@@ -135,24 +132,22 @@ function mapInvoiceStatus(status: Stripe.Invoice.Status | null): PaymentStatus {
 	}
 }
 
+/** Identity map — SubscriptionStatus = Stripe Subscription.status 1:1. */
 function mapSubscriptionStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
 	switch (status) {
-		case 'active':
-			return 'active';
-		case 'past_due':
-			return 'past_due';
-		case 'canceled':
-			return 'canceled';
 		case 'incomplete':
-			return 'incomplete';
 		case 'incomplete_expired':
-			return 'incomplete_expired';
 		case 'trialing':
-			return 'trialing';
+		case 'active':
+		case 'past_due':
+		case 'canceled':
+		case 'unpaid':
 		case 'paused':
-			return 'paused';
-		default:
-			return 'active';
+			return status;
+		default: {
+			const _exhaustive: never = status;
+			throw new Error(`Unknown Stripe subscription status: ${String(_exhaustive)}`);
+		}
 	}
 }
 
@@ -222,7 +217,7 @@ export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 		enrollment.collectionStatus === 'canceled'
 	) {
 		collectionStatus = enrollment.collectionStatus;
-	} else if (failedOrOpen.length > 0 && installmentsPaid >= 1) {
+	} else if (hasOpenOrFailedPayments(payments) && installmentsPaid >= 1) {
 		collectionStatus = 'past_due';
 	} else if (failedOrOpen.some((p) => p.status === 'failed')) {
 		collectionStatus = 'past_due';
@@ -259,13 +254,36 @@ export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 	await applyAccessPolicy(enrollmentId);
 }
 
-/** @deprecated Use recomputeEnrollmentCollectionState */
-export const recalculateEnrollmentPaymentAggregates = recomputeEnrollmentCollectionState;
+function paymentFieldsFromInvoice(
+	invoice: Stripe.Invoice,
+	status: PaymentStatus,
+	failureReason: string | null,
+	paymentIntentId: string | undefined,
+) {
+	return {
+		stripeInvoiceId: invoice.id,
+		stripePaymentIntentId: paymentIntentId,
+		amountCents: invoice.amount_paid || invoice.amount_due || 0,
+		currency: invoice.currency ?? 'eur',
+		status,
+		failureReason,
+		invoicePdfUrl: invoice.invoice_pdf ?? null,
+		hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+		invoicedAt: invoice.created ? new Date(invoice.created * 1000) : null,
+		paidAt: invoice.status_transitions?.paid_at
+			? new Date(invoice.status_transitions.paid_at * 1000)
+			: null,
+		dueAt: invoice.due_date
+			? new Date(invoice.due_date * 1000)
+			: invoice.next_payment_attempt
+				? new Date(invoice.next_payment_attempt * 1000)
+				: null,
+	};
+}
 
 export async function syncStripeInvoice(
 	invoice: Stripe.Invoice,
 	options: {
-		stripeEventId?: string;
 		enrollmentId?: string;
 		forceStatus?: PaymentStatus;
 	} = {},
@@ -303,6 +321,7 @@ export async function syncStripeInvoice(
 			: null);
 
 	const paymentIntentId = paymentIntentIdFromInvoice(invoice);
+	const fields = paymentFieldsFromInvoice(invoice, status, failureReason, paymentIntentId);
 
 	await prisma.payment.upsert({
 		where: {
@@ -313,48 +332,13 @@ export async function syncStripeInvoice(
 		},
 		create: {
 			enrollmentId: enrollment.id,
-			stripeInvoiceId: invoice.id,
-			stripePaymentIntentId: paymentIntentId,
 			installmentNumber,
-			amountCents: invoice.amount_paid || invoice.amount_due || 0,
-			currency: invoice.currency ?? 'eur',
-			status,
-			failureReason,
-			invoicePdfUrl: invoice.invoice_pdf ?? null,
-			hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
-			invoicedAt: invoice.created ? new Date(invoice.created * 1000) : null,
-			paidAt: invoice.status_transitions?.paid_at
-				? new Date(invoice.status_transitions.paid_at * 1000)
-				: null,
-			dueAt: invoice.due_date
-				? new Date(invoice.due_date * 1000)
-				: invoice.next_payment_attempt
-					? new Date(invoice.next_payment_attempt * 1000)
-					: null,
+			...fields,
 		},
-		update: {
-			stripeInvoiceId: invoice.id,
-			stripePaymentIntentId: paymentIntentId,
-			amountCents: invoice.amount_paid || invoice.amount_due || 0,
-			currency: invoice.currency ?? 'eur',
-			status,
-			failureReason,
-			invoicePdfUrl: invoice.invoice_pdf ?? null,
-			hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
-			invoicedAt: invoice.created ? new Date(invoice.created * 1000) : null,
-			paidAt: invoice.status_transitions?.paid_at
-				? new Date(invoice.status_transitions.paid_at * 1000)
-				: null,
-			dueAt: invoice.due_date
-				? new Date(invoice.due_date * 1000)
-				: invoice.next_payment_attempt
-					? new Date(invoice.next_payment_attempt * 1000)
-					: null,
-		},
+		update: fields,
 	});
 
 	await recomputeEnrollmentCollectionState(enrollment.id);
-
 
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
@@ -500,7 +484,6 @@ export async function startCheckout(input: {
  */
 export async function confirmPaidCheckout(
 	session: Stripe.Checkout.Session,
-	_options: { stripeEventId?: string } = {},
 ): Promise<ConfirmCheckoutResult> {
 	const enrollmentId =
 		session.metadata?.enrollmentId ?? session.client_reference_id ?? undefined;
@@ -585,10 +568,7 @@ export async function confirmPaidCheckout(
 	};
 }
 
-export async function syncSubscriptionState(
-	subscription: Stripe.Subscription,
-	_options: { stripeEventId?: string } = {},
-) {
+export async function syncSubscriptionState(subscription: Stripe.Subscription) {
 	const subscriptionId = subscription.id;
 	const prisma = getPrisma();
 	const enrollment = await findEnrollmentBySubscriptionId(subscriptionId);
@@ -616,26 +596,22 @@ export async function syncSubscriptionState(
 	await prisma.enrollment.update({
 		where: { id: enrollment.id },
 		data: {
-			subscriptionStatus:
-				subscription.status === 'canceled' && enrollment.installmentsPaid >= (enrollment.installmentsTotal ?? 0)
-					? 'completed'
-					: mapSubscriptionStatus(subscription.status),
+			subscriptionStatus: mapSubscriptionStatus(subscription.status),
 			...(scheduleId ? { stripeScheduleId: scheduleId } : {}),
 		},
 	});
 
-
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
 
+/**
+ * Schedule Stripe terminé → sync statut abo (souvent canceled) + clear prochaine échéance.
+ * “Soldé” métier = collectionStatus / Payments, pas subscriptionStatus.
+ */
 export async function markSubscriptionScheduleCompleted(
 	schedule: Stripe.SubscriptionSchedule,
-	options: { stripeEventId?: string } = {},
 ) {
-	const subscriptionId =
-		typeof schedule.subscription === 'string'
-			? schedule.subscription
-			: schedule.subscription?.id;
+	const subscriptionId = stripeId(schedule.subscription);
 
 	if (!subscriptionId) {
 		return { ok: false as const, reason: 'no_subscription' };
@@ -648,14 +624,15 @@ export async function markSubscriptionScheduleCompleted(
 		return { ok: false as const, reason: 'enrollment_not_found' };
 	}
 
+	const subscription = await retrieveSubscription(subscriptionId);
+
 	await prisma.enrollment.update({
 		where: { id: enrollment.id },
 		data: {
-			subscriptionStatus: 'completed',
+			subscriptionStatus: mapSubscriptionStatus(subscription.status),
 			nextInstallmentDueAt: null,
 		},
 	});
-
 
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
@@ -705,11 +682,35 @@ export async function syncPaymentFromStripe(enrollmentId: string): Promise<Confi
 	}
 
 	const session = await retrieveCheckoutSession(enrollment.stripeCheckoutSessionId);
-	const result = await confirmPaidCheckout(session, { stripeEventId: `admin-sync:${session.id}` });
+	const result = await confirmPaidCheckout(session);
 
 	if (result.ok && enrollment.stripeSubscriptionId) {
 		await syncAllSubscriptionInvoices(enrollmentId);
 	}
 
 	return result;
+}
+
+/** Liens facture PDF / page hébergée pour le client (paiements payés uniquement). */
+export async function listPaidInvoiceLinks(enrollmentId: string) {
+	const payments = await getPrisma().payment.findMany({
+		where: { enrollmentId, status: 'paid' },
+		orderBy: { installmentNumber: 'asc' },
+		select: {
+			installmentNumber: true,
+			invoicePdfUrl: true,
+			hostedInvoiceUrl: true,
+		},
+	});
+
+	return payments
+		.map((payment) => {
+			const url = payment.invoicePdfUrl ?? payment.hostedInvoiceUrl;
+			if (!url) return null;
+			return {
+				installmentNumber: payment.installmentNumber,
+				url,
+			};
+		})
+		.filter((row): row is { installmentNumber: number; url: string } => Boolean(row));
 }

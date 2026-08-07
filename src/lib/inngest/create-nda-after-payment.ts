@@ -1,3 +1,4 @@
+import { isPaidEnough } from '../enrollment-gates';
 import {
 	clearNdaFields,
 	findEnrollmentByIdOrThrow,
@@ -42,10 +43,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 			return { skipped: true, reason: 'nda_already_created' };
 		}
 
-		const paidEnough =
-			enrollment.collectionStatus !== 'pending' &&
-			enrollment.collectionStatus !== 'canceled';
-		if (!paidEnough) {
+		if (!isPaidEnough(enrollment.collectionStatus)) {
 			return { skipped: true, reason: `collection_${enrollment.collectionStatus}` };
 		}
 

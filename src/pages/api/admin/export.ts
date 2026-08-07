@@ -58,7 +58,6 @@ export const GET: APIRoute = async ({ request }) => {
 				collectionStatus: r.collectionStatus,
 				installmentsPaid: r.installmentsPaid,
 				installmentsTotal: r.installmentsTotal,
-				subscriptionStatus: r.subscriptionStatus,
 				payments: r.payments,
 			});
 			const lastPayment = r.payments.at(-1);

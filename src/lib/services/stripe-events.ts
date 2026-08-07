@@ -1,7 +1,6 @@
 import type Stripe from 'stripe';
 import { decryptPayload } from '../crypto';
 import { inngest } from '../inngest/client';
-import { getStripe } from '../stripe';
 import {
 	findEnrollmentByCheckoutSession,
 	findEnrollmentById,
@@ -120,7 +119,7 @@ export async function handleStripeProviderEvent(input: {
 
 	if (PAID_CHECKOUT_EVENTS.has(eventType)) {
 		const session = object as Stripe.Checkout.Session;
-		const result = await confirmPaidCheckout(session, { stripeEventId });
+		const result = await confirmPaidCheckout(session);
 		if (!result.ok && result.reason.startsWith('payment_status=')) {
 			return { enrollmentId: session.metadata?.enrollmentId, ignored: true };
 		}
@@ -131,7 +130,7 @@ export async function handleStripeProviderEvent(input: {
 
 	if (eventType === 'invoice.paid') {
 		const invoice = object as Stripe.Invoice;
-		const result = await syncStripeInvoice(invoice, { stripeEventId });
+		const result = await syncStripeInvoice(invoice);
 		if (!result.ok && result.reason === 'enrollment_not_found') {
 			return { ignored: true };
 		}
@@ -145,7 +144,6 @@ export async function handleStripeProviderEvent(input: {
 	) {
 		const invoice = object as Stripe.Invoice;
 		const result = await syncStripeInvoice(invoice, {
-			stripeEventId,
 			forceStatus: eventType === 'invoice.payment_failed' ? 'failed' : 'open',
 		});
 		if (!result.ok && result.reason === 'enrollment_not_found') {
@@ -160,14 +158,14 @@ export async function handleStripeProviderEvent(input: {
 		eventType === 'customer.subscription.deleted'
 	) {
 		const subscription = object as Stripe.Subscription;
-		const result = await syncSubscriptionState(subscription, { stripeEventId });
+		const result = await syncSubscriptionState(subscription);
 		if (!result.ok) return { ignored: true };
 		return { enrollmentId: result.enrollmentId };
 	}
 
 	if (eventType === 'subscription_schedule.completed') {
 		const schedule = object as Stripe.SubscriptionSchedule;
-		const result = await markSubscriptionScheduleCompleted(schedule, { stripeEventId });
+		const result = await markSubscriptionScheduleCompleted(schedule);
 		if (!result.ok) return { ignored: true };
 		return { enrollmentId: result.enrollmentId };
 	}
@@ -183,5 +181,3 @@ export function stripeEventPayload(event: Stripe.Event) {
 		data: { object: event.data.object },
 	};
 }
-
-export { getStripe };

@@ -1,4 +1,5 @@
-import type { AccessStatus, CollectionStatus, ContractStatus } from '../../generated/prisma/client';
+import type { AccessStatus } from '../../generated/prisma/client';
+import { isOverdueForAccess } from '../enrollment-gates';
 import { getPrisma } from '../prisma';
 import { inngest } from '../inngest/client';
 import { findEnrollmentForAccessPolicy } from './enrollment';
@@ -69,7 +70,8 @@ function targetAccessStatus(
 }
 
 /**
- * Modifier: lit les états, décide, update accessStatus, emit grant/suspend.
+ * Modifier: lit les états, décide, update accessStatus, emit grant.
+ * Suspend / revoke : timestamps posés ici ; hook Teachizy API = plus tard (pas d’event stub).
  * Ne passe jamais directement à `active` sans confirmation Teachizy.
  */
 export async function applyAccessPolicy(enrollmentId: string): Promise<{
@@ -83,17 +85,13 @@ export async function applyAccessPolicy(enrollmentId: string): Promise<{
 	const firstPaymentPaid =
 		enrollment.installmentsPaid >= 1 || enrollment.firstPaymentPaidAt != null;
 	const contractSigned = enrollment.contractStatus === 'signed';
-	const hasOverdueInstallment =
-		enrollment.collectionStatus === 'past_due' ||
-		enrollment.payments.some((p) => p.status === 'failed' || p.status === 'open');
 	const orderCanceled = enrollment.collectionStatus === 'canceled';
 	const orderRefunded = enrollment.collectionStatus === 'refunded';
 
 	const decision = evaluateAccess({
 		firstPaymentPaid,
 		contractSigned,
-		hasOverdueInstallment:
-			hasOverdueInstallment && enrollment.collectionStatus === 'past_due',
+		hasOverdueInstallment: isOverdueForAccess(enrollment.collectionStatus),
 		orderCanceled,
 		orderRefunded,
 	});
@@ -135,69 +133,10 @@ export async function applyAccessPolicy(enrollmentId: string): Promise<{
 		});
 		emitted = 'grant';
 	} else if (next === 'suspended' && previous === 'active') {
-		await inngest.send({
-			name: 'enrollment/access.suspend',
-			data: { enrollmentId },
-		});
 		emitted = 'suspend';
 	} else if (next === 'revoked') {
-		await inngest.send({
-			name: 'enrollment/access.suspend',
-			data: { enrollmentId, revoke: true },
-		});
 		emitted = 'revoke';
 	}
 
 	return { decision, previous, next, emitted };
-}
-
-export function collectionStatusLabel(status: CollectionStatus): string {
-	switch (status) {
-		case 'pending':
-			return 'En attente';
-		case 'current':
-			return 'À jour';
-		case 'past_due':
-			return 'Impayé';
-		case 'paid':
-			return 'Soldé';
-		case 'canceled':
-			return 'Annulé';
-		case 'refunded':
-			return 'Remboursé';
-	}
-}
-
-export function contractStatusLabel(status: ContractStatus): string {
-	switch (status) {
-		case 'pending':
-			return 'En attente';
-		case 'sent':
-			return 'Envoyé';
-		case 'signed':
-			return 'Signé';
-		case 'expired':
-			return 'Expiré';
-		case 'declined':
-			return 'Refusé';
-		case 'canceled':
-			return 'Annulé';
-		case 'error':
-			return 'Erreur';
-	}
-}
-
-export function accessStatusLabel(status: AccessStatus): string {
-	switch (status) {
-		case 'not_eligible':
-			return 'Non éligible';
-		case 'pending':
-			return 'Provisionnement';
-		case 'active':
-			return 'Actif';
-		case 'suspended':
-			return 'Suspendu';
-		case 'revoked':
-			return 'Révoqué';
-	}
 }

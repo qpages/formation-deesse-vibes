@@ -3,6 +3,7 @@ import {
 	createEnrollmentSessionToken,
 	enrollmentCookieOptions,
 } from '../../../lib/auth/session';
+import { json } from '../../../lib/http';
 import { findEnrollmentByEmail } from '../../../lib/services/enrollment';
 import { magicLinkSchema } from '../../../lib/validation';
 
@@ -25,22 +26,11 @@ export const POST: APIRoute = async ({ request }) => {
 		}
 
 		const token = await createEnrollmentSessionToken(enrollment.id);
-		return new Response(JSON.stringify({ ok: true }), {
-			status: 200,
-			headers: {
-				'Content-Type': 'application/json',
-				'Set-Cookie': enrollmentCookieOptions(token),
-			},
+		return json({ ok: true }, 200, {
+			'Set-Cookie': enrollmentCookieOptions(token),
 		});
 	} catch (error) {
 		console.error('[session/login]', error);
 		return json({ error: 'Impossible de vous connecter pour le moment.' }, 500);
 	}
 };
-
-function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { 'Content-Type': 'application/json' },
-	});
-}

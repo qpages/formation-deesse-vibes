@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
 import { inngest } from '../../../lib/inngest/client';
+import { json } from '../../../lib/http';
 import { recordProviderEvent } from '../../../lib/services/enrollment';
 import { stripeEventPayload } from '../../../lib/services/stripe-events';
 import { constructStripeEvent } from '../../../lib/stripe';
@@ -43,10 +44,3 @@ export const POST: APIRoute = async ({ request }) => {
 
 	return json({ received: true });
 };
-
-function json(data: unknown, status = 200) {
-	return new Response(JSON.stringify(data), {
-		status,
-		headers: { 'Content-Type': 'application/json' },
-	});
-}
