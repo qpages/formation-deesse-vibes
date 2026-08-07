@@ -37,7 +37,11 @@ export const POST: APIRoute = async ({ request }) => {
 			},
 		});
 
-		return json({ ok: true });
+		return json({
+			ok: true,
+			...(result.message ? { message: result.message } : {}),
+			...(result.toast ? { toast: result.toast } : {}),
+		});
 	} catch (error) {
 		console.error('[admin/action]', error);
 		return json({ error: 'Échec de l’action.' }, 500);

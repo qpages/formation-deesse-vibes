@@ -656,7 +656,7 @@ export async function syncAllSubscriptionInvoices(enrollmentId: string) {
 
 /**
  * Répare une inscription bloquée en vérifiant la session Stripe (money only).
- * NDA / Teachizy = jobs Inngest séparés (admin retrigger_nda, etc.).
+ * NDA / Teachizy = jobs Inngest séparés (création NDA / invitation formation).
  */
 export async function syncPaymentFromStripe(enrollmentId: string): Promise<ConfirmCheckoutResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);

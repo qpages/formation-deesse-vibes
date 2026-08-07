@@ -66,7 +66,7 @@ const pipelineStages = buildPipelineStageCards(detail, paymentSummary);
 	<EnrollmentPipeline stages={pipelineStages} />
 
 	{
-		actionPartition.secondary.length > 0 || actionPartition.danger.length > 0 ? (
+		actionPartition.secondary.length > 0 ? (
 			<EnrollmentActionPanel
 				enrollmentId={detail.id}
 				displayName={detail.displayName}

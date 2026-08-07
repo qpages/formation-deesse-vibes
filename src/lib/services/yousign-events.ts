@@ -169,10 +169,10 @@ export async function handleYousignProviderEvent(input: {
 
 		const actionHint =
 			eventName === 'signer.notification_delivery_failed'
-				? 'Action admin: vérifier e-mail acheteur / Relancer NDA'
+				? 'Action admin: vérifier e-mail acheteur / Renvoyer le lien Yousign'
 				: eventName === 'signature_request.deleted'
-					? 'Action admin: Recréer NDA ou rembourser'
-					: 'Action admin: Relancer (si expiré) ou Recréer NDA / rembourser';
+					? 'Action admin: Recréer un lien Yousign ou rembourser'
+					: 'Action admin: Renvoyer le lien Yousign (si expiré) ou Recréer un lien Yousign / rembourser';
 
 		await alertFinalFailure({
 			title: `Yousign ${eventName}`,

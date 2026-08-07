@@ -1,9 +1,7 @@
 import type { AdminActionMetaClient } from '../../lib/admin/actions';
 
-const confirmBtnBase =
-	'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush disabled:pointer-events-none disabled:opacity-50 h-10 px-4 text-sm text-mist';
-const confirmBtnPrimary = `${confirmBtnBase} bg-ink hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]`;
-const confirmBtnDanger = `${confirmBtnBase} bg-blush-deep hover:bg-blush`;
+const confirmBtnPrimary =
+	'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush disabled:pointer-events-none disabled:opacity-50 h-10 px-4 text-sm text-mist bg-ink hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]';
 
 declare global {
 	interface Window {
@@ -60,7 +58,7 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 		if (descEl) descEl.textContent = fillDescription(meta.description, name);
 		if (confirmBtn) {
 			confirmBtn.textContent = meta.confirm;
-			confirmBtn.className = meta.danger ? confirmBtnDanger : confirmBtnPrimary;
+			confirmBtn.className = confirmBtnPrimary;
 		}
 
 		setBusy(false);
@@ -128,7 +126,9 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 			closeDialog();
 
 			if (res.ok) {
-				toast('Action effectuée.', 'success');
+				const variant =
+					json.toast === 'info' || json.toast === 'error' ? json.toast : 'success';
+				toast(json.message || 'Action effectuée.', variant);
 				window.setTimeout(() => location.reload(), 700);
 				return true;
 			}

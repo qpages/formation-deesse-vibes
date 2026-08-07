@@ -39,7 +39,7 @@ export function buildPipelineStageCards(
 	} else if (detail.contractStatus === 'signed') {
 		signatureHint = 'NDA signé';
 	} else if (detail.contractStatus === 'sent') {
-		signatureHint = 'En attente de signature · relancer si besoin';
+		signatureHint = 'En attente de signature';
 	} else if (detail.yousignRequestId) {
 		signatureHint = `Yousign · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
 	} else {

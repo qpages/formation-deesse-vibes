@@ -1,37 +1,15 @@
 import type { Enrollment } from '../../generated/prisma/client';
-import { isPaidEnough } from '../enrollment-gates';
 import { inngest } from '../inngest/client';
-import { applyAccessPolicy } from '../services/access';
-import {
-	canResendNda,
-	clearNdaFields,
-	markEnrollmentAccessRevoked,
-	markEnrollmentRefunded,
-} from '../services/enrollment';
+import { canResendNda } from '../services/enrollment';
 import { syncPaymentFromStripe } from '../services/payments';
 import { syncYousignStatus } from '../services/yousign-events';
 import type { AdminActionKey } from './actions';
 
 export type AdminDispatchResult =
-	| { ok: true }
+	| { ok: true; message?: string; toast?: 'success' | 'info' }
 	| { ok: false; error: string; status?: number };
 
 type Handler = (enrollment: Enrollment) => Promise<AdminDispatchResult>;
-
-async function enqueueAccessGrant(enrollment: Enrollment): Promise<AdminDispatchResult> {
-	if (enrollment.accessStatus === 'revoked') {
-		return {
-			ok: false,
-			error: 'Accès révoqué — impossible de rejouer Teachizy.',
-			status: 400,
-		};
-	}
-	await inngest.send({
-		name: 'enrollment/access.grant',
-		data: { enrollmentId: enrollment.id },
-	});
-	return { ok: true };
-}
 
 const handlers = {
 	async sync_payment(enrollment) {
@@ -70,33 +48,26 @@ const handlers = {
 		return { ok: true };
 	},
 
-	async retrigger_nda(enrollment) {
-		if (!isPaidEnough(enrollment.collectionStatus)) {
+	async retrigger_teachizy(enrollment) {
+		if (enrollment.accessStatus === 'revoked') {
 			return {
 				ok: false,
-				error: 'Statut incompatible (besoin paiement confirmé).',
+				error: 'Accès révoqué — impossible d’inviter à la formation.',
 				status: 400,
 			};
 		}
-		await inngest.send({
-			name: 'stripe/payment.confirmed',
-			data: {
-				enrollmentId: enrollment.id,
-				stripeEventId: `admin-retrigger-nda:${enrollment.id}:${Date.now()}`,
-			},
-		});
-		return { ok: true };
-	},
-
-	async retrigger_signature(enrollment) {
-		if (!enrollment.yousignRequestId) {
-			return { ok: false, error: 'Aucune demande Yousign associée.', status: 400 };
+		if (enrollment.teachizyInvitedAt && enrollment.accessStatus === 'active') {
+			return {
+				ok: true,
+				message: 'Déjà invitée à la formation — aucun nouvel e-mail envoyé.',
+				toast: 'info',
+			};
 		}
-		return enqueueAccessGrant(enrollment);
-	},
-
-	async retrigger_teachizy(enrollment) {
-		return enqueueAccessGrant(enrollment);
+		await inngest.send({
+			name: 'enrollment/access.grant',
+			data: { enrollmentId: enrollment.id },
+		});
+		return { ok: true, message: 'Invitation à la formation déclenchée.' };
 	},
 
 	async resend_nda(enrollment) {
@@ -116,32 +87,6 @@ const handlers = {
 			name: 'admin/recreate-nda',
 			data: { enrollmentId: enrollment.id },
 		});
-		return { ok: true };
-	},
-
-	async delete_nda(enrollment) {
-		await clearNdaFields(enrollment.id);
-		return { ok: true };
-	},
-
-	async mark_refunded(enrollment) {
-		if (enrollment.collectionStatus === 'refunded') {
-			return { ok: false, error: 'Déjà marqué remboursé.', status: 400 };
-		}
-		await markEnrollmentRefunded(enrollment.id);
-		await applyAccessPolicy(enrollment.id);
-		return { ok: true };
-	},
-
-	async revoke_access(enrollment) {
-		if (enrollment.accessStatus === 'revoked') {
-			return { ok: false, error: 'Accès déjà retiré.', status: 400 };
-		}
-		if (enrollment.collectionStatus === 'refunded') {
-			return { ok: false, error: 'Inscription déjà remboursée.', status: 400 };
-		}
-		await markEnrollmentAccessRevoked(enrollment.id);
-		await applyAccessPolicy(enrollment.id);
 		return { ok: true };
 	},
 } satisfies Record<AdminActionKey, Handler>;

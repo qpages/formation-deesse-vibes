@@ -280,7 +280,7 @@ function startOfUtcDay(d: Date) {
 	return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
-/** Clear Yousign ids without calling provider cancel (admin delete_nda). */
+/** Clear Yousign ids without calling provider cancel (recreate NDA). */
 export async function clearNdaFields(enrollmentId: string) {
 	return getPrisma().enrollment.update({
 		where: { id: enrollmentId },
@@ -289,29 +289,6 @@ export async function clearNdaFields(enrollmentId: string) {
 			yousignSignerId: null,
 			yousignStatus: null,
 			contractStatus: 'pending',
-		},
-		...withUser,
-	});
-}
-
-export async function markEnrollmentRefunded(enrollmentId: string) {
-	return getPrisma().enrollment.update({
-		where: { id: enrollmentId },
-		data: {
-			collectionStatus: 'refunded',
-			accessStatus: 'revoked',
-			accessRevokedAt: new Date(),
-		},
-		...withUser,
-	});
-}
-
-export async function markEnrollmentAccessRevoked(enrollmentId: string) {
-	return getPrisma().enrollment.update({
-		where: { id: enrollmentId },
-		data: {
-			accessStatus: 'revoked',
-			accessRevokedAt: new Date(),
 		},
 		...withUser,
 	});
