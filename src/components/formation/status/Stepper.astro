@@ -1,0 +1,63 @@
+---
+import StatusBadge from '../../ui/StatusBadge.astro';
+import { stepLabel, type StepKey, type StepState } from '../../../lib/status';
+
+interface Props {
+	steps: Record<StepKey, StepState>;
+}
+
+const { steps } = Astro.props;
+const showBadges = Boolean(steps);
+
+const items: Array<{ key: StepKey; title: string; text: string }> = [
+	{
+		key: 'paiement',
+		title: 'Vous payez en ligne sur Stripe',
+		text: 'Règlement sécurisé via la plateforme de paiement Stripe.',
+	},
+	{
+		key: 'nda',
+		title: 'Vous signez l’accord par e-mail',
+		text: 'Signature électronique de l’accord de confidentialité via Yousign, envoyée dès confirmation du paiement.',
+	},
+	{
+		key: 'acces',
+		title: 'Vous recevez vos accès Teachizy',
+		text: 'L’invitation Teachizy avec vos identifiants vous est envoyée dès que la signature est confirmée.',
+	},
+];
+
+function tone(state: StepState) {
+	if (state === 'termine') return 'success' as const;
+	if (state === 'action_requise') return 'action' as const;
+	if (state === 'en_cours') return 'progress' as const;
+	return 'neutral' as const;
+}
+---
+
+<ol class="grid gap-10 sm:grid-cols-3 sm:gap-12">
+	{
+		items.map((item, index) => {
+			const state = steps?.[item.key];
+			return (
+				<li>
+					<div class="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-x-4 gap-y-4">
+						<span
+							class="shrink-0 font-display text-[2.75rem] leading-none tracking-tight text-gold"
+							aria-hidden="true"
+						>
+							{index + 1}
+						</span>
+						<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+							<h3 class="font-display text-xl leading-snug text-ink sm:text-2xl">{item.title}</h3>
+							{showBadges && state && <StatusBadge tone={tone(state)}>{stepLabel(state)}</StatusBadge>}
+						</div>
+						<div class="col-span-2 border-t border-ink/12 pt-3">
+							<p class="pl-16 text-sm leading-relaxed text-ink-soft">{item.text}</p>
+						</div>
+					</div>
+				</li>
+			);
+		})
+	}
+</ol>

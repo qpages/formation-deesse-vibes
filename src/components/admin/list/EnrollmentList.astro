@@ -1,0 +1,148 @@
+---
+import StatusBadge from '../../ui/StatusBadge.astro';
+import type { AdminEnrollmentRow } from '../../../lib/admin/enrollments';
+import type { AdminPaymentSummary } from '../../../lib/admin/payments';
+import EnrollmentRowActions from './EnrollmentRowActions.astro';
+
+interface Props {
+	rows: AdminEnrollmentRow[];
+}
+
+const { rows } = Astro.props;
+
+const rowNavClass =
+	'cursor-pointer transition-colors hover:bg-ink/2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blush/50';
+
+function paymentMeta(summary: AdminPaymentSummary): string {
+	const meta: string[] = [summary.planLabel];
+	if ((summary.installmentsTotal ?? 1) > 1) {
+		meta.push(summary.progressLabel);
+	}
+	if (summary.trackingState === 'a_jour' && summary.nextInstallmentDueAt) {
+		meta.push(
+			`proch. ${new Date(summary.nextInstallmentDueAt).toLocaleDateString('fr-FR')}`,
+		);
+	}
+	return meta.join(' · ');
+}
+---
+
+{/* Mobile: cartes cliquables */}
+<ul class="space-y-3 lg:hidden">
+	{
+		rows.map((row) => {
+			const href = `/admin/enrollments/${row.id}`;
+			const createdLabel = row.createdAt.toLocaleString('fr-FR', {
+				dateStyle: 'short',
+				timeStyle: 'short',
+			});
+			return (
+				<li
+					class:list={['border border-ink/10 bg-white/60 px-4 py-4', rowNavClass]}
+					data-enrollment-href={href}
+					tabindex={0}
+					role="link"
+					aria-label={`Ouvrir ${row.displayName}`}
+				>
+					<div class="min-w-0">
+						<p class="font-medium text-ink">{row.displayName}</p>
+						<p class="truncate text-ink-soft">{row.email}</p>
+						<p class="mt-1 text-[11px] text-ink/45">{createdLabel}</p>
+					</div>
+					<div class="mt-3 flex flex-wrap items-start gap-3">
+						<div class="min-w-0">
+							<StatusBadge tone={row.paymentSummary.trackingTone}>
+								{row.paymentSummary.trackingLabel}
+							</StatusBadge>
+							<p class="mt-1 text-[11px] text-ink/45">
+								{paymentMeta(row.paymentSummary)}
+							</p>
+						</div>
+						<div class="flex flex-wrap items-center gap-2">
+							<StatusBadge tone={row.pipeline.signature.tone}>
+								{row.pipeline.signature.label}
+							</StatusBadge>
+							<StatusBadge tone={row.pipeline.acces.tone}>
+								{row.pipeline.acces.label}
+							</StatusBadge>
+						</div>
+					</div>
+					<div class="mt-3 border-t border-ink/10 pt-3">
+						<EnrollmentRowActions row={row} />
+					</div>
+				</li>
+			);
+		})
+	}
+</ul>
+
+{/* Desktop: table — row cliquable sauf zone actions */}
+<div class="hidden overflow-x-auto lg:block">
+	<table class="w-full text-left text-sm">
+		<thead class="border-b border-ink/15 text-[11px] uppercase tracking-[0.12em] text-ink-soft">
+			<tr>
+				<th class="py-3 pr-4 font-medium">Personne</th>
+				<th class="py-3 pr-3 font-medium">Paiement</th>
+				<th class="py-3 pr-3 font-medium">Signature</th>
+				<th class="py-3 pr-3 font-medium">Accès</th>
+				<th class="py-3 font-medium">Actions</th>
+			</tr>
+		</thead>
+		<tbody class="divide-y divide-ink/10">
+			{
+				rows.map((row) => {
+					const href = `/admin/enrollments/${row.id}`;
+					const createdLabel = row.createdAt.toLocaleString('fr-FR', {
+						dateStyle: 'short',
+						timeStyle: 'short',
+					});
+					return (
+						<tr
+							class={rowNavClass}
+							data-enrollment-href={href}
+							tabindex={0}
+							role="link"
+							aria-label={`Ouvrir ${row.displayName}`}
+						>
+							<td class="py-3.5 pr-4">
+								<div class="min-w-0">
+									<p class="font-medium text-ink">{row.displayName}</p>
+									<p class="truncate text-ink-soft">{row.email}</p>
+									<p class="mt-1 text-[11px] text-ink/45">{createdLabel}</p>
+								</div>
+							</td>
+							<td class="py-3.5 pr-3">
+								<div class="min-w-0">
+									<StatusBadge tone={row.paymentSummary.trackingTone}>
+										{row.paymentSummary.trackingLabel}
+									</StatusBadge>
+									<p class="mt-1 text-[11px] text-ink/45">
+										{paymentMeta(row.paymentSummary)}
+									</p>
+								</div>
+							</td>
+							<td class="py-3.5 pr-3">
+								<StatusBadge tone={row.pipeline.signature.tone}>
+									{row.pipeline.signature.label}
+								</StatusBadge>
+							</td>
+							<td class="py-3.5 pr-3">
+								<StatusBadge tone={row.pipeline.acces.tone}>
+									{row.pipeline.acces.label}
+								</StatusBadge>
+							</td>
+							<td class="py-3.5">
+								<EnrollmentRowActions row={row} />
+							</td>
+						</tr>
+					);
+				})
+			}
+		</tbody>
+	</table>
+</div>
+
+<script>
+	import { bindEnrollmentListNavigation } from './list-nav';
+	bindEnrollmentListNavigation();
+</script>

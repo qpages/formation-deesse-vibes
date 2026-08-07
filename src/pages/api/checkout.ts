@@ -3,10 +3,12 @@ import {
 	createPendingEnrollment,
 	DuplicateEnrollmentError,
 } from '../../lib/services/enrollment';
-import { createCheckoutSession } from '../../lib/services/stripe';
+import {
+	CheckoutAlreadyPaidError,
+	startCheckout,
+} from '../../lib/services/payments';
 import { getEnv } from '../../lib/env';
 import { checkoutSchema } from '../../lib/validation';
-import { getPrisma } from '../../lib/db';
 
 export const POST: APIRoute = async ({ request }) => {
 	try {
@@ -25,27 +27,19 @@ export const POST: APIRoute = async ({ request }) => {
 		const enrollment = await createPendingEnrollment(parsed.data);
 		const site = getEnv().PUBLIC_SITE_URL;
 
-		const session = await createCheckoutSession({
-			enrollmentId: enrollment.id,
-			email: enrollment.email,
-			firstName: enrollment.firstName,
-			lastName: enrollment.lastName,
+		const { url } = await startCheckout({
+			enrollment,
+			paymentPlan: parsed.data.paymentPlan,
 			successUrl: `${site}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
 			cancelUrl: `${site}/?checkout=cancel`,
 		});
 
-		await getPrisma().enrollment.update({
-			where: { id: enrollment.id },
-			data: { stripeCheckoutSessionId: session.id },
-		});
-
-		if (!session.url) {
-			return json({ error: 'Impossible de créer la session de paiement.' }, 500);
-		}
-
-		return json({ url: session.url });
+		return json({ url });
 	} catch (error) {
-		if (error instanceof DuplicateEnrollmentError) {
+		if (
+			error instanceof DuplicateEnrollmentError ||
+			error instanceof CheckoutAlreadyPaidError
+		) {
 			return json(
 				{
 					error:

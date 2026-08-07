@@ -1,6 +1,6 @@
 # Formation Matrice Évolution
 
-Portail `formation.deesse-vibes.com` — 320 € TTC. Accès Teachizy uniquement après paiement + NDA signé (jamais depuis une page succès client).
+Portail `formation.deesse-vibes.com` — 1 849 € TTC (paiement unique ; majoration en échéances). Accès Teachizy uniquement après paiement + NDA signé (jamais depuis une page succès client).
 
 ## Parcours
 
@@ -47,7 +47,7 @@ Endpoint : `/api/inngest`
 | Outil | URL / notes |
 | --- | --- |
 | Neon | https://console.neon.tech |
-| Stripe | prix `STRIPE_PRICE_ID` (320 €) |
+| Stripe | prix `STRIPE_PRICE_UNIQUE` (1 849 €) + X2/X4/X6 |
 | Yousign | template NDA côté Yousign (pas dans le repo) |
 | Resend | from `formation@deesse-vibes.com` |
 | Inngest | https://app.inngest.com |

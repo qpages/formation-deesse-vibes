@@ -17,7 +17,7 @@ export const POST: APIRoute = async ({ request }) => {
 		}
 
 		const enrollment = await findEnrollmentByEmail(parsed.data.email);
-		if (!enrollment || enrollment.status === 'paiement_en_attente') {
+		if (!enrollment || enrollment.collectionStatus === 'pending') {
 			return json(
 				{ error: 'Aucune inscription active pour cet e-mail.' },
 				404,

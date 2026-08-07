@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-	--font-display: "Cormorant Garamond", "Times New Roman", serif;
-	--font-sans: "Outfit", "Helvetica Neue", sans-serif;
+	--font-display: "Figtree", "Helvetica Neue", sans-serif;
+	--font-sans: "Figtree", "Helvetica Neue", sans-serif;
 
 	--color-ink: #1a1410;
 	--color-ink-soft: #3d3229;

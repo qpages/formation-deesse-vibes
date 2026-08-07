@@ -2,40 +2,44 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import Button from '../../components/ui/Button.astro';
 import Dialog from '../../components/ui/Dialog.astro';
-import SearchBar from '../../components/admin/SearchBar.astro';
-import Pagination from '../../components/admin/Pagination.astro';
-import EnrollmentList from '../../components/admin/EnrollmentList.astro';
-import {
-	ADMIN_COOKIE,
-	parseCookie,
-	verifyAdminSessionToken,
-} from '../../lib/auth/session';
+import FilterBar from '../../components/admin/list/FilterBar.astro';
+import Pagination from '../../components/admin/list/Pagination.astro';
+import EnrollmentList from '../../components/admin/list/EnrollmentList.astro';
+import { requireAdminPage } from '../../lib/admin/auth';
 import { listAdminEnrollments } from '../../lib/admin/enrollments';
+import { adminActionMetaForClient } from '../../lib/admin/actions';
+import { activeFilterChips } from '../../lib/admin/filter-labels';
 import { parseAdminListQuery } from '../../lib/validation';
 
 export const prerender = false;
 
-const adminEmail = await verifyAdminSessionToken(
-	parseCookie(Astro.request.headers.get('cookie'), ADMIN_COOKIE) ?? '',
-);
-if (!adminEmail) {
-	return Astro.redirect('/admin/login');
-}
+const admin = await requireAdminPage(Astro);
+if (admin instanceof Response) return admin;
 
-const { q, page } = parseAdminListQuery(Astro.url.searchParams);
-const list = await listAdminEnrollments({ q, page });
+const filters = parseAdminListQuery(Astro.url.searchParams);
+const list = await listAdminEnrollments(filters);
+const actionMeta = adminActionMetaForClient();
+
+const chips = activeFilterChips({
+	q: list.q,
+	collection: list.collection,
+	contract: list.contract,
+	access: list.access,
+});
 
 const summary =
 	list.total === 0
-		? q
-			? `Aucun résultat pour « ${q} »`
+		? list.q || chips.length
+			? 'Aucun résultat pour ces critères'
 			: 'Aucune inscription'
-		: q
-			? `${list.from}–${list.to} sur ${list.total} pour « ${q} »`
-			: `${list.from}–${list.to} sur ${list.total} clients`;
+		: list.q
+			? `${list.from}–${list.to} sur ${list.total} pour « ${list.q} »`
+			: chips.length
+				? `${list.from}–${list.to} sur ${list.total} filtrés`
+				: `${list.from}–${list.to} sur ${list.total} clients`;
 ---
 
-<AdminLayout title="Inscriptions" email={adminEmail}>
+<AdminLayout title="Inscriptions" email={admin}>
 	<div class="mb-6 flex flex-wrap items-end justify-between gap-4">
 		<div>
 			<h1 class="font-display text-4xl text-ink">Inscriptions</h1>
@@ -44,15 +48,20 @@ const summary =
 		<Button href="/api/admin/export" variant="secondary" size="sm">Export CSV</Button>
 	</div>
 
-	<div class="mb-6">
-		<SearchBar q={list.q} />
+	<div class="mb-6 border border-ink/10 bg-white/50 p-4">
+		<FilterBar
+			q={list.q}
+			collection={list.collection}
+			contract={list.contract}
+			access={list.access}
+		/>
 	</div>
 
 	{
 		list.rows.length === 0 ? (
 			<p class="border border-dashed border-ink/15 px-4 py-10 text-center text-sm text-ink-soft">
-				{q
-					? 'Aucune inscription ne correspond à cette recherche.'
+				{list.q || chips.length
+					? 'Aucune inscription ne correspond à ces critères.'
 					: 'Les inscriptions apparaîtront ici.'}
 			</p>
 		) : (
@@ -65,6 +74,9 @@ const summary =
 					totalPages={list.totalPages}
 					hasPrev={list.hasPrev}
 					hasNext={list.hasNext}
+					collection={list.collection}
+					contract={list.contract}
+					access={list.access}
 				/>
 			</>
 		)
@@ -80,231 +92,17 @@ const summary =
 	</Dialog>
 </AdminLayout>
 
+<script
+	id="admin-action-meta"
+	type="application/json"
+	set:html={JSON.stringify(actionMeta)}
+/>
 <script>
-	type ActionKey =
-		| 'sync_payment'
-		| 'sync_yousign'
-		| 'retrigger_nda'
-		| 'retrigger_signature'
-		| 'relance_nda'
-		| 'recreate_nda'
-		| 'delete_nda'
-		| 'retrigger_teachizy';
+	import { bindAdminActions } from '../../components/admin/admin-client';
+	import type { AdminActionMetaClient } from '../../lib/admin/actions';
 
-	const ACTION_META: Record<
-		ActionKey,
-		{ eyebrow: string; title: string; description: (name: string) => string; confirm: string; danger?: boolean }
-	> = {
-		sync_payment: {
-			eyebrow: 'Paiement',
-			title: 'Synchroniser le paiement',
-			description: (name) =>
-				`Vérifier la session Stripe de ${name} et passer le statut à « paiement confirmé » si le paiement est bien abouti (puis déclencher le NDA).`,
-			confirm: 'Synchroniser',
-		},
-		sync_yousign: {
-			eyebrow: 'Dev',
-			title: 'Synchroniser Yousign',
-			description: (name) =>
-				`Lire le statut de la demande Yousign de ${name} et aligner yousignStatus en base. Ne change pas le statut métier ni ne déclenche Teachizy.`,
-			confirm: 'Synchroniser',
-		},
-		retrigger_nda: {
-			eyebrow: 'Signature',
-			title: 'Déclencher création NDA (Inngest)',
-			description: (name) =>
-				`Envoyer l’event Inngest stripe/payment.confirmed pour ${name} (création Yousign + e-mail). Utile si le job a raté après un paiement déjà confirmé.`,
-			confirm: 'Déclencher Inngest',
-		},
-		retrigger_signature: {
-			eyebrow: 'Dev',
-			title: 'Déclencher invitation Teachizy (Inngest)',
-			description: (name) =>
-				`Envoyer l’event Inngest yousign/signature.done pour ${name} (invitation Teachizy). Utile si le job a raté après une signature déjà faite.`,
-			confirm: 'Déclencher Inngest',
-		},
-		relance_nda: {
-			eyebrow: 'Signature',
-			title: 'Relancer le NDA',
-			description: (name) =>
-				`Renvoyer un e-mail de relance à ${name} et réactiver le lien de signature YouSign.`,
-			confirm: 'Envoyer la relance',
-		},
-		recreate_nda: {
-			eyebrow: 'Signature',
-			title: 'Recréer le NDA',
-			description: (name) =>
-				`Créer une nouvelle demande YouSign pour ${name} et remplacer le lien actuel. L’ancien lien ne sera plus valide.`,
-			confirm: 'Recréer le NDA',
-			danger: true,
-		},
-		delete_nda: {
-			eyebrow: 'Dev',
-			title: 'Supprimer le NDA',
-			description: (name) =>
-				`Effacer les IDs YouSign de ${name} en base (local uniquement) et revenir à « paiement confirmé ». Permet de retester [dev] Trigger Inngest.`,
-			confirm: 'Supprimer le NDA',
-			danger: true,
-		},
-		retrigger_teachizy: {
-			eyebrow: 'Dev',
-			title: 'Renvoyer le lien Teachizy',
-			description: (name) =>
-				`Appeler l’API Teachizy pour renvoyer l’invitation à ${name}. Si c’est la 1ère fois : pose le statut « accès envoyés ». Sinon : ne touche pas teachizyInvitedAt (audit via AdminAction).`,
-			confirm: 'Renvoyer le lien',
-		},
-	};
-
-	const dialog = document.getElementById('admin-action-dialog') as HTMLDialogElement | null;
-	const eyebrowEl = dialog?.querySelector<HTMLElement>('[data-dialog-eyebrow]');
-	const titleEl = dialog?.querySelector<HTMLElement>('[data-dialog-title]');
-	const descEl = dialog?.querySelector<HTMLElement>('[data-dialog-description]');
-	const confirmBtn = document.getElementById('admin-dialog-confirm') as HTMLButtonElement | null;
-	const cancelBtn = document.getElementById('admin-dialog-cancel') as HTMLButtonElement | null;
-	const closeBtn = dialog?.querySelector<HTMLButtonElement>('[data-dialog-close]');
-
-	dialog?.addEventListener('cancel', (event) => {
-		if (busy) event.preventDefault();
-	});
-
-	const confirmBtnBase =
-		'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush disabled:pointer-events-none disabled:opacity-50 h-10 px-4 text-sm text-mist';
-	const confirmBtnPrimary = `${confirmBtnBase} bg-ink hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]`;
-	const confirmBtnDanger = `${confirmBtnBase} bg-blush-deep hover:bg-blush`;
-
-	let busy = false;
-	let pendingConfirmLabel = 'Confirmer';
-
-	function toast(message: string, variant: 'success' | 'error' | 'info' = 'info') {
-		window.toast?.(message, variant);
+	const el = document.getElementById('admin-action-meta');
+	if (el?.textContent) {
+		bindAdminActions(JSON.parse(el.textContent) as AdminActionMetaClient);
 	}
-
-	function setBusy(next: boolean) {
-		busy = next;
-		if (confirmBtn) {
-			confirmBtn.disabled = next;
-			confirmBtn.textContent = next ? 'En cours…' : pendingConfirmLabel;
-		}
-		if (cancelBtn) cancelBtn.disabled = next;
-		if (closeBtn) closeBtn.disabled = next;
-	}
-
-	function closeDialog() {
-		dialog?.close();
-		setBusy(false);
-	}
-
-	function askConfirm(action: ActionKey, name: string): Promise<boolean> {
-		const meta = ACTION_META[action];
-		if (!dialog || !meta) return Promise.resolve(false);
-
-		pendingConfirmLabel = meta.confirm;
-		if (eyebrowEl) eyebrowEl.textContent = meta.eyebrow;
-		if (titleEl) titleEl.textContent = meta.title;
-		if (descEl) descEl.textContent = meta.description(name || 'cette personne');
-		if (confirmBtn) {
-			confirmBtn.textContent = meta.confirm;
-			confirmBtn.className = meta.danger ? confirmBtnDanger : confirmBtnPrimary;
-		}
-
-		setBusy(false);
-		dialog.showModal();
-		confirmBtn?.focus();
-
-		return new Promise((resolve) => {
-			let settled = false;
-
-			const finish = (value: boolean) => {
-				if (settled) return;
-				settled = true;
-				cleanup();
-				if (!value && dialog.open) dialog.close();
-				resolve(value);
-			};
-
-			const onConfirm = () => {
-				if (busy) return;
-				finish(true);
-			};
-			const onCancel = () => {
-				if (busy) return;
-				finish(false);
-			};
-			const onClose = () => finish(false);
-
-			const cleanup = () => {
-				confirmBtn?.removeEventListener('click', onConfirm);
-				cancelBtn?.removeEventListener('click', onCancel);
-				closeBtn?.removeEventListener('click', onCancel);
-				dialog.removeEventListener('click', onBackdrop);
-				dialog.removeEventListener('close', onClose);
-			};
-
-			const onBackdrop = (event: MouseEvent) => {
-				if (busy) return;
-				if (event.target === dialog) finish(false);
-			};
-
-			confirmBtn?.addEventListener('click', onConfirm);
-			cancelBtn?.addEventListener('click', onCancel);
-			closeBtn?.addEventListener('click', onCancel);
-			dialog.addEventListener('click', onBackdrop);
-			dialog.addEventListener('close', onClose);
-		});
-	}
-
-	async function runAdminAction(enrollmentId: string, action: string, name: string) {
-		if (!(action in ACTION_META)) return false;
-
-		const confirmed = await askConfirm(action as ActionKey, name);
-		if (!confirmed) return false;
-
-		setBusy(true);
-
-		try {
-			const res = await fetch('/api/admin/action', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ enrollmentId, action }),
-			});
-			const json = await res.json();
-
-			closeDialog();
-
-			if (res.ok) {
-				toast('Action effectuée.', 'success');
-				window.setTimeout(() => location.reload(), 700);
-				return true;
-			}
-
-			toast(json.error || 'Échec de l’action.', 'error');
-			return false;
-		} catch {
-			closeDialog();
-			toast('Erreur réseau. Réessayez.', 'error');
-			return false;
-		}
-	}
-
-	document.querySelectorAll('[data-action]').forEach((btn) => {
-		btn.addEventListener('click', async () => {
-			const action = btn.getAttribute('data-action');
-			const wrap = btn.closest('[data-enrollment]');
-			const enrollmentId = wrap?.getAttribute('data-enrollment');
-			const name = wrap?.getAttribute('data-name') ?? '';
-			if (!action || !enrollmentId) return;
-			await runAdminAction(enrollmentId, action, name);
-		});
-	});
-
-	document.querySelectorAll<HTMLSelectElement>('[data-action-select]').forEach((select) => {
-		select.addEventListener('change', async () => {
-			const action = select.value;
-			const enrollmentId = select.getAttribute('data-enrollment');
-			const name = select.getAttribute('data-name') ?? '';
-			if (!action || !enrollmentId) return;
-			const ok = await runAdminAction(enrollmentId, action, name);
-			if (!ok) select.value = '';
-		});
-	});
 </script>

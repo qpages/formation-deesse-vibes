@@ -9,17 +9,34 @@ datasource db {
   provider = "postgresql"
 }
 
-enum EnrollmentStatus {
-  paiement_en_attente
-  paiement_confirme
-  nda_envoye
-  nda_signe
-  teachizy_envoye
-  rembourse
-  acces_retire
+enum CollectionStatus {
+  pending
+  current
+  past_due
+  paid
+  canceled
+  refunded
 }
 
-/// État de la demande Yousign (indépendant du statut métier EnrollmentStatus).
+enum ContractStatus {
+  pending
+  sent
+  signed
+  expired
+  declined
+  canceled
+  error
+}
+
+enum AccessStatus {
+  not_eligible
+  pending
+  active
+  suspended
+  revoked
+}
+
+/// État de la demande Yousign (indépendant du statut métier).
 enum YousignRequestStatus {
   ongoing
   done
@@ -30,21 +47,77 @@ enum YousignRequestStatus {
   error
 }
 
+enum PaymentPlanId {
+  unique
+  x2
+  x4
+  x6
+}
+
+enum PaymentStatus {
+  paid
+  open
+  failed
+  void
+  uncollectible
+  draft
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  canceled
+  incomplete
+  incomplete_expired
+  trialing
+  paused
+  completed
+}
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  firstName        String
+  lastName         String
+  stripeCustomerId String?  @unique
+  teachizyUserId   String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  enrollments Enrollment[]
+
+  @@map("users")
+}
+
 model Enrollment {
-  id        String           @id @default(cuid())
-  email     String           @unique
-  firstName String
-  lastName  String
-  status    EnrollmentStatus @default(paiement_en_attente)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  collectionStatus CollectionStatus @default(pending)
+  contractStatus   ContractStatus   @default(pending)
+  accessStatus     AccessStatus     @default(not_eligible)
 
   consentCgvAt     DateTime?
   consentNdaAt     DateTime?
   consentPrivacyAt DateTime?
 
-  stripeCustomerId        String?
+  currency             String               @default("eur")
+  amountCents          Int                  @default(184900)
+  paymentPlan          PaymentPlanId?
+  installmentsTotal    Int?
+  installmentsPaid     Int                  @default(0)
+  totalAmountCents     Int?
+  collectedAmountCents Int                  @default(0)
+  firstPaymentPaidAt   DateTime?
+  fullyPaidAt          DateTime?
+  nextInstallmentDueAt DateTime?
+  subscriptionStatus   SubscriptionStatus?
+
   stripeCheckoutSessionId String? @unique
   stripePaymentIntentId   String? @unique
-  amountCents             Int     @default(32000)
+  stripeSubscriptionId    String? @unique
+  stripeScheduleId        String? @unique
 
   yousignRequestId String?               @unique
   yousignSignerId  String?
@@ -53,33 +126,71 @@ model Enrollment {
   ndaResendDay     DateTime?
   ndaLastResendAt  DateTime?
 
+  accessGrantedAt   DateTime?
+  accessSuspendedAt DateTime?
+  accessRevokedAt   DateTime?
   teachizyInvitedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events       ProcessedEvent[]
+  events       ProviderEvent[]
+  payments     Payment[]
   magicLinks   MagicLink[]
   adminActions AdminAction[]
 
-  @@index([status])
+  @@index([userId])
+  @@index([collectionStatus])
+  @@index([contractStatus])
+  @@index([accessStatus])
   @@index([createdAt])
+  @@index([subscriptionStatus])
   @@map("enrollments")
 }
 
-model ProcessedEvent {
+model Payment {
+  id                    String        @id @default(cuid())
+  enrollmentId          String
+  enrollment            Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  stripeInvoiceId       String?       @unique
+  stripePaymentIntentId String?
+  installmentNumber     Int
+  amountCents           Int
+  currency              String        @default("eur")
+  status                PaymentStatus
+  failureReason         String?
+  invoicePdfUrl         String?
+  hostedInvoiceUrl      String?
+  invoicedAt            DateTime?
+  paidAt                DateTime?
+  dueAt                 DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@unique([enrollmentId, installmentNumber])
+  @@index([enrollmentId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("payments")
+}
+
+model ProviderEvent {
   id                String      @id @default(cuid())
   provider          String
-  eventId           String
+  providerEventId   String
+  eventType         String
+  status            String      @default("received") // received | processed | ignored | failed
   enrollmentId      String?
   enrollment        Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
   payloadCipherText String?
-  createdAt         DateTime    @default(now())
+  receivedAt        DateTime    @default(now())
+  processedAt       DateTime?
+  lastError         String?
 
-  @@unique([provider, eventId])
-  @@index([createdAt])
+  @@unique([provider, providerEventId])
+  @@index([status, receivedAt])
   @@index([enrollmentId])
-  @@map("processed_events")
+  @@map("provider_events")
 }
 
 model MagicLink {

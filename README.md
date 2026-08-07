@@ -1,6 +1,6 @@
 # Formation Déesse Vibes
 
-Portail `formation.deesse-vibes.com` — Formation Matrice Évolution (320 €).
+Portail `formation.deesse-vibes.com` — Formation Matrice Évolution (1 849 €).
 
 Parcours : landing → Stripe Checkout → NDA Yousign → Teachizy.  
 Suivi sur la même page via lien magique Resend. Accès Teachizy uniquement via API directe après signature vérifiée.
@@ -28,3 +28,21 @@ npm run dev
 Scripts utiles : `npm test`, `npm run build`, `npm run db:deploy`.
 
 Vue d’ensemble (parcours, Inngest, webhooks, consoles) : [`docs/overview.md`](./docs/overview.md).
+
+## Flow
+
+Le flow métier complet :
+
+commande créée
+→ paiement initial validé
+→ signature demandée
+→ contrat signé
+→ accès actif
+→ échéances suivantes
+→ payé intégralement
+
+avec des branches :
+
+échéance échouée → grâce → suspension → régularisation → réactivation
+signature expirée/refusée → relance ou annulation
+remboursement/litige → suspension ou révocation

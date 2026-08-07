@@ -1,0 +1,100 @@
+import { z } from 'zod';
+import { getEnv } from './env';
+
+export const paymentPlanIdSchema = z.enum(['unique', 'x2', 'x4', 'x6']);
+export type PaymentPlanId = z.infer<typeof paymentPlanIdSchema>;
+
+export type PaymentPlanMode = 'payment' | 'subscription';
+
+export interface PaymentPlan {
+	id: PaymentPlanId;
+	label: string;
+	mode: PaymentPlanMode;
+	installments: number;
+	installmentAmountCents: number;
+	totalAmountCents: number;
+	envPriceKey:
+		| 'STRIPE_PRICE_UNIQUE'
+		| 'STRIPE_PRICE_X2'
+		| 'STRIPE_PRICE_X4'
+		| 'STRIPE_PRICE_X6';
+}
+
+/** Source de vérité serveur — ne jamais faire confiance au montant côté client. */
+export const PAYMENT_PLANS: Record<PaymentPlanId, PaymentPlan> = {
+	unique: {
+		id: 'unique',
+		label: 'Paiement unique',
+		mode: 'payment',
+		installments: 1,
+		installmentAmountCents: 184_900,
+		totalAmountCents: 184_900,
+		envPriceKey: 'STRIPE_PRICE_UNIQUE',
+	},
+	x2: {
+		id: 'x2',
+		label: '2 échéances',
+		mode: 'subscription',
+		installments: 2,
+		installmentAmountCents: 94_950,
+		totalAmountCents: 189_900,
+		envPriceKey: 'STRIPE_PRICE_X2',
+	},
+	x4: {
+		id: 'x4',
+		label: '4 échéances',
+		mode: 'subscription',
+		installments: 4,
+		installmentAmountCents: 49_975,
+		totalAmountCents: 199_900,
+		envPriceKey: 'STRIPE_PRICE_X4',
+	},
+	x6: {
+		id: 'x6',
+		label: '6 échéances',
+		mode: 'subscription',
+		installments: 6,
+		installmentAmountCents: 34_650,
+		totalAmountCents: 207_900,
+		envPriceKey: 'STRIPE_PRICE_X6',
+	},
+};
+
+export function getPaymentPlan(id: PaymentPlanId): PaymentPlan {
+	return PAYMENT_PLANS[id];
+}
+
+export function resolvePaymentPlan(raw: string): PaymentPlan | null {
+	const parsed = paymentPlanIdSchema.safeParse(raw);
+	if (!parsed.success) return null;
+	return PAYMENT_PLANS[parsed.data];
+}
+
+export function formatMoney(cents: number, currency = 'eur'): string {
+	return new Intl.NumberFormat('fr-FR', {
+		style: 'currency',
+		currency: currency.toUpperCase(),
+	}).format(cents / 100);
+}
+
+export function stripePriceIdForPlan(plan: PaymentPlan): string {
+	const env = getEnv();
+
+	switch (plan.envPriceKey) {
+		case 'STRIPE_PRICE_UNIQUE':
+			return env.STRIPE_PRICE_UNIQUE ?? env.STRIPE_PRICE_ID;
+		case 'STRIPE_PRICE_X2':
+			return requirePrice(env.STRIPE_PRICE_X2, 'STRIPE_PRICE_X2');
+		case 'STRIPE_PRICE_X4':
+			return requirePrice(env.STRIPE_PRICE_X4, 'STRIPE_PRICE_X4');
+		case 'STRIPE_PRICE_X6':
+			return requirePrice(env.STRIPE_PRICE_X6, 'STRIPE_PRICE_X6');
+	}
+}
+
+function requirePrice(value: string | undefined, key: string): string {
+	if (!value) {
+		throw new Error(`Variable d'environnement manquante: ${key}`);
+	}
+	return value;
+}

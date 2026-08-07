@@ -1,0 +1,66 @@
+---
+import { adminListHref } from '../../../lib/admin/enrollments';
+import { cn } from '../../../lib/cn';
+
+interface Props {
+	q: string;
+	page: number;
+	totalPages: number;
+	hasPrev: boolean;
+	hasNext: boolean;
+	collection?: string;
+	contract?: string;
+	access?: string;
+	class?: string;
+}
+
+const {
+	q,
+	page,
+	totalPages,
+	hasPrev,
+	hasNext,
+	collection = '',
+	contract = '',
+	access = '',
+	class: className,
+} = Astro.props;
+
+const filters = { q, collection, contract, access };
+
+const linkClass =
+	'inline-flex h-9 min-w-9 items-center justify-center border border-ink/15 px-3 text-sm text-ink transition-colors hover:border-ink/30 hover:bg-ink/3';
+const disabledClass =
+	'inline-flex h-9 min-w-9 items-center justify-center border border-ink/10 px-3 text-sm text-ink/35';
+---
+
+{
+	totalPages > 1 ? (
+		<nav
+			class={cn('flex items-center justify-between gap-3', className)}
+			aria-label="Pagination"
+		>
+			{hasPrev ? (
+				<a href={adminListHref({ ...filters, page: page - 1 })} class={linkClass}>
+					Précédent
+				</a>
+			) : (
+				<span class={disabledClass} aria-disabled="true">
+					Précédent
+				</span>
+			)}
+			<p class="text-sm text-ink-soft">
+				Page <span class="text-ink">{page}</span> / {totalPages}
+			</p>
+			{hasNext ? (
+				<a href={adminListHref({ ...filters, page: page + 1 })} class={linkClass}>
+					Suivant
+				</a>
+			) : (
+				<span class={disabledClass} aria-disabled="true">
+					Suivant
+				</span>
+			)}
+		</nav>
+	) : null
+}

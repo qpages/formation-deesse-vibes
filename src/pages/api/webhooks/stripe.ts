@@ -1,18 +1,14 @@
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
-import {
-	recordProcessedEvent,
-	releaseProcessedEvent,
-} from '../../../lib/services/enrollment';
-import { confirmPaidCheckout } from '../../../lib/services/payment';
-import { alertFinalFailure } from '../../../lib/services/slack';
-import { constructStripeEvent } from '../../../lib/services/stripe';
+import { inngest } from '../../../lib/inngest/client';
+import { recordProviderEvent } from '../../../lib/services/enrollment';
+import { stripeEventPayload } from '../../../lib/services/stripe-events';
+import { constructStripeEvent } from '../../../lib/stripe';
 
-const PAID_CHECKOUT_EVENTS = new Set([
-	'checkout.session.completed',
-	'checkout.session.async_payment_succeeded',
-]);
-
+/**
+ * Template Method webhook Stripe: verify → record → enqueue → 200.
+ * Zéro sync métier inline.
+ */
 export const POST: APIRoute = async ({ request }) => {
 	const signature = request.headers.get('stripe-signature');
 	if (!signature) {
@@ -29,56 +25,24 @@ export const POST: APIRoute = async ({ request }) => {
 		return new Response('Invalid signature', { status: 400 });
 	}
 
-	const { created } = await recordProcessedEvent({
+	const { created, id } = await recordProviderEvent({
 		provider: 'stripe',
-		eventId: event.id,
-		payload: { type: event.type, id: event.id },
+		providerEventId: event.id,
+		eventType: event.type,
+		payload: stripeEventPayload(event),
 	});
 
-	if (!created) {
-		return new Response(JSON.stringify({ received: true, duplicate: true }), {
-			status: 200,
-			headers: { 'Content-Type': 'application/json' },
-		});
+	if (!created || !id) {
+		return json({ received: true, duplicate: true });
 	}
 
-	try {
-		if (PAID_CHECKOUT_EVENTS.has(event.type)) {
-			const session = event.data.object as Stripe.Checkout.Session;
-			const result = await confirmPaidCheckout(session, { stripeEventId: event.id });
-			if (!result.ok && result.reason.startsWith('payment_status=')) {
-				// Paiement différé — attendre async_payment_succeeded
-				return json({ received: true, deferred: true });
-			}
-			if (!result.ok) {
-				throw new Error(result.reason);
-			}
-		} else if (
-			event.type === 'charge.dispute.created' ||
-			event.type === 'charge.dispute.funds_withdrawn'
-		) {
-			await handleDispute(event);
-		}
-	} catch (error) {
-		console.error('[stripe webhook] handler', error);
-		await releaseProcessedEvent('stripe', event.id);
-		await alertFinalFailure({
-			title: `Erreur traitement Stripe ${event.type}`,
-			error: error instanceof Error ? error.message : String(error),
-		});
-		return new Response('Webhook handler failed', { status: 500 });
-	}
+	await inngest.send({
+		name: 'provider/stripe-event.received',
+		data: { providerEventId: id },
+	});
 
 	return json({ received: true });
 };
-
-async function handleDispute(event: Stripe.Event) {
-	const dispute = event.data.object as Stripe.Dispute;
-	await alertFinalFailure({
-		title: 'Litige Stripe — décision manuelle requise',
-		error: `Dispute ${dispute.id} — statut ${dispute.status}`,
-	});
-}
 
 function json(data: unknown, status = 200) {
 	return new Response(JSON.stringify(data), {

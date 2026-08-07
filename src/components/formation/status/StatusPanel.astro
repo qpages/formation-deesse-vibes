@@ -1,0 +1,176 @@
+---
+import type { Enrollment } from '../../../generated/prisma/client';
+import {
+	ENROLLMENT_POLL_INTERVAL_MS,
+	ENROLLMENT_POLL_MAX_MS,
+	primaryAction,
+	shouldPollEnrollment,
+	statusMessage,
+} from '../../../lib/status';
+import Alert from '../../ui/Alert.astro';
+import Button from '../../ui/Button.astro';
+import SignLinkCard from './SignLinkCard.astro';
+
+interface Props {
+	enrollment: Enrollment;
+	ndaSignUrl?: string | null;
+	flash?: string | null;
+}
+
+const { enrollment, ndaSignUrl, flash } = Astro.props;
+const orthogonal = {
+	collectionStatus: enrollment.collectionStatus,
+	contractStatus: enrollment.contractStatus,
+	accessStatus: enrollment.accessStatus,
+};
+const action = primaryAction(orthogonal, ndaSignUrl);
+const message = statusMessage(orthogonal);
+const panelTitle =
+	enrollment.accessStatus === 'active' ? 'Accès prêt' : 'Votre inscription';
+const showSignCard = Boolean(ndaSignUrl);
+const poll = shouldPollEnrollment({
+	...orthogonal,
+	hasCheckoutSession: Boolean(enrollment.stripeCheckoutSessionId),
+	hasNdaSignUrl: showSignCard,
+});
+const closed =
+	enrollment.accessStatus === 'revoked' || enrollment.collectionStatus === 'refunded';
+const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractStatus}|${enrollment.accessStatus}`;
+---
+
+<div
+	class="space-y-6"
+	id="status-panel"
+	data-fingerprint={pollFingerprint}
+	data-poll={poll ? 'true' : 'false'}
+	data-poll-interval={ENROLLMENT_POLL_INTERVAL_MS}
+	data-poll-max={ENROLLMENT_POLL_MAX_MS}
+>
+	<div class="space-y-2">
+		<h3 class="font-display text-3xl text-ink">{panelTitle}</h3>
+		{showSignCard && (
+			<p class="text-ink-soft">Le lien de signature est prêt.</p>
+		)}
+	</div>
+
+	{
+		flash && (
+			<Alert variant="success">{flash}</Alert>
+		)
+	}
+
+	{
+		enrollment.collectionStatus === 'pending' && enrollment.stripeCheckoutSessionId && (
+			<p class="text-ink-soft">
+				Paiement en cours de confirmation. Cette page se met à jour automatiquement.
+			</p>
+		)
+	}
+	{
+		enrollment.collectionStatus !== 'pending' &&
+			enrollment.contractStatus === 'pending' &&
+			!showSignCard && (
+			<p class="text-ink-soft">
+				Paiement confirmé. Votre lien de signature apparaît ici dès qu’il est prêt.
+			</p>
+		)
+	}
+	{
+		enrollment.contractStatus === 'sent' && !showSignCard && (
+			<p class="text-ink-soft">
+				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page
+				ou contactez un administrateur.
+			</p>
+		)
+	}
+	{message && <p class="text-ink-soft">{message}</p>}
+	{
+		closed && (
+			<Alert variant="info">
+				Cette inscription est clôturée. Contactez un administrateur si besoin.
+			</Alert>
+		)
+	}
+
+	{showSignCard && ndaSignUrl && <SignLinkCard signUrl={ndaSignUrl} />}
+
+	{
+		!showSignCard && (action.kind === 'refresh' || action.kind === 'open_platform') && (
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+				{action.kind === 'refresh' && (
+					<Button href="/" size="lg" variant="primary">
+						{action.label}
+					</Button>
+				)}
+				{action.kind === 'open_platform' && (
+					<Button
+						href={action.href}
+						size="lg"
+						variant="primary"
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						{action.label}
+					</Button>
+				)}
+			</div>
+		)
+	}
+</div>
+
+<script>
+	const panel = document.getElementById('status-panel');
+	if (panel?.dataset.poll === 'true') {
+		const initialFingerprint = panel.dataset.fingerprint ?? '';
+		const intervalMs = Number(panel.dataset.pollInterval) || 2000;
+		const maxMs = Number(panel.dataset.pollMax) || 90_000;
+		const startedAt = Date.now();
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let stopped = false;
+
+		const stop = () => {
+			stopped = true;
+			if (timer !== undefined) clearTimeout(timer);
+		};
+
+		const schedule = () => {
+			if (!stopped) timer = setTimeout(tick, intervalMs);
+		};
+
+		const tick = async () => {
+			if (stopped) return;
+			if (Date.now() - startedAt >= maxMs) {
+				stop();
+				return;
+			}
+			if (document.visibilityState === 'hidden') {
+				schedule();
+				return;
+			}
+			try {
+				const res = await fetch('/api/enrollment/status', {
+					headers: { Accept: 'application/json' },
+					credentials: 'same-origin',
+				});
+				if (res.ok) {
+					const data = (await res.json()) as {
+						collectionStatus?: string;
+						contractStatus?: string;
+						accessStatus?: string;
+					};
+					const next = `${data.collectionStatus ?? ''}|${data.contractStatus ?? ''}|${data.accessStatus ?? ''}`;
+					if (next && next !== initialFingerprint) {
+						stop();
+						window.location.reload();
+						return;
+					}
+				}
+			} catch {
+				// ignore transient network errors; keep polling until max
+			}
+			schedule();
+		};
+
+		schedule();
+	}
+</script>

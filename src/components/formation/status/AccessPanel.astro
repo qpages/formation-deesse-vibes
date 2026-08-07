@@ -1,0 +1,244 @@
+---
+import type { StepKey, StepState } from '../../../lib/status';
+import type { EnrollmentWithUser } from '../../../lib/services/enrollment';
+import { getEnv } from '../../../lib/env';
+import CheckoutForm from '../landing/CheckoutForm.astro';
+import MagicLinkForm from './MagicLinkForm.astro';
+import StatusPanel from './StatusPanel.astro';
+import Stepper from './Stepper.astro';
+
+const adminContactEmail = getEnv().PUBLIC_ADMIN_CONTACT_EMAIL;
+
+interface Props {
+	showFunnel: boolean;
+	enrollment: EnrollmentWithUser | null;
+	steps: Record<StepKey, StepState>;
+	ndaSignUrl?: string | null;
+	invoiceLinks?: { installmentNumber: number; url: string }[];
+	flash?: string | null;
+	checkoutCancel?: boolean;
+	magicLinkFailed?: boolean;
+	defaultTab?: 'nouveau' | 'retrouver';
+}
+
+const {
+	showFunnel,
+	enrollment,
+	steps,
+	ndaSignUrl = null,
+	invoiceLinks = [],
+	flash = null,
+	checkoutCancel = false,
+	magicLinkFailed = false,
+	defaultTab = 'nouveau',
+} = Astro.props;
+
+const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
+const funnelFlash = showFunnel ? flash : null;
+---
+
+{
+	showFunnel ? (
+		<div id="access-funnel" class="space-y-8">
+			<div>
+				<Stepper />
+			</div>
+
+			<div class="border-t border-ink/10 pt-8">
+				<h3 class="mb-5 font-display text-3xl text-ink">Démarrer ma formation</h3>
+				<div
+					class="inline-flex rounded-sm border border-ink/15 p-1"
+					role="tablist"
+					aria-label="Choisir votre parcours"
+				>
+					<button
+						type="button"
+						role="tab"
+						id="tab-nouveau"
+						aria-controls="panel-nouveau"
+						aria-selected={activeTab === 'nouveau' ? 'true' : 'false'}
+						data-access-tab="nouveau"
+						class:list={[
+							'access-tab h-10 px-4 text-sm font-medium transition',
+							activeTab === 'nouveau'
+								? 'bg-ink text-mist'
+								: 'text-ink-soft',
+						]}
+					>
+						Nouveau
+					</button>
+					<button
+						type="button"
+						role="tab"
+						id="tab-retrouver"
+						aria-controls="panel-retrouver"
+						aria-selected={activeTab === 'retrouver' ? 'true' : 'false'}
+						data-access-tab="retrouver"
+						class:list={[
+							'access-tab h-10 px-4 text-sm font-medium transition',
+							activeTab === 'retrouver'
+								? 'bg-ink text-mist'
+								: 'text-ink-soft',
+						]}
+					>
+						Déjà inscrit·e
+					</button>
+				</div>
+
+				<div
+					id="panel-nouveau"
+					role="tabpanel"
+					aria-labelledby="tab-nouveau"
+					class:list={['mt-6', activeTab !== 'nouveau' && 'hidden']}
+					data-access-panel="nouveau"
+				>
+					<p class="mb-5 text-sm text-ink-soft">
+						Renseignez vos informations, puis réglez en toute sécurité via la plateforme de paiement Stripe.
+					</p>
+					<CheckoutForm />
+				</div>
+
+				<div
+					id="panel-retrouver"
+					role="tabpanel"
+					aria-labelledby="tab-retrouver"
+					class:list={['mt-6', activeTab !== 'retrouver' && 'hidden']}
+					data-access-panel="retrouver"
+				>
+					<p class="mb-1 text-sm text-ink-soft">
+						Saisissez l’e-mail utilisé lors du paiement pour retrouver votre inscription.
+					</p>
+					<MagicLinkForm />
+				</div>
+			</div>
+		</div>
+	) : (
+		<div id="access-tracking" class="space-y-8">
+			{enrollment && (
+				<>
+					<div>
+						<Stepper steps={steps} />
+					</div>
+
+					<div class="pt-8">
+						<StatusPanel
+							enrollment={enrollment}
+							ndaSignUrl={ndaSignUrl}
+							flash={flash}
+						/>
+						<div class="mt-6">
+							<p class="text-sm text-ink-soft">
+								Connecté·e en tant que{' '}
+								<span class="font-medium text-ink">
+									{enrollment.user.firstName} {enrollment.user.lastName}
+								</span>{' '}
+								({enrollment.user.email})
+							</p>
+						</div>
+
+						{invoiceLinks.length > 0 && (
+							<div class="mt-6 space-y-2">
+								<p class="text-[10px] uppercase tracking-[0.12em] text-ink/40">Factures</p>
+								<ul class="space-y-2">
+									{invoiceLinks.map((invoice) => (
+										<li>
+											<a
+												href={invoice.url}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="text-sm text-ink underline underline-offset-2 hover:text-blush-deep"
+											>
+												{invoiceLinks.length === 1
+													? 'Télécharger ma facture'
+													: `Facture échéance ${invoice.installmentNumber}`}
+											</a>
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+
+						<div class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+							<button
+								type="button"
+								id="clear-session"
+								class="underline-offset-4 hover:text-ink hover:underline"
+							>
+								Ce n’est pas moi
+							</button>
+							<span class="text-ink/25" aria-hidden="true">
+								·
+							</span>
+							<a
+								href={`mailto:${adminContactEmail}?subject=${encodeURIComponent('Formation Matrice Évolution')}`}
+								class="text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+							>
+								Contacter un administrateur
+							</a>
+						</div>
+					</div>
+				</>
+			)}
+		</div>
+	)
+}
+
+<script
+	define:vars={{
+		funnelFlash,
+		checkoutCancel,
+		magicLinkFailed,
+	}}
+>
+	const tabs = document.querySelectorAll('[data-access-tab]');
+	const panels = document.querySelectorAll('[data-access-panel]');
+
+	function setTab(name) {
+		tabs.forEach((tab) => {
+			const active = tab.dataset.accessTab === name;
+			tab.setAttribute('aria-selected', active ? 'true' : 'false');
+			tab.classList.toggle('bg-ink', active);
+			tab.classList.toggle('text-mist', active);
+			tab.classList.toggle('text-ink-soft', !active);
+		});
+		panels.forEach((panel) => {
+			panel.classList.toggle('hidden', panel.dataset.accessPanel !== name);
+		});
+	}
+
+	tabs.forEach((tab) => {
+		tab.addEventListener('click', () => {
+			const name = tab.dataset.accessTab;
+			if (name) setTab(name);
+		});
+	});
+
+	const clearBtn = document.getElementById('clear-session');
+	clearBtn?.addEventListener('click', async () => {
+		clearBtn.setAttribute('disabled', 'true');
+		try {
+			const response = await fetch('/api/session/clear', { method: 'POST' });
+			if (!response.ok) throw new Error('Session impossible à réinitialiser');
+			window.location.assign('/');
+		} catch {
+			clearBtn.removeAttribute('disabled');
+		}
+	});
+
+	function showFunnelToasts(attempt = 0) {
+		if (typeof window.toast !== 'function') {
+			if (attempt < 20) window.setTimeout(() => showFunnelToasts(attempt + 1), 25);
+			return;
+		}
+		if (funnelFlash) {
+			window.toast(funnelFlash, magicLinkFailed ? 'error' : 'success');
+		}
+		if (checkoutCancel) {
+			window.toast('Paiement annulé. Vous pouvez reprendre quand vous voulez.', 'info');
+		}
+	}
+
+	if (funnelFlash || checkoutCancel) {
+		showFunnelToasts();
+	}
+</script>

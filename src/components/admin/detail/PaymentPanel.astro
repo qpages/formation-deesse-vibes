@@ -1,0 +1,178 @@
+---
+import StatusBadge from '../../ui/StatusBadge.astro';
+import {
+	expandAdminInstallments,
+	type AdminPaymentSummary,
+} from '../../../lib/admin/payments';
+
+interface Props {
+	summary: AdminPaymentSummary;
+	heading?: string;
+}
+
+const { summary, heading } = Astro.props;
+
+const installments = expandAdminInstallments(summary);
+const total = summary.installmentsTotal ?? 1;
+const collected = new Intl.NumberFormat('fr-FR', {
+	style: 'currency',
+	currency: 'EUR',
+}).format(summary.collectedAmountCents / 100);
+const totalLabel =
+	summary.totalAmountCents != null
+		? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(
+				summary.totalAmountCents / 100,
+			)
+		: null;
+const nextDue = summary.nextInstallmentDueAt
+	? new Date(summary.nextInstallmentDueAt).toLocaleDateString('fr-FR')
+	: null;
+const showNextDue =
+	Boolean(nextDue) &&
+	summary.trackingState !== 'termine' &&
+	summary.trackingState !== 'rembourse';
+
+const statusTone = {
+	paid: 'success',
+	open: 'progress',
+	failed: 'action',
+	uncollectible: 'action',
+	void: 'neutral',
+	draft: 'neutral',
+} as const;
+
+function formatDate(iso: string | null, withTime = false) {
+	if (!iso) return null;
+	return new Date(iso).toLocaleString('fr-FR', {
+		dateStyle: 'short',
+		...(withTime ? { timeStyle: 'short' } : {}),
+	});
+}
+---
+
+<section class="space-y-5" id="paiements" aria-labelledby="paiements-heading">
+	{
+		heading ? (
+			<h2 id="paiements-heading" class="font-display text-2xl text-ink">
+				{heading}
+			</h2>
+		) : (
+			<h2 id="paiements-heading" class="sr-only">
+				Paiements
+			</h2>
+		)
+	}
+
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div class="min-w-0">
+			<p class="text-xs font-medium uppercase tracking-[0.12em] text-ink/55">{summary.planLabel}</p>
+			<p class="mt-1 font-display text-2xl leading-none tracking-tight text-ink tabular-nums">
+				{collected}
+				{
+					totalLabel ? (
+						<span class="text-base font-sans font-normal text-ink/35"> / {totalLabel}</span>
+					) : null
+				}
+			</p>
+			<p class="mt-2 text-sm text-ink-soft">
+				{summary.installmentsPaid}/{total} échéance{total > 1 ? 's' : ''}
+				{showNextDue ? ` · prochaine le ${nextDue}` : ''}
+			</p>
+		</div>
+		<StatusBadge tone={summary.trackingTone}>{summary.trackingLabel}</StatusBadge>
+	</div>
+
+	{
+		summary.stripeSubscriptionUrl || summary.stripeScheduleUrl ? (
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+				<span class="text-xs font-medium uppercase tracking-[0.12em] text-ink/55">Stripe</span>
+				{summary.stripeSubscriptionUrl ? (
+					<a
+						href={summary.stripeSubscriptionUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+					>
+						Abonnement
+					</a>
+				) : null}
+				{summary.stripeScheduleUrl ? (
+					<a
+						href={summary.stripeScheduleUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+					>
+						Schedule
+					</a>
+				) : null}
+			</div>
+		) : null
+	}
+
+	<div>
+		<p class="mb-1 text-xs font-medium uppercase tracking-[0.12em] text-ink/55">Échéances</p>
+		{
+			installments.length === 0 ? (
+				<p class="border-t border-dashed border-ink/15 py-6 text-sm text-ink-soft">
+					Aucune échéance enregistrée. Synchronisez le paiement Stripe pour charger le calendrier
+					et les factures.
+				</p>
+			) : (
+				<ul class="divide-y divide-ink/10 border-t border-ink/10">
+					{installments.map((p) => {
+						const paid = formatDate(p.paidAt, true);
+						const due = formatDate(p.dueAt);
+						const meta = paid ? `Payé le ${paid}` : due ? `Échéance ${due}` : 'Date à venir';
+						const tone = statusTone[p.status] ?? 'neutral';
+						const invoiceHref = p.invoicePdfUrl ?? p.hostedInvoiceUrl;
+						const isEstimated = p.id.startsWith('estimated-');
+						return (
+							<li class="flex items-start gap-3 py-3.5">
+								<span class="mt-0.5 w-5 shrink-0 text-xs font-medium text-ink/45 tabular-nums">
+									{p.installmentNumber}
+								</span>
+								<div class="min-w-0 flex-1">
+									<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+										<span class="font-medium text-ink tabular-nums">{p.amountLabel}</span>
+										<StatusBadge tone={tone}>{p.statusLabel}</StatusBadge>
+										{isEstimated ? (
+											<span class="text-xs text-ink/40">estimée</span>
+										) : null}
+									</div>
+									<p class="mt-1 text-sm text-ink-soft">{meta}</p>
+									{p.failureReason ? (
+										<p class="mt-1 text-sm text-blush-deep">{p.failureReason}</p>
+									) : null}
+									{invoiceHref ? (
+										<p class="mt-1.5">
+											<a
+												href={invoiceHref}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+											>
+												{p.invoicePdfUrl ? 'Télécharger la facture' : 'Voir la facture'}
+											</a>
+										</p>
+									) : null}
+								</div>
+								{p.stripeUrl ? (
+									<a
+										href={p.stripeUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="mt-0.5 inline-flex min-h-9 shrink-0 items-center text-xs text-ink/45 underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+										aria-label={`Ouvrir l’échéance ${p.installmentNumber} dans Stripe`}
+									>
+										Stripe
+									</a>
+								) : null}
+							</li>
+						);
+					})}
+				</ul>
+			)
+		}
+	</div>
+</section>

@@ -1,0 +1,75 @@
+---
+import Button from '../../ui/Button.astro';
+
+interface Props {
+	signUrl: string;
+}
+
+const { signUrl } = Astro.props;
+---
+
+<div class="space-y-2">
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+		<div
+			class="flex min-w-0 flex-1 items-stretch overflow-hidden rounded-sm border border-ink/12 transition focus-within:border-gold/50"
+		>
+			<input
+				id="nda-sign-url"
+				type="text"
+				readonly
+				value={signUrl}
+				class="min-w-0 flex-1 bg-transparent px-3.5 py-3 font-sans text-sm text-ink-soft outline-none selection:bg-blush/25"
+			/>
+			<button
+				id="copy-sign-url"
+				type="button"
+				class="shrink-0 border-l border-ink/10 px-4 text-xs font-medium uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-mist"
+				data-copied="false"
+			>
+				<span data-copy-label>Copier</span>
+			</button>
+		</div>
+		<Button
+			href={signUrl}
+			size="lg"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="w-full shrink-0 sm:w-auto"
+		>
+			Signer mon accord
+		</Button>
+	</div>
+	<p id="copy-sign-feedback" class="sr-only" aria-live="polite"></p>
+</div>
+
+<script>
+	const input = document.getElementById('nda-sign-url') as HTMLInputElement | null;
+	const btn = document.getElementById('copy-sign-url');
+	const label = btn?.querySelector<HTMLElement>('[data-copy-label]');
+	const feedback = document.getElementById('copy-sign-feedback');
+
+	async function copyUrl() {
+		if (!input || !btn || !label) return;
+		const value = input.value;
+		try {
+			await navigator.clipboard.writeText(value);
+		} catch {
+			input.select();
+			document.execCommand('copy');
+			input.setSelectionRange(0, 0);
+			input.blur();
+		}
+		btn.dataset.copied = 'true';
+		label.textContent = 'Copié';
+		if (feedback) feedback.textContent = 'Lien copié dans le presse-papiers.';
+		window.setTimeout(() => {
+			btn.dataset.copied = 'false';
+			label.textContent = 'Copier';
+			if (feedback) feedback.textContent = '';
+		}, 2000);
+	}
+
+	btn?.addEventListener('click', () => {
+		void copyUrl();
+	});
+</script>

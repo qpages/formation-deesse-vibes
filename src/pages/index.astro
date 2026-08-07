@@ -1,9 +1,9 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import Section from '../components/ui/Section.astro';
-import Hero from '../components/formation/Hero.astro';
-import AccessPanel from '../components/formation/AccessPanel.astro';
-import Faq from '../components/formation/Faq.astro';
+import Hero from '../components/formation/landing/Hero.astro';
+import AccessPanel from '../components/formation/status/AccessPanel.astro';
+import Faq from '../components/formation/landing/Faq.astro';
 import {
 	createEnrollmentSessionToken,
 	enrollmentCookieOptions,
@@ -20,9 +20,10 @@ import {
 import {
 	confirmPaidCheckout,
 	retrieveCheckoutSession,
-} from '../lib/services/payment';
+} from '../lib/services/payments';
 import { checkoutSuccessFlash, stepStates } from '../lib/status';
-import type { Enrollment } from '../generated/prisma/client';
+import { listPaidInvoiceLinks } from '../lib/admin/payments';
+import type { EnrollmentWithUser } from '../lib/services/enrollment';
 
 export const prerender = false;
 
@@ -31,7 +32,7 @@ const token = url.searchParams.get('token');
 const sessionId = url.searchParams.get('session_id');
 const checkout = url.searchParams.get('checkout');
 
-let enrollment: Enrollment | null = null;
+let enrollment: EnrollmentWithUser | null = null;
 let flash: string | null = null;
 let setCookie: string | null = null;
 
@@ -68,12 +69,12 @@ try {
 	// Filet de sécurité : si Stripe a encaissé mais le webhook a loupé
 	const checkoutToSync =
 		sessionId ??
-		(enrollment?.status === 'paiement_en_attente'
+		(enrollment?.collectionStatus === 'pending'
 			? enrollment.stripeCheckoutSessionId
 			: null);
 	if (
 		checkoutToSync &&
-		(!enrollment || enrollment.status === 'paiement_en_attente')
+		(!enrollment || enrollment.collectionStatus === 'pending')
 	) {
 		try {
 			const stripeSession = await retrieveCheckoutSession(checkoutToSync);
@@ -94,7 +95,11 @@ try {
 	}
 
 	if (checkout === 'success' && enrollment) {
-		flash = checkoutSuccessFlash(enrollment.status);
+		flash = checkoutSuccessFlash({
+			collectionStatus: enrollment.collectionStatus,
+			contractStatus: enrollment.contractStatus,
+			accessStatus: enrollment.accessStatus,
+		});
 	}
 } catch (error) {
 	console.error('[index] enrollment lookup', error);
@@ -104,23 +109,36 @@ if (setCookie) {
 	Astro.response.headers.append('Set-Cookie', setCookie);
 }
 
+const checkoutCancel = checkout === 'cancel';
+
 const awaitingWebhook =
-	enrollment?.status === 'paiement_en_attente' && Boolean(enrollment.stripeCheckoutSessionId);
+	!checkoutCancel &&
+	enrollment?.collectionStatus === 'pending' &&
+	Boolean(enrollment.stripeCheckoutSessionId);
 
 const showFunnel =
 	!enrollment ||
-	enrollment.status === 'rembourse' ||
-	enrollment.status === 'acces_retire' ||
-	(enrollment.status === 'paiement_en_attente' && !enrollment.stripeCheckoutSessionId);
+	enrollment.collectionStatus === 'refunded' ||
+	enrollment.accessStatus === 'revoked' ||
+	(enrollment.collectionStatus === 'pending' && !enrollment.stripeCheckoutSessionId);
 
-const showTracking = Boolean(enrollment) && (!showFunnel || awaitingWebhook);
+const showTracking =
+	!checkoutCancel && Boolean(enrollment) && (!showFunnel || awaitingWebhook);
 
 const steps = enrollment
-	? stepStates(enrollment.status)
+	? stepStates({
+			collectionStatus: enrollment.collectionStatus,
+			contractStatus: enrollment.contractStatus,
+			accessStatus: enrollment.accessStatus,
+		})
 	: { paiement: 'a_faire' as const, nda: 'a_faire' as const, acces: 'a_faire' as const };
 
 let ndaSignUrl: string | null = null;
-if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === 'paiement_confirme')) {
+if (
+	enrollment &&
+	enrollment.collectionStatus !== 'pending' &&
+	(enrollment.contractStatus === 'pending' || enrollment.contractStatus === 'sent')
+) {
 	try {
 		ndaSignUrl = await resolveNdaSignUrl(enrollment);
 	} catch {
@@ -128,8 +146,13 @@ if (enrollment && (enrollment.status === 'nda_envoye' || enrollment.status === '
 	}
 }
 
+const invoiceLinks =
+	enrollment && enrollment.collectionStatus !== 'pending'
+		? await listPaidInvoiceLinks(enrollment.id)
+		: [];
+
 const magicLinkFailed = Boolean(token && !enrollment);
-const sectionDescription = 'Suivez votre parcours en temps réel : paiement, signature, puis accès à Teachizy.';
+const sectionDescription = 'Suivez votre parcours en temps réel.';
 ---
 
 <MarketingLayout>
@@ -147,8 +170,9 @@ const sectionDescription = 'Suivez votre parcours en temps réel : paiement, sig
 			enrollment={enrollment}
 			steps={steps}
 			ndaSignUrl={ndaSignUrl}
+			invoiceLinks={invoiceLinks}
 			flash={flash}
-			checkoutCancel={checkout === 'cancel'}
+			checkoutCancel={checkoutCancel}
 			magicLinkFailed={magicLinkFailed}
 			defaultTab={magicLinkFailed ? 'retrouver' : 'nouveau'}
 		/>
