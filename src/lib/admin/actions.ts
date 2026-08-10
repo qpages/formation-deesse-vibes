@@ -61,7 +61,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Réparation',
 		title: 'Synchroniser le paiement',
 		description:
-			'Lire la session Stripe de {name}, recalculer la collection, puis réévaluer l’accès. Peut enchaîner la création NDA si éligible.',
+			'Lire la session Stripe de {name} et aligner la collection en base (sync lecture). Ne crée pas le NDA — utiliser Recréer un lien Yousign ensuite si besoin.',
 		confirm: 'Synchroniser',
 	},
 	{
@@ -71,7 +71,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Réparation',
 		title: 'Synchroniser Yousign',
 		description:
-			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus en base (sync lecture).',
+			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus en base (sync lecture). N’invite pas Teachizy — utiliser Inviter à la formation ensuite.',
 		confirm: 'Synchroniser',
 	},
 	{

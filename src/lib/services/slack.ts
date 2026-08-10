@@ -5,6 +5,7 @@ export type OpsSeverity = 'info' | 'warn' | 'critical';
 export type OpsKind =
 	| 'checkout.created'
 	| 'payment.first_confirmed'
+	| 'payment.installment_paid'
 	| 'collection.past_due'
 	| 'collection.paid'
 	| 'collection.refunded'

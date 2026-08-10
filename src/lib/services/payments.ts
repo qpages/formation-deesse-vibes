@@ -54,6 +54,28 @@ const COLLECTION_NOTIFY: Partial<
 	},
 };
 
+async function notifyInstallmentPaid(
+	enrollment: EnrollmentWithUser,
+	installmentNumber: number,
+	amountCents: number,
+) {
+	const total = enrollment.installmentsTotal ?? 1;
+	await notifyOps({
+		kind: 'payment.installment_paid',
+		severity: 'info',
+		title: `Échéance ${installmentNumber}/${total} payée`,
+		enrollmentId: enrollment.id,
+		email: enrollment.user.email,
+		detail: [
+			`${enrollment.user.firstName} ${enrollment.user.lastName}`,
+			enrollment.paymentPlan ? `plan=${enrollment.paymentPlan}` : null,
+			`amount=${amountCents}`,
+		]
+			.filter(Boolean)
+			.join(' | '),
+	});
+}
+
 export { retrieveCheckoutSession } from '../stripe';
 
 export class CheckoutAlreadyPaidError extends Error {
@@ -322,7 +344,7 @@ export async function syncStripeInvoice(
 	const subscriptionId = subscriptionIdFromInvoice(invoice);
 
 	const prisma = getPrisma();
-	let enrollment: Enrollment | null = null;
+	let enrollment: EnrollmentWithUser | null = null;
 
 	if (options.enrollmentId) {
 		enrollment = await findEnrollmentById(options.enrollmentId);
@@ -354,6 +376,17 @@ export async function syncStripeInvoice(
 	const paymentIntentId = paymentIntentIdFromInvoice(invoice);
 	const fields = paymentFieldsFromInvoice(invoice, status, failureReason, paymentIntentId);
 
+	const previous = await prisma.payment.findUnique({
+		where: {
+			enrollmentId_installmentNumber: {
+				enrollmentId: enrollment.id,
+				installmentNumber,
+			},
+		},
+		select: { status: true },
+	});
+	const becamePaid = status === 'paid' && previous?.status !== 'paid';
+
 	await prisma.payment.upsert({
 		where: {
 			enrollmentId_installmentNumber: {
@@ -371,11 +404,15 @@ export async function syncStripeInvoice(
 
 	await recomputeEnrollmentCollectionState(enrollment.id);
 
+	if (becamePaid) {
+		await notifyInstallmentPaid(enrollment, installmentNumber, fields.amountCents);
+	}
+
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
 
 async function syncOneTimePaymentFromCheckout(
-	enrollment: Enrollment,
+	enrollment: EnrollmentWithUser,
 	session: Stripe.Checkout.Session,
 ) {
 	const invoiceId =
@@ -390,6 +427,17 @@ async function syncOneTimePaymentFromCheckout(
 	const prisma = getPrisma();
 	const paymentIntentId = paymentIntentIdFromSession(session);
 	const amount = session.amount_total ?? enrollment.amountCents;
+
+	const previous = await prisma.payment.findUnique({
+		where: {
+			enrollmentId_installmentNumber: {
+				enrollmentId: enrollment.id,
+				installmentNumber: 1,
+			},
+		},
+		select: { status: true },
+	});
+	const becamePaid = previous?.status !== 'paid';
 
 	await prisma.payment.upsert({
 		where: {
@@ -417,6 +465,10 @@ async function syncOneTimePaymentFromCheckout(
 	});
 
 	await recomputeEnrollmentCollectionState(enrollment.id);
+
+	if (becamePaid) {
+		await notifyInstallmentPaid(enrollment, 1, amount);
+	}
 }
 
 async function syncSubscriptionCheckout(

@@ -2,15 +2,23 @@ import type { Enrollment } from '../../generated/prisma/client';
 import { inngest } from '../inngest/client';
 import { canResendNda, findEnrollmentById } from '../services/enrollment';
 import { syncPaymentFromStripe } from '../services/payments';
-import { notifyOps } from '../services/slack';
+import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncYousignStatus } from '../services/yousign-events';
-import type { AdminActionKey } from './actions';
+import { ADMIN_ACTIONS, type AdminActionKey } from './actions';
 
 export type AdminDispatchResult =
 	| { ok: true; message?: string; toast?: 'success' | 'info' }
 	| { ok: false; error: string; status?: number };
 
 type Handler = (enrollment: Enrollment) => Promise<AdminDispatchResult>;
+
+const ADMIN_NOTIFY_SEVERITY: Record<AdminActionKey, OpsSeverity> = {
+	resend_nda: 'info',
+	retrigger_teachizy: 'info',
+	sync_payment: 'info',
+	sync_yousign: 'info',
+	recreate_nda: 'warn',
+};
 
 const handlers = {
 	async sync_payment(enrollment) {
@@ -26,7 +34,7 @@ const handlers = {
 				status: 400,
 			};
 		}
-		// syncPaymentFromStripe / confirmPaidCheckout déjà appellent applyAccessPolicy
+		// Pur sync lecture Stripe → DB. Pas d’event NDA (suite = Recréer).
 		return { ok: true };
 	},
 
@@ -88,22 +96,39 @@ const handlers = {
 			name: 'admin/recreate-nda',
 			data: { enrollmentId: enrollment.id },
 		});
-		const withUser = await findEnrollmentById(enrollment.id);
-		await notifyOps({
-			kind: 'admin.action',
-			severity: 'warn',
-			title: 'Admin: recréer NDA',
-			enrollmentId: enrollment.id,
-			email: withUser?.user.email,
-			detail: 'action=recreate_nda',
-		});
 		return { ok: true };
 	},
 } satisfies Record<AdminActionKey, Handler>;
+
+async function notifyAdminAction(
+	action: AdminActionKey,
+	enrollment: Enrollment,
+	result: Extract<AdminDispatchResult, { ok: true }>,
+) {
+	const def = ADMIN_ACTIONS.find((a) => a.action === action);
+	const withUser = await findEnrollmentById(enrollment.id);
+	await notifyOps({
+		kind: 'admin.action',
+		severity: ADMIN_NOTIFY_SEVERITY[action],
+		title: `Admin: ${def?.title ?? action}`,
+		enrollmentId: enrollment.id,
+		email: withUser?.user.email,
+		detail: [
+			`action=${action}`,
+			result.message ? `note=${result.message}` : null,
+		]
+			.filter(Boolean)
+			.join(' | '),
+	});
+}
 
 export async function dispatchAdminAction(
 	action: AdminActionKey,
 	enrollment: Enrollment,
 ): Promise<AdminDispatchResult> {
-	return handlers[action](enrollment);
+	const result = await handlers[action](enrollment);
+	if (result.ok) {
+		await notifyAdminAction(action, enrollment, result);
+	}
+	return result;
 }

@@ -65,6 +65,16 @@ function extractReason(payload: YousignWebhookPayload) {
 	);
 }
 
+function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date()) {
+	const name = `${firstName} ${lastName}`.trim() || 'Un acheteur';
+	const when = at.toLocaleString('fr-FR', {
+		dateStyle: 'long',
+		timeStyle: 'short',
+		timeZone: 'Europe/Paris',
+	});
+	return `${name} a signé l'accord de confidentialité le ${when}`;
+}
+
 export function isHandledYousignEventType(eventType: string) {
 	return eventType === 'signature_request.done' || MONITOR_EVENTS.has(eventType);
 }
@@ -92,22 +102,27 @@ export async function syncYousignStatus(
 
 	const becameSigned =
 		yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
+	// Rattrapage : DB déjà signed (sync avant Slack / webhook raté) mais Teachizy pas encore invité.
+	const catchUpSignedNotify =
+		yousignStatus === 'done' &&
+		enrollment.contractStatus === 'signed' &&
+		!enrollment.teachizyInvitedAt;
 
 	await updateEnrollmentYousignMirror(enrollmentId, {
 		yousignStatus,
 		...(yousignStatus === 'done' ? { contractStatus: 'signed' as const } : {}),
 	});
 
-	if (becameSigned) {
+	// Pur sync : miroir DB (+ Slack). Pas d’Inngest — suite via boutons Inviter / Recréer.
+	if (becameSigned || catchUpSignedNotify) {
 		await notifyOps({
 			kind: 'nda.signed',
 			severity: 'info',
-			title: 'NDA signé',
+			title: formatNdaSignedTitle(enrollment.user.firstName, enrollment.user.lastName),
 			enrollmentId,
 			email: enrollment.user.email,
-			detail: `sync Yousign → ${yousignStatus}`,
+			detail: catchUpSignedNotify && !becameSigned ? 'rattrapage sync admin' : undefined,
 		});
-		await applyAccessPolicy(enrollmentId);
 	}
 
 	return { ok: true, yousignStatus };
@@ -144,17 +159,21 @@ export async function handleYousignProviderEvent(input: {
 			contractStatus: 'signed',
 		});
 
-		await applyAccessPolicy(enrollment.id);
-
+		// Slack avant Teachizy / access policy : la notif signature ne dépend pas de l'invite.
 		if (becameSigned) {
 			await notifyOps({
 				kind: 'nda.signed',
 				severity: 'info',
-				title: 'NDA signé',
+				title: formatNdaSignedTitle(
+					enrollment.user.firstName,
+					enrollment.user.lastName,
+				),
 				enrollmentId: enrollment.id,
 				email: enrollment.user.email,
 			});
 		}
+
+		await applyAccessPolicy(enrollment.id);
 
 		await inngest.send({
 			name: 'yousign/signature.done',
