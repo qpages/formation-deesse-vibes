@@ -5,7 +5,7 @@ import {
 	persistNdaDraftRequestId,
 	persistNdaProvisioned,
 } from '../services/enrollment';
-import { alertFinalFailure } from '../services/slack';
+import { alertFinalFailure, notifyOps } from '../services/slack';
 import {
 	activateNdaRequest,
 	createNdaDraft,
@@ -79,6 +79,17 @@ export const createNdaAfterPayment = inngest.createFunction(
 			await persistNdaProvisioned(enrollment.id, {
 				requestId: nda.requestId,
 				signerId: nda.signerId,
+			});
+		});
+
+		await step.run('notify-nda-sent', async () => {
+			await notifyOps({
+				kind: 'nda.sent',
+				severity: 'info',
+				title: isRecreate ? 'NDA recréé et envoyé' : 'NDA envoyé',
+				enrollmentId: enrollment.id,
+				email: enrollment.user.email,
+				detail: `requestId=${nda.requestId}`,
 			});
 		});
 

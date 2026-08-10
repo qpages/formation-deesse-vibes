@@ -3,6 +3,7 @@ import { isOverdueForAccess } from '../enrollment-gates';
 import { getPrisma } from '../prisma';
 import { inngest } from '../inngest/client';
 import { findEnrollmentForAccessPolicy } from './enrollment';
+import { notifyOps } from './slack';
 
 export type AccessDecision =
 	| { shouldHaveAccess: true; reason: 'ELIGIBLE' }
@@ -134,8 +135,24 @@ export async function applyAccessPolicy(enrollmentId: string): Promise<{
 		emitted = 'grant';
 	} else if (next === 'suspended' && previous === 'active') {
 		emitted = 'suspend';
+		await notifyOps({
+			kind: 'access.suspended',
+			severity: 'warn',
+			title: 'Accès Teachizy suspendu',
+			enrollmentId,
+			email: enrollment.user.email,
+			detail: `${previous} → ${next} (${decision.reason})`,
+		});
 	} else if (next === 'revoked') {
 		emitted = 'revoke';
+		await notifyOps({
+			kind: 'access.revoked',
+			severity: 'critical',
+			title: 'Accès Teachizy révoqué',
+			enrollmentId,
+			email: enrollment.user.email,
+			detail: `${previous} → ${next} (${decision.reason})`,
+		});
 	}
 
 	return { decision, previous, next, emitted };

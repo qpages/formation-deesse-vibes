@@ -1,5 +1,6 @@
 import { getPrisma } from '../prisma';
 import { applyAccessPolicy } from '../services/access';
+import { notifyOps } from '../services/slack';
 import { inngest } from './client';
 
 /** Command: ré-applique applyAccessPolicy (cron léger ou admin). */
@@ -44,6 +45,17 @@ export const reconcileEnrollments = inngest.createFunction(
 
 		for (const id of ids) {
 			await step.run(`reconcile-${id}`, () => applyAccessPolicy(id));
+		}
+
+		if (ids.length > 0) {
+			await step.run('notify-reconcile', () =>
+				notifyOps({
+					kind: 'ops.reconcile_issues',
+					severity: 'warn',
+					title: 'Reconcile: dossiers incohérents corrigés',
+					detail: `count=${ids.length}`,
+				}),
+			);
 		}
 
 		return { ok: true, count: ids.length };

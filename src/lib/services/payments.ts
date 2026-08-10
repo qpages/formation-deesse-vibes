@@ -23,6 +23,7 @@ import {
 	findEnrollmentBySubscriptionId,
 	type EnrollmentWithUser,
 } from './enrollment';
+import { notifyOps, type OpsKind, type OpsSeverity } from './slack';
 import {
 	createCheckoutSession,
 	ensureSubscriptionSchedule,
@@ -32,6 +33,48 @@ import {
 	retrieveCheckoutSession,
 	retrieveSubscription,
 } from '../stripe';
+
+const COLLECTION_NOTIFY: Partial<
+	Record<CollectionStatus, { kind: OpsKind; severity: OpsSeverity; title: string }>
+> = {
+	past_due: {
+		kind: 'collection.past_due',
+		severity: 'warn',
+		title: 'Collection en retard',
+	},
+	paid: {
+		kind: 'collection.paid',
+		severity: 'info',
+		title: 'Collection soldée',
+	},
+	refunded: {
+		kind: 'collection.refunded',
+		severity: 'warn',
+		title: 'Collection remboursée',
+	},
+};
+
+async function notifyInstallmentPaid(
+	enrollment: EnrollmentWithUser,
+	installmentNumber: number,
+	amountCents: number,
+) {
+	const total = enrollment.installmentsTotal ?? 1;
+	await notifyOps({
+		kind: 'payment.installment_paid',
+		severity: 'info',
+		title: `Échéance ${installmentNumber}/${total} payée`,
+		enrollmentId: enrollment.id,
+		email: enrollment.user.email,
+		detail: [
+			`${enrollment.user.firstName} ${enrollment.user.lastName}`,
+			enrollment.paymentPlan ? `plan=${enrollment.paymentPlan}` : null,
+			`amount=${amountCents}`,
+		]
+			.filter(Boolean)
+			.join(' | '),
+	});
+}
 
 export { retrieveCheckoutSession } from '../stripe';
 
@@ -211,12 +254,10 @@ export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 			.filter(Boolean)
 			.sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
 
+	const previous = enrollment.collectionStatus;
 	let collectionStatus: CollectionStatus;
-	if (
-		enrollment.collectionStatus === 'refunded' ||
-		enrollment.collectionStatus === 'canceled'
-	) {
-		collectionStatus = enrollment.collectionStatus;
+	if (previous === 'refunded' || previous === 'canceled') {
+		collectionStatus = previous;
 	} else if (hasOpenOrFailedPayments(payments) && installmentsPaid >= 1) {
 		collectionStatus = 'past_due';
 	} else if (failedOrOpen.some((p) => p.status === 'failed')) {
@@ -250,6 +291,18 @@ export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 			fullyPaidAt,
 		},
 	});
+
+	if (previous !== collectionStatus) {
+		const notify = COLLECTION_NOTIFY[collectionStatus];
+		if (notify) {
+			await notifyOps({
+				...notify,
+				enrollmentId,
+				email: enrollment.user.email,
+				detail: `${previous} → ${collectionStatus}`,
+			});
+		}
+	}
 
 	await applyAccessPolicy(enrollmentId);
 }
@@ -291,7 +344,7 @@ export async function syncStripeInvoice(
 	const subscriptionId = subscriptionIdFromInvoice(invoice);
 
 	const prisma = getPrisma();
-	let enrollment: Enrollment | null = null;
+	let enrollment: EnrollmentWithUser | null = null;
 
 	if (options.enrollmentId) {
 		enrollment = await findEnrollmentById(options.enrollmentId);
@@ -323,6 +376,17 @@ export async function syncStripeInvoice(
 	const paymentIntentId = paymentIntentIdFromInvoice(invoice);
 	const fields = paymentFieldsFromInvoice(invoice, status, failureReason, paymentIntentId);
 
+	const previous = await prisma.payment.findUnique({
+		where: {
+			enrollmentId_installmentNumber: {
+				enrollmentId: enrollment.id,
+				installmentNumber,
+			},
+		},
+		select: { status: true },
+	});
+	const becamePaid = status === 'paid' && previous?.status !== 'paid';
+
 	await prisma.payment.upsert({
 		where: {
 			enrollmentId_installmentNumber: {
@@ -340,11 +404,15 @@ export async function syncStripeInvoice(
 
 	await recomputeEnrollmentCollectionState(enrollment.id);
 
+	if (becamePaid) {
+		await notifyInstallmentPaid(enrollment, installmentNumber, fields.amountCents);
+	}
+
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
 
 async function syncOneTimePaymentFromCheckout(
-	enrollment: Enrollment,
+	enrollment: EnrollmentWithUser,
 	session: Stripe.Checkout.Session,
 ) {
 	const invoiceId =
@@ -359,6 +427,17 @@ async function syncOneTimePaymentFromCheckout(
 	const prisma = getPrisma();
 	const paymentIntentId = paymentIntentIdFromSession(session);
 	const amount = session.amount_total ?? enrollment.amountCents;
+
+	const previous = await prisma.payment.findUnique({
+		where: {
+			enrollmentId_installmentNumber: {
+				enrollmentId: enrollment.id,
+				installmentNumber: 1,
+			},
+		},
+		select: { status: true },
+	});
+	const becamePaid = previous?.status !== 'paid';
 
 	await prisma.payment.upsert({
 		where: {
@@ -386,6 +465,10 @@ async function syncOneTimePaymentFromCheckout(
 	});
 
 	await recomputeEnrollmentCollectionState(enrollment.id);
+
+	if (becamePaid) {
+		await notifyInstallmentPaid(enrollment, 1, amount);
+	}
 }
 
 async function syncSubscriptionCheckout(
@@ -469,6 +552,18 @@ export async function startCheckout(input: {
 	});
 
 	await attachStripeCheckoutSession(enrollment.id, session.id);
+
+	if (!prev) {
+		const { user } = enrollment;
+		await notifyOps({
+			kind: 'checkout.created',
+			severity: 'info',
+			title: 'Checkout ouvert',
+			enrollmentId: enrollment.id,
+			email: user.email,
+			detail: `${user.firstName} ${user.lastName} | plan=${paymentPlan}`,
+		});
+	}
 
 	if (!session.url) {
 		throw new Error('Checkout sans url');
@@ -559,6 +654,22 @@ export async function confirmPaidCheckout(
 	}
 
 	await applyAccessPolicy(enrollmentId);
+
+	if (transitioned) {
+		await notifyOps({
+			kind: 'payment.first_confirmed',
+			severity: 'info',
+			title: 'Premier paiement confirmé',
+			enrollmentId,
+			email: fresh.user.email,
+			detail: [
+				`${fresh.user.firstName} ${fresh.user.lastName}`,
+				fresh.paymentPlan ? `plan=${fresh.paymentPlan}` : null,
+			]
+				.filter(Boolean)
+				.join(' | '),
+		});
+	}
 
 	return {
 		ok: true,

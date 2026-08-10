@@ -3,7 +3,7 @@ import {
 	findEnrollmentByIdOrThrow,
 	updateEnrollmentYousignMirror,
 } from '../services/enrollment';
-import { alertFinalFailure } from '../services/slack';
+import { alertFinalFailure, notifyOps } from '../services/slack';
 import { inviteToTeachizy } from '../teachizy';
 import { getPrisma } from '../prisma';
 import { inngest } from './client';
@@ -80,6 +80,17 @@ export const grantTeachizyAccess = inngest.createFunction(
 					accessSuspendedAt: null,
 					teachizyInvitedAt: fresh.teachizyInvitedAt ?? new Date(),
 				},
+			});
+		});
+
+		await step.run('notify-access-active', async () => {
+			await notifyOps({
+				kind: 'access.active',
+				severity: 'info',
+				title: 'Accès Teachizy actif',
+				enrollmentId: fresh.id,
+				email: fresh.user.email,
+				detail: `${fresh.user.firstName} ${fresh.user.lastName}`,
 			});
 		});
 

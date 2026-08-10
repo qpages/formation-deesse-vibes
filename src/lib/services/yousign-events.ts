@@ -9,7 +9,7 @@ import {
 	findEnrollmentByYousignRequestOrExternalId,
 	updateEnrollmentYousignMirror,
 } from './enrollment';
-import { alertFinalFailure } from './slack';
+import { notifyOps } from './slack';
 
 const MONITOR_EVENTS = new Set([
 	'signature_request.declined',
@@ -65,6 +65,16 @@ function extractReason(payload: YousignWebhookPayload) {
 	);
 }
 
+function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date()) {
+	const name = `${firstName} ${lastName}`.trim() || 'Un acheteur';
+	const when = at.toLocaleString('fr-FR', {
+		dateStyle: 'long',
+		timeStyle: 'short',
+		timeZone: 'Europe/Paris',
+	});
+	return `${name} a signé l'accord de confidentialité le ${when}`;
+}
+
 export function isHandledYousignEventType(eventType: string) {
 	return eventType === 'signature_request.done' || MONITOR_EVENTS.has(eventType);
 }
@@ -90,13 +100,29 @@ export async function syncYousignStatus(
 		return { ok: false, reason: 'unmapped_status', detail: remote.status };
 	}
 
+	const becameSigned =
+		yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
+	// Rattrapage : DB déjà signed (sync avant Slack / webhook raté) mais Teachizy pas encore invité.
+	const catchUpSignedNotify =
+		yousignStatus === 'done' &&
+		enrollment.contractStatus === 'signed' &&
+		!enrollment.teachizyInvitedAt;
+
 	await updateEnrollmentYousignMirror(enrollmentId, {
 		yousignStatus,
 		...(yousignStatus === 'done' ? { contractStatus: 'signed' as const } : {}),
 	});
 
-	if (yousignStatus === 'done') {
-		await applyAccessPolicy(enrollmentId);
+	// Pur sync : miroir DB (+ Slack). Pas d’Inngest — suite via boutons Inviter / Recréer.
+	if (becameSigned || catchUpSignedNotify) {
+		await notifyOps({
+			kind: 'nda.signed',
+			severity: 'info',
+			title: formatNdaSignedTitle(enrollment.user.firstName, enrollment.user.lastName),
+			enrollmentId,
+			email: enrollment.user.email,
+			detail: catchUpSignedNotify && !becameSigned ? 'rattrapage sync admin' : undefined,
+		});
 	}
 
 	return { ok: true, yousignStatus };
@@ -126,10 +152,26 @@ export async function handleYousignProviderEvent(input: {
 			throw new Error(`Enrollment introuvable pour Yousign ${requestId}`);
 		}
 
+		const becameSigned = enrollment.contractStatus !== 'signed';
+
 		await updateEnrollmentYousignMirror(enrollment.id, {
 			yousignStatus: 'done',
 			contractStatus: 'signed',
 		});
+
+		// Slack avant Teachizy / access policy : la notif signature ne dépend pas de l'invite.
+		if (becameSigned) {
+			await notifyOps({
+				kind: 'nda.signed',
+				severity: 'info',
+				title: formatNdaSignedTitle(
+					enrollment.user.firstName,
+					enrollment.user.lastName,
+				),
+				enrollmentId: enrollment.id,
+				email: enrollment.user.email,
+			});
+		}
 
 		await applyAccessPolicy(enrollment.id);
 
@@ -174,11 +216,15 @@ export async function handleYousignProviderEvent(input: {
 					? 'Action admin: Recréer un lien Yousign ou rembourser'
 					: 'Action admin: Renvoyer le lien Yousign (si expiré) ou Recréer un lien Yousign / rembourser';
 
-		await alertFinalFailure({
+		await notifyOps({
+			kind: 'nda.monitor',
+			severity: eventName.includes('error') || eventName.includes('deleted')
+				? 'critical'
+				: 'warn',
 			title: `Yousign ${eventName}`,
 			enrollmentId: enrollment?.id,
 			email: enrollment?.user.email,
-			error: [
+			detail: [
 				requestId ? `requestId=${requestId}` : 'requestId manquant',
 				reason ? `raison=${reason}` : null,
 				actionHint,
