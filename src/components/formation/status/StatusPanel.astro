@@ -72,7 +72,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 			enrollment.contractStatus === 'pending' &&
 			!showSignCard && (
 			<p class="text-ink-soft">
-				Paiement confirmé. Votre lien de signature apparaît ici dès qu’il est prêt.
+				Votre paiement est bien confirmé. Le lien de signature apparaît ici dès qu’il est prêt.
 			</p>
 		)
 	}
@@ -99,7 +99,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		!showSignCard && (action.kind === 'refresh' || action.kind === 'open_platform') && (
 			<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
 				{action.kind === 'refresh' && (
-					<Button href="/" size="lg" variant="primary">
+					<Button href="/#acces" size="lg" variant="primary" id="status-refresh">
 						{action.label}
 					</Button>
 				)}
@@ -120,6 +120,12 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 </div>
 
 <script>
+	document.getElementById('status-refresh')?.addEventListener('click', (event) => {
+		event.preventDefault();
+		window.location.hash = 'acces';
+		window.location.reload();
+	});
+
 	const panel = document.getElementById('status-panel');
 	if (panel?.dataset.poll === 'true') {
 		const initialFingerprint = panel.dataset.fingerprint ?? '';
