@@ -98,6 +98,14 @@ export async function persistNdaDraftRequestId(enrollmentId: string, requestId: 
 	});
 }
 
+/** "camille" / "MArtin" / "jean-pierre" → "Camille" / "Martin" / "Jean-Pierre" */
+function normalizePersonName(value: string): string {
+	return value
+		.trim()
+		.toLowerCase()
+		.replace(/(^|[\s'-])(\p{L})/gu, (_, sep: string, letter: string) => sep + letter.toUpperCase());
+}
+
 export async function createPendingEnrollment(input: {
 	email: string;
 	firstName: string;
@@ -108,8 +116,8 @@ export async function createPendingEnrollment(input: {
 	consentPrivacy: boolean;
 }) {
 	const email = input.email.trim().toLowerCase();
-	const firstName = input.firstName.trim();
-	const lastName = input.lastName.trim();
+	const firstName = normalizePersonName(input.firstName);
+	const lastName = normalizePersonName(input.lastName);
 	const prisma = getPrisma();
 
 	const existingPaid = await prisma.enrollment.findFirst({
