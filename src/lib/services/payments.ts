@@ -13,7 +13,8 @@ import {
 	stripePriceIdForPlan,
 	type PaymentPlanId,
 } from '../payment-plans';
-import { hasOpenOrFailedPayments } from '../enrollment-gates';
+import { hasOpenOrFailedPayments, isPaidEnough } from '../enrollment-gates';
+import { inngest } from '../inngest/client';
 import { applyAccessPolicy } from './access';
 import {
 	attachStripeCheckoutSession,
@@ -33,6 +34,7 @@ import {
 	retrieveCheckoutSession,
 	retrieveSubscription,
 } from '../stripe';
+import { isNdaFullyProvisioned } from '../yousign';
 
 const COLLECTION_NOTIFY: Partial<
 	Record<CollectionStatus, { kind: OpsKind; severity: OpsSeverity; title: string }>
@@ -93,6 +95,30 @@ export type ConfirmCheckoutResult =
 			contractStatus: ContractStatus;
 	  }
 	| { ok: false; reason: string };
+
+/**
+ * Post-condition unique : paiement OK + NDA manquant → enqueue création Yousign.
+ * Idempotent (le job Inngest skip si déjà provisionné). Tous les chemins
+ * (webhook, retour Checkout, sync admin) doivent passer par ici.
+ */
+export async function ensureNdaAfterPayment(
+	enrollmentId: string,
+	sourceId: string,
+): Promise<void> {
+	const enrollment = await findEnrollmentById(enrollmentId);
+	if (!enrollment) return;
+	if (!isPaidEnough(enrollment.collectionStatus)) return;
+	if (enrollment.contractStatus !== 'pending' && enrollment.contractStatus !== 'sent') {
+		return;
+	}
+	if (isNdaFullyProvisioned(enrollment)) return;
+
+	await inngest.send({
+		id: `nda-after-payment:${enrollmentId}`,
+		name: 'stripe/payment.confirmed',
+		data: { enrollmentId, stripeEventId: sourceId },
+	});
+}
 
 /** Mark enrollment paid when still pending collection; returns false if already confirmed. */
 async function updateEnrollmentPaymentConfirmed(
@@ -671,6 +697,9 @@ export async function confirmPaidCheckout(
 		});
 	}
 
+	// Même post-condition quel que soit l’appelant (webhook / page / admin).
+	await ensureNdaAfterPayment(enrollmentId, session.id);
+
 	return {
 		ok: true,
 		enrollmentId,
@@ -766,8 +795,9 @@ export async function syncAllSubscriptionInvoices(enrollmentId: string) {
 }
 
 /**
- * Répare une inscription bloquée en vérifiant la session Stripe (money only).
- * NDA / Teachizy = jobs Inngest séparés (création NDA / invitation formation).
+ * Répare une inscription bloquée via Stripe.
+ * Confirme le paiement si besoin, puis enqueue le NDA s’il manque encore
+ * (même post-condition que le webhook — pas de chemin « money only » divergent).
  */
 export async function syncPaymentFromStripe(enrollmentId: string): Promise<ConfirmCheckoutResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);
@@ -781,6 +811,10 @@ export async function syncPaymentFromStripe(enrollmentId: string): Promise<Confi
 		} else {
 			await recomputeEnrollmentCollectionState(enrollmentId);
 		}
+		await ensureNdaAfterPayment(
+			enrollmentId,
+			enrollment.stripeCheckoutSessionId ?? `admin-sync:${enrollmentId}`,
+		);
 		return {
 			ok: true,
 			enrollmentId,

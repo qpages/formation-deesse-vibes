@@ -15,10 +15,12 @@ import {
 } from '../services/enrollment';
 import {
 	confirmPaidCheckout,
+	ensureNdaAfterPayment,
 	listPaidInvoiceLinks,
 	retrieveCheckoutSession,
 } from '../services/payments';
 import { checkoutSuccessFlash, stepStates } from '../status';
+import { isNdaFullyProvisioned } from '../yousign';
 
 export type HomeEnrollmentView = {
 	enrollment: EnrollmentWithUser | null;
@@ -97,6 +99,22 @@ export async function resolveHomeEnrollment(input: {
 				}
 			} catch (error) {
 				console.error('[index] checkout reconcile', error);
+			}
+		}
+
+		// Filet 2 : payé en DB, NDA jamais enqueue (ex. confirm avant ce fix)
+		if (
+			enrollment &&
+			isAwaitingNda(enrollment) &&
+			!isNdaFullyProvisioned(enrollment)
+		) {
+			try {
+				await ensureNdaAfterPayment(
+					enrollment.id,
+					enrollment.stripeCheckoutSessionId ?? `page-reconcile:${enrollment.id}`,
+				);
+			} catch (error) {
+				console.error('[index] nda reconcile', error);
 			}
 		}
 

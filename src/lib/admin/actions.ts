@@ -61,7 +61,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Réparation',
 		title: 'Synchroniser le paiement',
 		description:
-			'Lire la session Stripe de {name} et aligner la collection en base (sync lecture). Ne crée pas le NDA — utiliser Recréer un lien Yousign ensuite si besoin.',
+			'Lire la session Stripe de {name}, aligner la collection en base, et lancer la création du NDA s’il manque encore.',
 		confirm: 'Synchroniser',
 	},
 	{
@@ -71,7 +71,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Réparation',
 		title: 'Synchroniser Yousign',
 		description:
-			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus en base (sync lecture). N’invite pas Teachizy — utiliser Inviter à la formation ensuite.',
+			'Lire le statut Yousign de {name}, aligner contractStatus / yousignStatus, et inviter Teachizy si le NDA est signé.',
 		confirm: 'Synchroniser',
 	},
 	{
@@ -223,9 +223,9 @@ export function recommendedActionReason(
 		case 'resend_nda':
 			return 'Signature en attente — renvoyez le lien Yousign.';
 		case 'sync_yousign':
-			return 'Statut signature à vérifier — synchronisez Yousign.';
+			return 'Signature à rattraper — synchronisez Yousign (aligne le statut et invite Teachizy si signé).';
 		case 'retrigger_teachizy':
-			return 'NDA signé — invitez à la formation.';
+			return 'NDA signé — invitez à la formation (force, si le sync n’a pas suffi).';
 		default:
 			return 'Prochaine action recommandée pour ce dossier.';
 	}

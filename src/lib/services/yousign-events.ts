@@ -82,6 +82,7 @@ export function isHandledYousignEventType(eventType: string) {
 /**
  * Aligne yousignStatus (+ contractStatus si done) sur l’API Yousign.
  * Adapter = lecture SDK ; write ici (service).
+ * Si la signature est done : même post-condition que le webhook (Teachizy).
  */
 export async function syncYousignStatus(
 	enrollmentId: string,
@@ -102,7 +103,6 @@ export async function syncYousignStatus(
 
 	const becameSigned =
 		yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
-	// Rattrapage : DB déjà signed (sync avant Slack / webhook raté) mais Teachizy pas encore invité.
 	const catchUpSignedNotify =
 		yousignStatus === 'done' &&
 		enrollment.contractStatus === 'signed' &&
@@ -113,7 +113,6 @@ export async function syncYousignStatus(
 		...(yousignStatus === 'done' ? { contractStatus: 'signed' as const } : {}),
 	});
 
-	// Pur sync : miroir DB (+ Slack). Pas d’Inngest — suite via boutons Inviter / Recréer.
 	if (becameSigned || catchUpSignedNotify) {
 		await notifyOps({
 			kind: 'nda.signed',
@@ -125,7 +124,42 @@ export async function syncYousignStatus(
 		});
 	}
 
+	if (yousignStatus === 'done') {
+		await ensureTeachizyAfterSignature(
+			enrollmentId,
+			`sync-yousign:${enrollmentId}`,
+			enrollment.yousignRequestId,
+		);
+	}
+
 	return { ok: true, yousignStatus };
+}
+
+/**
+ * Post-condition unique : NDA signé → politique d’accès + enqueue invite Teachizy.
+ * Idempotent (event id + job skip si déjà invité). Webhook et sync admin partagent ça.
+ */
+export async function ensureTeachizyAfterSignature(
+	enrollmentId: string,
+	sourceId: string,
+	requestId: string,
+): Promise<void> {
+	const enrollment = await findEnrollmentById(enrollmentId);
+	if (!enrollment) return;
+	if (enrollment.contractStatus !== 'signed') return;
+	if (enrollment.teachizyInvitedAt && enrollment.accessStatus === 'active') return;
+
+	await applyAccessPolicy(enrollmentId);
+
+	await inngest.send({
+		id: `teachizy-after-signature:${enrollmentId}`,
+		name: 'yousign/signature.done',
+		data: {
+			enrollmentId,
+			yousignEventId: sourceId,
+			requestId,
+		},
+	});
 }
 
 export async function handleYousignProviderEvent(input: {
@@ -159,7 +193,7 @@ export async function handleYousignProviderEvent(input: {
 			contractStatus: 'signed',
 		});
 
-		// Slack avant Teachizy / access policy : la notif signature ne dépend pas de l'invite.
+		// Slack avant Teachizy : la notif signature ne dépend pas de l'invite.
 		if (becameSigned) {
 			await notifyOps({
 				kind: 'nda.signed',
@@ -173,16 +207,7 @@ export async function handleYousignProviderEvent(input: {
 			});
 		}
 
-		await applyAccessPolicy(enrollment.id);
-
-		await inngest.send({
-			name: 'yousign/signature.done',
-			data: {
-				enrollmentId: enrollment.id,
-				yousignEventId: input.providerEventId,
-				requestId,
-			},
-		});
+		await ensureTeachizyAfterSignature(enrollment.id, input.providerEventId, requestId);
 
 		return { enrollmentId: enrollment.id };
 	}

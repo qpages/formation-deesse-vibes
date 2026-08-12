@@ -34,7 +34,7 @@ const handlers = {
 				status: 400,
 			};
 		}
-		// Pur sync lecture Stripe → DB. Pas d’event NDA (suite = Recréer).
+		// confirmPaidCheckout / sync → ensureNdaAfterPayment (même post-condition que le webhook).
 		return { ok: true };
 	},
 
