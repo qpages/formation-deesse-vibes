@@ -3,6 +3,7 @@ import type {
 	Enrollment,
 	PaymentPlanId,
 	YousignRequestStatus,
+	YousignSignerStatus,
 } from '../../generated/prisma/client';
 import { generateToken, hashToken } from '../crypto';
 import { isAwaitingNda } from '../enrollment-gates';
@@ -27,6 +28,7 @@ export {
 	findEnrollmentBySubscriptionId,
 	findEnrollmentByYousignRequestId,
 	findEnrollmentByYousignRequestOrExternalId,
+	findEnrollmentIdByPaymentIntentId,
 	findEnrollmentForAccessPolicy,
 	findEnrollmentIdByStripeInvoiceId,
 } from './enrollment-queries';
@@ -52,16 +54,24 @@ export async function attachStripeCheckoutSession(enrollmentId: string, sessionI
 export async function updateEnrollmentYousignMirror(
 	enrollmentId: string,
 	data: {
-		yousignStatus: YousignRequestStatus;
+		yousignStatus?: YousignRequestStatus;
 		contractStatus?: ContractStatus;
 		yousignRequestId?: string | null;
 		yousignSignerId?: string | null;
+		yousignSignerStatus?: YousignSignerStatus | null;
+		signatureLinkExpiresAt?: Date | null;
+		ndaNotifiedAt?: Date | null;
+		ndaLinkOpenedAt?: Date | null;
+		ndaSignedAt?: Date | null;
+		ndaDeliveryFailedAt?: Date | null;
+		yousignLastError?: string | null;
+		yousignLastErrorAt?: Date | null;
 	},
 ) {
 	return getPrisma().enrollment.update({
 		where: { id: enrollmentId },
 		data: {
-			yousignStatus: data.yousignStatus,
+			...(data.yousignStatus !== undefined ? { yousignStatus: data.yousignStatus } : {}),
 			...(data.contractStatus ? { contractStatus: data.contractStatus } : {}),
 			...(data.yousignRequestId !== undefined
 				? { yousignRequestId: data.yousignRequestId }
@@ -69,9 +79,47 @@ export async function updateEnrollmentYousignMirror(
 			...(data.yousignSignerId !== undefined
 				? { yousignSignerId: data.yousignSignerId }
 				: {}),
+			...(data.yousignSignerStatus !== undefined
+				? { yousignSignerStatus: data.yousignSignerStatus }
+				: {}),
+			...(data.signatureLinkExpiresAt !== undefined
+				? { signatureLinkExpiresAt: data.signatureLinkExpiresAt }
+				: {}),
+			...(data.ndaNotifiedAt !== undefined ? { ndaNotifiedAt: data.ndaNotifiedAt } : {}),
+			...(data.ndaLinkOpenedAt !== undefined
+				? { ndaLinkOpenedAt: data.ndaLinkOpenedAt }
+				: {}),
+			...(data.ndaSignedAt !== undefined ? { ndaSignedAt: data.ndaSignedAt } : {}),
+			...(data.ndaDeliveryFailedAt !== undefined
+				? { ndaDeliveryFailedAt: data.ndaDeliveryFailedAt }
+				: {}),
+			...(data.yousignLastError !== undefined
+				? { yousignLastError: data.yousignLastError }
+				: {}),
+			...(data.yousignLastErrorAt !== undefined
+				? { yousignLastErrorAt: data.yousignLastErrorAt }
+				: {}),
 		},
 		...withUser,
 	});
+}
+
+/** Max longueur stockée pour une erreur Yousign (colonne TEXT, on borne l'affichage admin). */
+const YOUSIGN_ERROR_MAX_LEN = 1000;
+
+/** Persiste la dernière erreur Yousign pour diagnostic admin. Ne throw jamais. */
+export async function recordYousignError(enrollmentId: string, message: string) {
+	try {
+		await getPrisma().enrollment.update({
+			where: { id: enrollmentId },
+			data: {
+				yousignLastError: message.slice(0, YOUSIGN_ERROR_MAX_LEN),
+				yousignLastErrorAt: new Date(),
+			},
+		});
+	} catch (error) {
+		console.error('[recordYousignError] persist failed', error);
+	}
 }
 
 export async function persistNdaProvisioned(
@@ -85,6 +133,14 @@ export async function persistNdaProvisioned(
 			yousignSignerId: nda.signerId,
 			yousignStatus: 'ongoing',
 			contractStatus: 'sent',
+			yousignSignerStatus: null,
+			signatureLinkExpiresAt: null,
+			ndaNotifiedAt: null,
+			ndaLinkOpenedAt: null,
+			ndaSignedAt: null,
+			ndaDeliveryFailedAt: null,
+			yousignLastError: null,
+			yousignLastErrorAt: null,
 		},
 		...withUser,
 	});
@@ -270,6 +326,8 @@ export async function markNdaResent(enrollment: Enrollment) {
 			ndaResendDay: dayStart,
 			ndaResendCount: sameDay ? enrollment.ndaResendCount + 1 : 1,
 			yousignStatus: 'ongoing',
+			yousignLastError: null,
+			yousignLastErrorAt: null,
 		},
 		...withUser,
 	});
@@ -296,6 +354,14 @@ export async function clearNdaFields(enrollmentId: string) {
 			yousignRequestId: null,
 			yousignSignerId: null,
 			yousignStatus: null,
+			yousignSignerStatus: null,
+			signatureLinkExpiresAt: null,
+			ndaNotifiedAt: null,
+			ndaLinkOpenedAt: null,
+			ndaSignedAt: null,
+			ndaDeliveryFailedAt: null,
+			yousignLastError: null,
+			yousignLastErrorAt: null,
 			contractStatus: 'pending',
 		},
 		...withUser,

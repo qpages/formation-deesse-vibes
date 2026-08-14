@@ -1,4 +1,8 @@
-import type { YousignRequestStatus } from '../../generated/prisma/client';
+import type {
+	ContractStatus,
+	YousignRequestStatus,
+	YousignSignerStatus,
+} from '../../generated/prisma/client';
 
 export const YOUSIGN_FAILURE: ReadonlySet<YousignRequestStatus> = new Set([
 	'expired',
@@ -56,5 +60,56 @@ export function mapYousignApiStatus(
 			return 'rejected';
 		default:
 			return null;
+	}
+}
+
+/** Mappe le `status` API d’un Signer vers l’enum Prisma. */
+export function mapYousignSignerApiStatus(
+	apiStatus: string,
+): YousignSignerStatus | null {
+	switch (apiStatus.toLowerCase()) {
+		case 'initiated':
+			return 'initiated';
+		case 'notified':
+			return 'notified';
+		case 'verified':
+			return 'verified';
+		case 'consent_given':
+			return 'consent_given';
+		case 'processing':
+			return 'processing';
+		case 'declined':
+			return 'declined';
+		case 'signed':
+			return 'signed';
+		case 'aborted':
+			return 'aborted';
+		case 'error':
+			return 'error';
+		default:
+			return null;
+	}
+}
+
+/** Aligne contractStatus métier sur le miroir request Yousign. */
+export function contractStatusFromYousignRequest(
+	yousignStatus: YousignRequestStatus,
+): ContractStatus | undefined {
+	switch (yousignStatus) {
+		case 'ongoing':
+			return 'sent';
+		case 'done':
+			return 'signed';
+		case 'expired':
+			return 'expired';
+		case 'declined':
+			return 'declined';
+		case 'canceled':
+		case 'rejected':
+			return 'canceled';
+		case 'error':
+			return 'error';
+		default:
+			return undefined;
 	}
 }

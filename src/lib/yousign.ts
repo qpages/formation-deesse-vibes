@@ -117,12 +117,23 @@ export async function reactivateNda(requestId: string) {
 }
 
 /** Lien de signature du signataire (même URL que dans l’e-mail Yousign). */
+export type YousignSigner = {
+	id: string;
+	status: string;
+	signature_link?: string | null;
+	signature_link_expiration_date?: string | null;
+	signed_at?: string | null;
+};
+
+/** Détail Signer — `signature_link` fiable uniquement ici, pas sur la Signature Request. */
+export async function getSigner(requestId: string, signerId: string) {
+	return yousignFetch<YousignSigner>(
+		`/signature_requests/${requestId}/signers/${signerId}`,
+	);
+}
+
 export async function getSignatureLink(requestId: string, signerId: string) {
-	// `signature_link` n’est fiable que sur GET …/signers/{id}, pas sur la Signature Request.
-	const signer = await yousignFetch<{
-		id: string;
-		signature_link?: string | null;
-	}>(`/signature_requests/${requestId}/signers/${signerId}`);
+	const signer = await getSigner(requestId, signerId);
 	return signer.signature_link ?? null;
 }
 

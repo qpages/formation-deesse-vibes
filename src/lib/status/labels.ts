@@ -4,6 +4,7 @@ import type {
 	ContractStatus,
 	PaymentStatus,
 	YousignRequestStatus,
+	YousignSignerStatus,
 } from '../../generated/prisma/client';
 
 export const COLLECTION_STATUS_LABELS: Record<CollectionStatus, string> = {
@@ -27,7 +28,7 @@ export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
 
 export const ACCESS_STATUS_LABELS: Record<AccessStatus, string> = {
 	not_eligible: 'Non éligible',
-	pending: 'Provisionnement',
+	pending: 'Invitation en cours',
 	active: 'Actif',
 	suspended: 'Suspendu',
 	revoked: 'Révoqué',
@@ -40,6 +41,18 @@ export const YOUSIGN_STATUS_LABELS: Record<YousignRequestStatus, string> = {
 	declined: 'Refusé',
 	canceled: 'Annulé',
 	rejected: 'Rejeté',
+	error: 'Erreur',
+};
+
+export const YOUSIGN_SIGNER_STATUS_LABELS: Record<YousignSignerStatus, string> = {
+	initiated: 'Initié',
+	notified: 'Notifié',
+	verified: 'Vérifié',
+	consent_given: 'Consentement',
+	processing: 'Signature en cours',
+	declined: 'Refusé',
+	signed: 'Signé',
+	aborted: 'Interrompu',
 	error: 'Erreur',
 };
 
