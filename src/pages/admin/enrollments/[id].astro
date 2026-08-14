@@ -2,17 +2,22 @@
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import Button from '../../../components/ui/Button.astro';
 import Dialog from '../../../components/ui/Dialog.astro';
-import ExternalLinks from '../../../components/admin/detail/ExternalLinks.astro';
+import EnrollmentHeader from '../../../components/admin/detail/EnrollmentHeader.astro';
 import PaymentPanel from '../../../components/admin/detail/PaymentPanel.astro';
 import AuditTimeline from '../../../components/admin/detail/AuditTimeline.astro';
-import EnrollmentNextAction from '../../../components/admin/detail/EnrollmentNextAction.astro';
 import EnrollmentPipeline from '../../../components/admin/detail/EnrollmentPipeline.astro';
 import EnrollmentActionPanel from '../../../components/admin/detail/EnrollmentActionPanel.astro';
+import EnrollmentAccessPanel from '../../../components/admin/detail/EnrollmentAccessPanel.astro';
+import SignaturePanel from '../../../components/admin/detail/SignaturePanel.astro';
 import { requireAdminPage } from '../../../lib/admin/auth';
 import { getAdminEnrollmentDetail } from '../../../lib/admin/enrollments';
+import { getAdminTeachizyLearner } from '../../../lib/admin/teachizy-learners';
 import { adminActionMetaForClient, partitionVisibleActions } from '../../../lib/admin/actions';
 import { getAdminPaymentSummary } from '../../../lib/admin/payments';
-import { buildPipelineStageCards } from '../../../lib/admin/pipeline-detail';
+import {
+	buildPipelineStageCards,
+	enrollmentHeadline,
+} from '../../../lib/admin/pipeline-detail';
 
 export const prerender = false;
 
@@ -20,67 +25,58 @@ const admin = await requireAdminPage(Astro);
 if (admin instanceof Response) return admin;
 
 const id = Astro.params.id;
-if (!id) return Astro.redirect('/admin');
+if (!id) return Astro.redirect('/admin/inscriptions');
 
 const detail = await getAdminEnrollmentDetail(id);
-if (!detail) return Astro.redirect('/admin');
+if (!detail) return Astro.redirect('/admin/inscriptions');
 
 const paymentSummary =
 	(await getAdminPaymentSummary(id)) ?? detail.paymentSummary;
 const actionMeta = adminActionMetaForClient();
 const actionPartition = partitionVisibleActions(detail);
 const pipelineStages = buildPipelineStageCards(detail, paymentSummary);
+const headline = enrollmentHeadline(detail);
+const teachizy = await getAdminTeachizyLearner(detail.email, detail.id);
 ---
 
 <AdminLayout title={`${detail.displayName} — Admin`} email={admin}>
-	<div class="mb-6">
-		<a
-			href="/admin"
-			class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
-		>
-			← Inscriptions
-		</a>
-		<div class="mt-4 flex flex-wrap items-start justify-between gap-4">
-			<div class="min-w-0">
-				<h1 class="font-display text-4xl text-pretty text-ink">{detail.displayName}</h1>
-				<p class="mt-1 break-all text-ink-soft">{detail.email}</p>
-				<p class="mt-2 text-sm text-ink/50">
-					Créé le{' '}
-					{detail.createdAt.toLocaleString('fr-FR', {
-						dateStyle: 'short',
-						timeStyle: 'short',
-					})}
-				</p>
-			</div>
-			<ExternalLinks stripeUrl={detail.stripeUrl} yousignUrl={detail.yousignUrl} />
-		</div>
-	</div>
+	<div id="enrollment-detail" data-enrollment-detail>
+		<EnrollmentHeader
+			displayName={detail.displayName}
+			email={detail.email}
+			enrollmentId={detail.id}
+			createdAt={detail.createdAt}
+			headline={headline}
+		/>
 
-	{/* Hybrid: recommended CTA first, then dump */}
-	<EnrollmentNextAction
-		enrollmentId={detail.id}
-		displayName={detail.displayName}
-		partition={actionPartition}
-	/>
+		<EnrollmentPipeline stages={pipelineStages} />
 
-	<EnrollmentPipeline stages={pipelineStages} />
-
-	{
-		actionPartition.secondary.length > 0 ? (
-			<EnrollmentActionPanel
-				enrollmentId={detail.id}
-				displayName={detail.displayName}
-				partition={actionPartition}
-			/>
-		) : null
-	}
-
-	<div class="mb-8 scroll-mt-20 border border-ink/10 bg-white/60 p-4 sm:p-5">
 		<PaymentPanel summary={paymentSummary} heading="Paiements" />
-	</div>
 
-	<div class="mb-8">
-		<AuditTimeline items={detail.audit} collapsed />
+		<SignaturePanel
+			detail={detail}
+			enrollmentId={detail.id}
+			displayName={detail.displayName}
+			actions={actionPartition.signature}
+		/>
+
+		<EnrollmentAccessPanel
+			detail={detail}
+			enrollmentId={detail.id}
+			displayName={detail.displayName}
+			teachizy={teachizy}
+			actions={actionPartition.access}
+		/>
+
+		<EnrollmentActionPanel
+			enrollmentId={detail.id}
+			displayName={detail.displayName}
+			partition={actionPartition}
+		/>
+
+		<div id="historique-wrap">
+			<AuditTimeline items={detail.audit} collapsed />
+		</div>
 	</div>
 
 	<Dialog id="admin-action-dialog" title="Confirmer l’action">

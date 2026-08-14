@@ -48,52 +48,60 @@ function formatDate(iso: string | null, withTime = false) {
 		...(withTime ? { timeStyle: 'short' } : {}),
 	});
 }
+
+const installmentSummary = `${summary.installmentsPaid}/${total}`;
+const openInstallments =
+	summary.trackingState === 'impaye' ||
+	installments.some((p) => p.status === 'failed' || p.status === 'uncollectible');
+
+const linkClass =
+	'text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
 ---
 
-<section class="space-y-5" id="paiements" aria-labelledby="paiements-heading">
-	{
-		heading ? (
-			<h2 id="paiements-heading" class="font-display text-2xl text-ink">
-				{heading}
-			</h2>
-		) : (
-			<h2 id="paiements-heading" class="sr-only">
-				Paiements
-			</h2>
-		)
-	}
-
-	<div class="flex flex-wrap items-start justify-between gap-3">
-		<div class="min-w-0">
-			<p class="text-xs font-medium uppercase tracking-[0.12em] text-ink/55">{summary.planLabel}</p>
-			<p class="mt-1 font-display text-2xl leading-none tracking-tight text-ink tabular-nums">
-				{collected}
-				{
-					totalLabel ? (
-						<span class="text-base font-sans font-normal text-ink/35"> / {totalLabel}</span>
-					) : null
-				}
-			</p>
-			<p class="mt-2 text-sm text-ink-soft">
-				{summary.installmentsPaid}/{total} échéance{total > 1 ? 's' : ''}
-				{showNextDue ? ` · prochaine le ${nextDue}` : ''}
-			</p>
-		</div>
+<section
+	class="mb-8 scroll-mt-20"
+	id="paiements"
+	aria-labelledby="paiements-heading"
+>
+	<div class="mb-3 flex flex-wrap items-center gap-2">
+		{
+			heading ? (
+				<h2 id="paiements-heading" class="text-lg font-medium text-ink">
+					{heading}
+				</h2>
+			) : (
+				<h2 id="paiements-heading" class="sr-only">
+					Paiements
+				</h2>
+			)
+		}
 		<StatusBadge tone={summary.trackingTone}>{summary.trackingLabel}</StatusBadge>
 	</div>
 
+	<p class="text-sm text-ink tabular-nums">
+		<span class="text-ink/45">{summary.planLabel}</span>
+		<span class="mx-1.5 text-ink/25">·</span>
+		<span class="font-medium">{collected}</span>
+		{totalLabel ? <span class="text-ink/35"> / {totalLabel}</span> : null}
+		<span class="mx-1.5 text-ink/25">·</span>
+		<span class="text-ink-soft">{installmentSummary}</span>
+		{showNextDue ? <span class="text-ink-soft"> · prochain {nextDue}</span> : null}
+	</p>
+
 	{
-		summary.stripeSubscriptionUrl || summary.stripeScheduleUrl ? (
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-				<span class="text-xs font-medium uppercase tracking-[0.12em] text-ink/55">Stripe</span>
+		installments.length === 0 ? (
+			<div class="mt-3 flex flex-wrap items-center gap-x-4">
+				<p class="text-sm text-ink-soft">
+					Aucune échéance. Sync Stripe pour charger le calendrier.
+				</p>
 				{summary.stripeSubscriptionUrl ? (
 					<a
 						href={summary.stripeSubscriptionUrl}
 						target="_blank"
 						rel="noopener noreferrer"
-						class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+						class={linkClass}
 					>
-						Abonnement
+						Abonnement Stripe ↗
 					</a>
 				) : null}
 				{summary.stripeScheduleUrl ? (
@@ -101,25 +109,47 @@ function formatDate(iso: string | null, withTime = false) {
 						href={summary.stripeScheduleUrl}
 						target="_blank"
 						rel="noopener noreferrer"
-						class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+						class={linkClass}
 					>
-						Schedule
+						Schedule Stripe ↗
 					</a>
 				) : null}
 			</div>
-		) : null
-	}
-
-	<div>
-		<p class="mb-1 text-xs font-medium uppercase tracking-[0.12em] text-ink/55">Échéances</p>
-		{
-			installments.length === 0 ? (
-				<p class="border-t border-dashed border-ink/15 py-6 text-sm text-ink-soft">
-					Aucune échéance enregistrée. Synchronisez le paiement Stripe pour charger le calendrier
-					et les factures.
-				</p>
-			) : (
-				<ul class="divide-y divide-ink/10 border-t border-ink/10">
+		) : (
+			<div class="mt-3 flex flex-wrap items-center gap-x-4">
+				<details class="peer group" open={openInstallments || undefined}>
+					<summary
+						class:list={[
+							'cursor-pointer list-none py-1',
+							linkClass,
+							'[&::-webkit-details-marker]:hidden',
+						]}
+					>
+						<span class="group-open:hidden">Voir les échéances</span>
+						<span class="hidden group-open:inline">Masquer les échéances</span>
+					</summary>
+				</details>
+				{summary.stripeSubscriptionUrl ? (
+					<a
+						href={summary.stripeSubscriptionUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class={linkClass}
+					>
+						Abonnement Stripe ↗
+					</a>
+				) : null}
+				{summary.stripeScheduleUrl ? (
+					<a
+						href={summary.stripeScheduleUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class={linkClass}
+					>
+						Schedule Stripe ↗
+					</a>
+				) : null}
+				<ul class="mt-2 hidden w-full basis-full divide-y divide-ink/10 border-t border-ink/10 peer-open:block">
 					{installments.map((p) => {
 						const paid = formatDate(p.paidAt, true);
 						const due = formatDate(p.dueAt);
@@ -128,7 +158,7 @@ function formatDate(iso: string | null, withTime = false) {
 						const invoiceHref = p.invoicePdfUrl ?? p.hostedInvoiceUrl;
 						const isEstimated = p.id.startsWith('estimated-');
 						return (
-							<li class="flex items-start gap-3 py-3.5">
+							<li class="flex items-start gap-3 py-3">
 								<span class="mt-0.5 w-5 shrink-0 text-xs font-medium text-ink/45 tabular-nums">
 									{p.installmentNumber}
 								</span>
@@ -145,14 +175,14 @@ function formatDate(iso: string | null, withTime = false) {
 										<p class="mt-1 text-sm text-blush-deep">{p.failureReason}</p>
 									) : null}
 									{invoiceHref ? (
-										<p class="mt-1.5">
+										<p class="mt-1">
 											<a
 												href={invoiceHref}
 												target="_blank"
 												rel="noopener noreferrer"
-												class="inline-flex min-h-9 items-center text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+												class={linkClass}
 											>
-												{p.invoicePdfUrl ? 'Télécharger la facture' : 'Voir la facture'}
+												{p.invoicePdfUrl ? 'Facture PDF' : 'Facture'}
 											</a>
 										</p>
 									) : null}
@@ -172,7 +202,7 @@ function formatDate(iso: string | null, withTime = false) {
 						);
 					})}
 				</ul>
-			)
-		}
-	</div>
+			</div>
+		)
+	}
 </section>

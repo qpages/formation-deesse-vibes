@@ -1,22 +1,226 @@
 import type { AdminEnrollmentDetail } from './enrollments';
 import type { AdminPaymentSummary } from './payments';
 import { formatMoney } from '../payment-plans';
+import type { BadgeTone } from '../status';
 import { COLLECTION_STATUS_LABELS, CONTRACT_STATUS_LABELS, ACCESS_STATUS_LABELS } from '../status';
 
+export type PipelineStageKey = 'paiement' | 'signature' | 'acces';
+
 export type PipelineStageCard = {
-	key: 'paiement' | 'signature' | 'acces';
+	key: PipelineStageKey;
 	title: string;
 	label: string;
 	tone: AdminEnrollmentDetail['pipeline']['paiement']['tone'];
 	hint: string;
 	href: string;
+	/** Étape qui bloque la suite du parcours. */
+	blocking: boolean;
 };
+
+export type EnrollmentHeadline = {
+	label: string;
+	tone: BadgeTone;
+};
+
+type BottleneckInput = Pick<
+	AdminEnrollmentDetail,
+	'collectionStatus' | 'contractStatus' | 'accessStatus'
+>;
+
+/** Première étape qui bloque paiement → signature → accès. null = dossier fluide. */
+export function resolvePipelineBottleneck(detail: BottleneckInput): PipelineStageKey | null {
+	if (
+		detail.collectionStatus === 'pending' ||
+		detail.collectionStatus === 'past_due' ||
+		detail.collectionStatus === 'canceled' ||
+		detail.collectionStatus === 'refunded'
+	) {
+		return 'paiement';
+	}
+
+	if (detail.contractStatus !== 'signed') {
+		return 'signature';
+	}
+
+	if (detail.accessStatus !== 'active') {
+		return 'acces';
+	}
+
+	return null;
+}
+
+/** Ligne d’état sous le nom (header détail). */
+export function enrollmentHeadline(detail: BottleneckInput): EnrollmentHeadline {
+	const bottleneck = resolvePipelineBottleneck(detail);
+
+	if (!bottleneck) {
+		return { label: 'Dossier à jour', tone: 'success' };
+	}
+
+	if (bottleneck === 'paiement') {
+		if (detail.collectionStatus === 'past_due') {
+			return { label: 'Bloqué · impayé', tone: 'action' };
+		}
+		if (detail.collectionStatus === 'canceled' || detail.collectionStatus === 'refunded') {
+			return {
+				label: `Bloqué · ${COLLECTION_STATUS_LABELS[detail.collectionStatus].toLowerCase()}`,
+				tone: 'neutral',
+			};
+		}
+		return { label: 'Bloqué · paiement', tone: 'action' };
+	}
+
+	if (bottleneck === 'signature') {
+		if (detail.contractStatus === 'sent') {
+			return { label: 'En attente · NDA à signer', tone: 'action' };
+		}
+		if (detail.contractStatus === 'error' || detail.contractStatus === 'expired') {
+			return {
+				label: `Signature · ${CONTRACT_STATUS_LABELS[detail.contractStatus].toLowerCase()}`,
+				tone: 'action',
+			};
+		}
+		return { label: 'Bloqué · signature', tone: 'progress' };
+	}
+
+	if (detail.accessStatus === 'suspended') {
+		return { label: 'Accès suspendu', tone: 'action' };
+	}
+	if (detail.accessStatus === 'pending') {
+		return { label: 'Accès en cours', tone: 'progress' };
+	}
+
+	return {
+		label: `Accès · ${ACCESS_STATUS_LABELS[detail.accessStatus].toLowerCase()}`,
+		tone: 'progress',
+	};
+}
+
+export type SignatureDiagnosticLevel = 'error' | 'warn' | 'info';
+
+export type SignatureDiagnostic = {
+	level: SignatureDiagnosticLevel;
+	/** Fait brut : soit l'erreur Yousign verbatim, soit l'état constaté. */
+	title: string;
+	/** Une seule action concrète, quand elle apporte de l'info. Optionnel. */
+	action?: string;
+};
+
+type SignatureDiagnosticInput = Pick<
+	AdminEnrollmentDetail,
+	| 'collectionStatus'
+	| 'contractStatus'
+	| 'yousignRequestId'
+	| 'yousignSignerId'
+	| 'yousignLastError'
+	| 'ndaDeliveryFailedAt'
+>;
+
+/**
+ * Diagnostic signature = faits, pas de narratif.
+ * Priorité absolue à l'erreur Yousign brute si on l'a captée ; sinon on nomme
+ * l'état constaté et l'action qui ira chercher le vrai motif côté Yousign.
+ * `null` = rien à signaler (signé, ou signature pas encore due car impayé).
+ */
+export function signatureDiagnostic(
+	detail: SignatureDiagnosticInput,
+): SignatureDiagnostic | null {
+	if (detail.contractStatus === 'signed') return null;
+
+	// 1. Erreur réelle remontée par un job / webhook / sync Yousign → affichée verbatim.
+	if (detail.yousignLastError) {
+		return { level: 'error', title: `Yousign : ${detail.yousignLastError}` };
+	}
+
+	const paid =
+		detail.collectionStatus !== 'pending' &&
+		detail.collectionStatus !== 'canceled' &&
+		detail.collectionStatus !== 'refunded';
+
+	// Signature pas encore due : pas un problème à signaler ici.
+	if (!paid) return null;
+
+	// 2. Pas d'erreur captée : on décrit l'état et on pointe l'action qui révèle le motif.
+	if (!detail.yousignRequestId) {
+		return {
+			level: 'warn',
+			title: 'Aucune demande Yousign créée.',
+			action: '« Recréer un lien Yousign » pour lancer la création.',
+		};
+	}
+
+	if (!detail.yousignSignerId && detail.contractStatus === 'pending') {
+		return {
+			level: 'warn',
+			title:
+				'Demande Yousign présente mais sans signataire, et aucune erreur enregistrée.',
+			action:
+				'« Sync statut Yousign » interroge Yousign en direct et affiche le statut/motif réel ici.',
+		};
+	}
+
+	if (detail.contractStatus === 'sent' && detail.ndaDeliveryFailedAt) {
+		return { level: 'error', title: 'E-mail de signature en échec de livraison.' };
+	}
+
+	return null;
+}
+
+function formatShortDate(value: Date | null | undefined): string | null {
+	if (!value) return null;
+	return value.toLocaleDateString('fr-FR', {
+		day: 'numeric',
+		month: 'short',
+		timeZone: 'Europe/Paris',
+	});
+}
+
+function formatShortDateTime(value: Date | null | undefined): string | null {
+	if (!value) return null;
+	return value.toLocaleString('fr-FR', {
+		dateStyle: 'short',
+		timeStyle: 'short',
+		timeZone: 'Europe/Paris',
+	});
+}
+
+function buildSignatureHint(detail: AdminEnrollmentDetail): string {
+	if (detail.collectionStatus === 'pending' || detail.collectionStatus === 'canceled') {
+		return 'Bloqué — paiement requis';
+	}
+
+	if (detail.contractStatus === 'signed') {
+		const when = formatShortDateTime(detail.ndaSignedAt);
+		return when ? `NDA signé le ${when}` : 'NDA signé';
+	}
+
+	if (detail.contractStatus === 'sent') {
+		if (detail.ndaDeliveryFailedAt) {
+			return 'E-mail en échec · renvoyer';
+		}
+		if (detail.ndaLinkOpenedAt) {
+			return 'Lien ouvert · pas encore signé';
+		}
+		if (detail.ndaNotifiedAt || detail.yousignSignerStatus === 'notified') {
+			const expires = formatShortDate(detail.signatureLinkExpiresAt);
+			return expires ? `E-mail envoyé · expire le ${expires}` : 'E-mail envoyé';
+		}
+		return 'En attente de signature';
+	}
+
+	if (detail.yousignRequestId) {
+		return `Yousign · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
+	}
+
+	return 'NDA pas encore créé';
+}
 
 /** Enriched pipeline tiles for the detail hybrid layout. */
 export function buildPipelineStageCards(
 	detail: AdminEnrollmentDetail,
 	paymentSummary: AdminPaymentSummary,
 ): PipelineStageCard[] {
+	const bottleneck = resolvePipelineBottleneck(detail);
 	const collected = formatMoney(paymentSummary.collectedAmountCents);
 	const total =
 		paymentSummary.totalAmountCents != null
@@ -33,18 +237,7 @@ export function buildPipelineStageCards(
 		paiementHint = `${moneyHint} · ${COLLECTION_STATUS_LABELS[detail.collectionStatus]}`;
 	}
 
-	let signatureHint: string;
-	if (detail.collectionStatus === 'pending' || detail.collectionStatus === 'canceled') {
-		signatureHint = 'Bloqué — paiement requis';
-	} else if (detail.contractStatus === 'signed') {
-		signatureHint = 'NDA signé';
-	} else if (detail.contractStatus === 'sent') {
-		signatureHint = 'En attente de signature';
-	} else if (detail.yousignRequestId) {
-		signatureHint = `Yousign · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
-	} else {
-		signatureHint = 'NDA pas encore créé';
-	}
+	const signatureHint = buildSignatureHint(detail);
 
 	let accesHint: string;
 	if (detail.contractStatus !== 'signed') {
@@ -52,7 +245,7 @@ export function buildPipelineStageCards(
 	} else if (detail.accessStatus === 'active') {
 		accesHint = 'Teachizy actif';
 	} else if (detail.accessStatus === 'pending') {
-		accesHint = 'Provisionnement en cours';
+		accesHint = 'Invitation Teachizy en cours';
 	} else if (detail.accessStatus === 'suspended') {
 		accesHint = 'Suspendu — renvoyer Teachizy si éligible';
 	} else {
@@ -67,6 +260,7 @@ export function buildPipelineStageCards(
 			tone: detail.pipeline.paiement.tone,
 			hint: paiementHint,
 			href: '#paiements',
+			blocking: bottleneck === 'paiement',
 		},
 		{
 			key: 'signature',
@@ -74,15 +268,17 @@ export function buildPipelineStageCards(
 			label: detail.pipeline.signature.label,
 			tone: detail.pipeline.signature.tone,
 			hint: signatureHint,
-			href: '#next-action',
+			href: '#signature',
+			blocking: bottleneck === 'signature',
 		},
 		{
 			key: 'acces',
-			title: 'Accès',
+			title: 'Teachizy',
 			label: detail.pipeline.acces.label,
 			tone: detail.pipeline.acces.tone,
 			hint: accesHint,
-			href: '#next-action',
+			href: '#acces',
+			blocking: bottleneck === 'acces',
 		},
 	];
 }

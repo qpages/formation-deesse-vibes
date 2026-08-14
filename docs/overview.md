@@ -75,6 +75,23 @@ Exemple plan ×4 : 4 lignes Payment, chacune avec son `status`.
 
 Miroir provider Yousign : `yousignStatus` (`ongoing`, `done`…). Référence métier = `contractStatus`.
 
+### Miroir Signer Yousign
+
+Détail d’engagement côté signataire (pas de nouveau `contractStatus`) :
+
+| Champ | Source | Rôle |
+| --- | --- | --- |
+| `yousignSignerStatus` | API Signer / webhooks | `initiated` → `notified` → … → `signed` |
+| `signatureLinkExpiresAt` | API Signer | Expiration du magic link (~48h) |
+| `ndaNotifiedAt` | `signer.notified` (+ sync) | E-mail parti / lien prêt |
+| `ndaLinkOpenedAt` | `signer.link_opened` | Lien ouvert |
+| `ndaSignedAt` | `signature_request.done` / `signed_at` | Date de signature |
+| `ndaDeliveryFailedAt` | `signer.notification_delivery_failed` | Bounce e-mail |
+
+Engagement (`notified`, `link_opened`) : webhooks **sans Slack**.  
+Alertes Slack : `nda.monitor` (échecs) + `nda.signed`.  
+Le lien de signature n’est **jamais** stocké : fetch live (`getSignatureLink`) pour l’élève / action admin « Copier le lien ».
+
 ### `accessStatus`
 
 | Valeur | En clair |
@@ -135,6 +152,8 @@ Pas de table d’événements dédiée : vérité = `Enrollment` / `Payment` / `
 | `nda.monitor` | warn/critical | Yousign declined / expired / delivery fail… |
 | `access.suspended` | warn | Accès Teachizy suspendu |
 | `access.revoked` | critical | Accès révoqué |
+| `job.first_failure` | warn | 1er échec Inngest (retries à suivre) |
+| `job.recovered` | info | Succès après retry |
 | `job.final_failure` | critical | Job Inngest à bout de retries |
 | `admin.action` | info/warn | Toute action admin réussie (`recreate_nda` = warn) |
 | `ops.reconcile_issues` | warn | Reconcile trouve ≥1 incohérence |
@@ -167,8 +186,29 @@ Admin `/admin` : `ADMIN_EMAIL` / `ADMIN_PASSWORD` + JWT
 | `grantTeachizyAccess` | `yousign/signature.done` / `enrollment/access.grant` | Invite Teachizy (5 retries, alerte Slack) |
 | `purgeWebhookPayloads` | cron `0 3 * * *` | Efface les payloads chiffrés > 30 j |
 
-Local : `npm run dev` + `npm run inngest:dev` → dashboard http://localhost:8288  
-Endpoint : `/api/inngest`
+**Handoffs async (invariants 1–2 ci-dessous) :** sans enqueue, la DB peut être à jour et l’élève quand même bloqué.
+
+**Contrat d'erreur de l'enqueue (via `sendInngestSafe`) :**
+
+- Chemin **dur** (webhook, retour Checkout) : une file HS **rejette** → Inngest rejoue.
+- Chemin **soft** (sync admin, `opts.soft` / `softEnqueue`) : l'effet primaire (miroir DB)
+  est déjà persisté ; une file HS renvoie `EnqueueResult { status: 'failed' }`. L'action
+  admin réussit quand même (loggée), avec un toast d'avertissement invitant à relancer.
+
+Cette séparation distingue les **actions `sync`** (miroir DB = effet primaire, enqueue
+best-effort) des **actions `flow`** (l'enqueue Inngest *est* l'action → 503 si file HS),
+cf. `AdminActionDef.execution` dans `src/lib/admin/actions.ts`.
+
+Local : 3 process en parallèle —
+
+```bash
+npm run dev
+npm run inngest:dev          # http://localhost:8288
+npm run webhook:stripe       # coller le whsec_… dans .env
+```
+
+Endpoint app : `/api/inngest`  
+Dashboard Inngest : http://localhost:8288
 
 ## Webhooks
 
@@ -204,10 +244,81 @@ Secrets : `.env.example` → `.env` (local) / Vercel (prod).
 - Preview ≠ prod (Stripe / Yousign / Teachizy / Neon)
 - Slack = canal ops (facade `notifyOps`), pas un second journal d’événements
 
-## Avant prod
+## Qualité : invariants → tests → gate live
 
-1. NDA juridique final + template Yousign
-2. Produit/prix Stripe live + webhooks
-3. Clés Teachizy + UUID formation
-4. Domaine Resend, Slack, DNS `formation.deesse-vibes.com`
-5. CGV + confidentialité
+Trois filets. Un audit code (skills `.cursor/skills/audit-*`) est un **radar**, pas un frein.
+
+```
+Invariant (règle métier)
+    → Test (alarme auto si on casse la règle)
+    → Gate live (pas de sk_live tant qu’une case rouge)
+```
+
+### Invariants (non négociables)
+
+Si un invariant est faux en prod = incident. Chaque règle doit avoir **un owner code** et **un test**
+
+| # | Règle | Owner typique | Si violé |
+| --- | --- | --- | --- |
+| 1 | 1er paiement confirmé → `ensureNdaAfterPayment` sur **tous** les chemins (webhook Stripe, retour Checkout, sync admin) | Inngest / payments | Élève payé, jamais de NDA |
+| 2 | NDA `signed` → `ensureTeachizyAfterSignature` sur **tous** les chemins (webhook Yousign, sync admin) | Inngest / access | NDA OK, pas d’accès |
+| 3 | Plans `x2` / `x4` / `x6` : Subscription Schedule avec durée = N mois et `end_behavior: cancel` (pas d’abo infini). API Stripe actuelle : `phases[].duration`, **pas** `iterations` | `src/lib/stripe.ts` | Prélèvements au-delà du plan |
+| 4 | Pas d’`accessStatus: active` sans 1er paiement OK + `contractStatus: signed` + pas d’impayé bloquant | `access` / eligibility | Accès cours non autorisé |
+| 5 | `collectionStatus: past_due` → accès Teachizy coupé (`suspended`) via API réelle, pas DB-only | Teachizy + payments | Cours ouverts malgré impayé |
+| 6 | `collectionStatus: refunded` (refund/dispute) → `accessStatus: revoked` | Stripe webhooks + access | Accès après remboursement |
+| 7 | Webhooks Stripe/Yousign : signature vérifiée ; même event id → pas de double effet métier | webhook handlers | Double NDA / double charge logique |
+| 8 | Lien de signature Yousign **jamais** persisté en DB (fetch live seulement) | yousign / enrollment | Fuite / lien périmé stocké |
+
+Gaps connus aujourd’hui (ne pas “oublier” au gate) : voir `task.md` §1 (Teachizy suspend/revoke API, refund→revoke, Brevo).
+
+### Tests (preuve exécutable)
+
+Minimum avant live — au-delà = bonus.
+
+| Niveau | Quoi | Done when |
+| --- | --- | --- |
+| Unitaire | Payload `ensureSubscriptionSchedule` : `duration` + `end_behavior: cancel` ; pas de `iterations` | `npm test` rouge si on régresse |
+| Unitaire | Eligibility accès + mapping refund/past_due → statut accès | Idem |
+| Unitaire / intégration | Idempotence `ProviderEvent` (replay même id) | Pas de double side-effect |
+| E2E test-mode | Parcours **unique** : payé → NDA → invite Teachizy | Checklist `task.md` §3 |
+| E2E test-mode | Parcours **x4** : schedule Stripe = 4 mois + cancel ; pas de 5e prélèvement | Vérifié Dashboard test ou API |
+| E2E test-mode | Magic link → même page `/` statut cohérent | OK manuel ou scripté |
+
+Règle : un finding **blocker** d’audit → ticket **+** test de non-régression avant de passer à autre chose.
+
+Audits domaine (optionnel, en vague) : `.cursor/skills/audit-critical-suite` — d’abord `stripe-money` + `webhooks` + `teachizy-access`.
+
+### Gate live (feu rouge)
+
+**Une case rouge = pas de clé `sk_live` / pas d’ouverture publique du paiement.**
+
+Copier dans la PR ou le runbook ; cocher seulement avec preuve (lien Dashboard, log test, CI verte).
+
+**Bloquants absolus**
+
+- [ ] Invariants 1–4 + 7–8 tenus dans le code **et** couverts par au moins un test ou E2E
+- [ ] Invariants 5–6 : implémentés **ou** décision écrite d’accepter le risque (sinon NO-GO)
+- [ ] Stripe **test** : parcours unique + x4 OK (schedule s’arrête)
+- [ ] Stripe **live** : prix + webhooks endpoint prod verts
+- [ ] Yousign : template NDA juridique final + webhook prod
+- [ ] Teachizy : UUID formation + invite OK ; coupe accès réelle si 5 exigé
+- [ ] DB prod migrée (`prisma migrate deploy`)
+- [ ] Secrets prod ≠ défauts ; admin password fort ; secrets JWT/session ≥ 32
+- [ ] DNS `formation.deesse-vibes.com` → Vercel ; e-mail from domaine vérifié
+- [ ] Inngest cloud branché sur `/api/inngest`
+
+**Fortement recommandés**
+
+- [ ] Slack ops branché (`notifyOps`)
+- [ ] CGV / confidentialité / mentions
+- [ ] Handoff accès outils au client (`task.md` §5)
+
+**Verdict**
+
+| Résultat | Condition |
+| --- | --- |
+| **NO-GO** | ≥1 bloquant absolu ouvert, ou invariant 3/4/7 cassé |
+| **GO avec conditions** | Bloquants OK ; gaps 5–6 ou Brevo listés avec owner + date |
+| **GO** | Bloquants + recommandés OK |
+
+Todo détaillée ops/code : [`task.md`](../task.md).

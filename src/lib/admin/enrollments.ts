@@ -114,7 +114,7 @@ export function adminListHref(input: {
 	if (input.access) params.set('access', input.access);
 	if (input.page && input.page > 1) params.set('page', String(input.page));
 	const qs = params.toString();
-	return qs ? `/admin?${qs}` : '/admin';
+	return qs ? `/admin/inscriptions?${qs}` : '/admin/inscriptions';
 }
 
 export function toAdminEnrollmentRow(

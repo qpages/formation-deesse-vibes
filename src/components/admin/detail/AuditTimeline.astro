@@ -14,35 +14,35 @@ const { items, collapsed = false } = Astro.props;
 const countLabel = items.length === 0 ? 'vide' : `${items.length}`;
 ---
 
-<section class="scroll-mt-20" id="historique" aria-labelledby="historique-heading">
+<section
+	class="scroll-mt-20"
+	id="historique"
+	aria-labelledby="historique-heading"
+>
 	{
 		collapsed ? (
-			<details class="group border border-ink/10 bg-white/60 open:bg-white/70">
-				<summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blush [&::-webkit-details-marker]:hidden">
-					<h2 id="historique-heading" class="font-display text-2xl text-ink">
+			<details class="group">
+				<summary class="flex cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush [&::-webkit-details-marker]:hidden">
+					<h2 id="historique-heading" class="text-lg font-medium text-ink">
 						Historique
+						<span class="ml-1.5 text-sm font-normal text-ink/40">{countLabel}</span>
 					</h2>
-					<span class="text-sm text-ink/45">
-						{countLabel}
-						<span class="ml-2 text-ink/35 group-open:hidden">· afficher</span>
-						<span class="ml-2 hidden text-ink/35 group-open:inline">· masquer</span>
-					</span>
+					<span class="text-sm text-ink/40 group-open:hidden">afficher</span>
+					<span class="hidden text-sm text-ink/40 group-open:inline">masquer</span>
 				</summary>
-				<div class="border-t border-ink/10 px-4 pb-4 pt-3">
+				<div class="mt-3">
 					{items.length === 0 ? (
-						<p class="border border-dashed border-ink/15 px-4 py-6 text-sm text-ink-soft">
-							Aucune action admin pour le moment. Les syncs et actions métier apparaîtront ici.
-						</p>
+						<p class="py-2 text-sm text-ink-soft">Aucune action admin.</p>
 					) : (
-						<ol class="divide-y divide-ink/10 border border-ink/10">
+						<ol class="divide-y divide-ink/10">
 							{items.map((item) => (
-								<li class="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
+								<li class="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
 									<div class="min-w-0">
-										<p class="font-medium text-ink">{item.actionLabel}</p>
-										<p class="text-sm text-ink-soft">{item.adminEmail}</p>
+										<p class="text-sm font-medium text-ink">{item.actionLabel}</p>
+										<p class="text-xs text-ink-soft">{item.adminEmail}</p>
 									</div>
 									<time
-										class="shrink-0 text-xs text-ink/50"
+										class="shrink-0 text-xs text-ink/45 tabular-nums"
 										datetime={item.createdAt.toISOString()}
 									>
 										{item.createdAt.toLocaleString('fr-FR', {
@@ -58,23 +58,21 @@ const countLabel = items.length === 0 ? 'vide' : `${items.length}`;
 			</details>
 		) : (
 			<>
-				<h2 id="historique-heading" class="font-display text-2xl text-ink">
+				<h2 id="historique-heading" class="text-lg font-medium text-ink">
 					Historique
 				</h2>
 				{items.length === 0 ? (
-					<p class="mt-3 border border-dashed border-ink/15 px-4 py-6 text-sm text-ink-soft">
-						Aucune action admin pour le moment.
-					</p>
+					<p class="mt-3 py-2 text-sm text-ink-soft">Aucune action admin.</p>
 				) : (
-					<ol class="mt-3 divide-y divide-ink/10 border border-ink/10">
+					<ol class="mt-3 divide-y divide-ink/10">
 						{items.map((item) => (
-							<li class="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
+							<li class="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
 								<div class="min-w-0">
-									<p class="font-medium text-ink">{item.actionLabel}</p>
-									<p class="text-sm text-ink-soft">{item.adminEmail}</p>
+									<p class="text-sm font-medium text-ink">{item.actionLabel}</p>
+									<p class="text-xs text-ink-soft">{item.adminEmail}</p>
 								</div>
 								<time
-									class="shrink-0 text-xs text-ink/50"
+									class="shrink-0 text-xs text-ink/45 tabular-nums"
 									datetime={item.createdAt.toISOString()}
 								>
 									{item.createdAt.toLocaleString('fr-FR', {

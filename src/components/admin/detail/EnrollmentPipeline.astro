@@ -1,5 +1,4 @@
 ---
-import StatusBadge from '../../ui/StatusBadge.astro';
 import type { PipelineStageCard } from '../../../lib/admin/pipeline-detail';
 
 interface Props {
@@ -7,27 +6,46 @@ interface Props {
 }
 
 const { stages } = Astro.props;
+
+const toneDot: Record<PipelineStageCard['tone'], string> = {
+	neutral: 'bg-ink/25',
+	progress: 'bg-gold',
+	success: 'bg-sage',
+	action: 'bg-blush-deep',
+};
 ---
 
-<section class="mb-8" aria-label="Pipeline inscription">
-	<ul class="grid gap-3 md:grid-cols-3">
+<nav class="my-2 mb-10 scroll-mt-20 py-5" id="pipeline" aria-label="Pipeline inscription">
+	<ol class="grid gap-5 sm:grid-cols-3 sm:gap-8">
 		{
 			stages.map((stage) => (
-				<li>
+				<li class="min-w-0">
 					<a
 						href={stage.href}
-						class="block border border-ink/10 bg-white/60 p-4 transition-colors hover:border-ink/25 hover:bg-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+						class:list={[
+							'group flex min-h-10 items-baseline gap-2.5 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush',
+							stage.blocking ? 'text-ink' : 'text-ink-soft hover:text-ink',
+						]}
 					>
-						<p class="text-xs font-medium uppercase tracking-[0.12em] text-ink/55">
-							{stage.title}
-						</p>
-						<div class="mt-2">
-							<StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>
-						</div>
-						<p class="mt-2.5 text-sm leading-snug text-ink-soft">{stage.hint}</p>
+						<span
+							class:list={['mt-1.5 size-2 shrink-0 rounded-full', toneDot[stage.tone]]}
+							aria-hidden="true"
+						/>
+						<span class="min-w-0">
+							<span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+								<span class="text-sm font-medium text-ink">{stage.title}</span>
+								<span class="text-sm">{stage.label}</span>
+								{stage.blocking ? (
+									<span class="text-xs font-medium text-blush-deep">bloque</span>
+								) : null}
+							</span>
+							<span class="mt-1 block truncate text-xs text-ink/45 group-hover:text-ink/60">
+								{stage.hint}
+							</span>
+						</span>
 					</a>
 				</li>
 			))
 		}
-	</ul>
-</section>
+	</ol>
+</nav>

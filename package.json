@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:4321/api/inngest",
+    "dev:inngest": "npx inngest-cli@latest dev -u http://localhost:4321/api/inngest",
     "webhook:yousign": "ngrok http 4321",
     "webhook:stripe": "stripe listen --forward-to localhost:4321/api/webhooks/stripe",
     "build": "prisma generate && astro build",
