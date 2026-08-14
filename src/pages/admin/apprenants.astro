@@ -1,0 +1,82 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import Alert from '../../components/ui/Alert.astro';
+import LearnerFilterBar from '../../components/admin/list/LearnerFilterBar.astro';
+import LearnerList from '../../components/admin/list/LearnerList.astro';
+import Pager from '../../components/admin/list/Pager.astro';
+import { requireAdminPage } from '../../lib/admin/auth';
+import {
+	adminLearnersHref,
+	listAdminTeachizyLearners,
+} from '../../lib/admin/teachizy-learners';
+import { parseAdminLearnersQuery } from '../../lib/validation';
+
+export const prerender = false;
+
+const admin = await requireAdminPage(Astro);
+if (admin instanceof Response) return admin;
+
+const filters = parseAdminLearnersQuery(Astro.url.searchParams);
+const list = await listAdminTeachizyLearners(filters);
+
+const summary = list.error
+	? null
+	: list.total === 0
+		? list.q || list.status
+			? 'Aucun résultat pour ces critères'
+			: 'Aucun apprenant Teachizy'
+		: `${list.from}–${list.to} sur ${list.total} apprenants`;
+---
+
+<AdminLayout title="Apprenants" email={admin}>
+	<div class="mb-6">
+		<h1 class="font-display text-4xl text-ink">Apprenants</h1>
+		{
+			summary && (
+				<p class="mt-2 text-sm text-ink-soft">{summary}</p>
+			)
+		}
+	</div>
+
+	<div class="mb-6 border border-ink/10 bg-white/50 p-4">
+		<LearnerFilterBar q={list.q} status={list.status} />
+	</div>
+
+	{
+		list.error ? (
+			<Alert variant="error">{list.error}</Alert>
+		) : list.rows.length === 0 ? (
+			<p class="border border-dashed border-ink/15 px-4 py-10 text-center text-sm text-ink-soft">
+				{list.q || list.status
+					? 'Aucun apprenant Teachizy ne correspond à ces critères.'
+					: 'Les apprenants Teachizy apparaîtront ici.'}
+			</p>
+		) : (
+			<>
+				<LearnerList rows={list.rows} />
+				<Pager
+					class="mt-6"
+					page={list.page}
+					totalPages={list.totalPages}
+					hasPrev={list.hasPrev}
+					hasNext={list.hasNext}
+					prevHref={adminLearnersHref({
+						q: list.q,
+						status: list.status,
+						page: list.page - 1,
+					})}
+					nextHref={adminLearnersHref({
+						q: list.q,
+						status: list.status,
+						page: list.page + 1,
+					})}
+				/>
+			</>
+		)
+	}
+</AdminLayout>
+
+<script>
+	import { bindEnrollmentListNavigation } from '../../components/admin/list/list-nav';
+	bindEnrollmentListNavigation();
+</script>

@@ -54,3 +54,18 @@ export function parseAdminListQuery(params: URLSearchParams) {
 		access: access.success ? access.data : ('' as const),
 	};
 }
+
+const learnerSearchQuerySchema = z.string().trim().max(254);
+const learnerStatusSchema = z.enum(['ACTIVE', 'DISABLED']);
+
+export function parseAdminLearnersQuery(params: URLSearchParams) {
+	const q = learnerSearchQuerySchema.safeParse(params.get('q') ?? '');
+	const page = adminPageSchema.safeParse(params.get('page') ?? 1);
+	const status = learnerStatusSchema.safeParse(params.get('status') ?? '');
+
+	return {
+		q: q.success ? q.data : '',
+		page: page.success ? page.data : 1,
+		status: status.success ? status.data : ('' as const),
+	};
+}

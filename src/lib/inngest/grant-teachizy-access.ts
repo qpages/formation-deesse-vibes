@@ -3,19 +3,27 @@ import {
 	findEnrollmentByIdOrThrow,
 	updateEnrollmentYousignMirror,
 } from '../services/enrollment';
-import { alertFinalFailure, notifyOps } from '../services/slack';
-import { inviteToTeachizy } from '../teachizy';
-import { getPrisma } from '../prisma';
+import {
+	inviteOrConfirmTeachizy,
+	markEnrollmentTeachizyActive,
+} from '../services/teachizy-access';
+import {
+	alertFinalFailure,
+	formatErrorDetail,
+	notifyOps,
+	withJobLifecycleAlerts,
+} from '../services/slack';
 import { inngest } from './client';
 
 /**
  * Command: invite Teachizy + pose accessStatus=active.
  * Triggers: signature.done, access.grant (admin / policy).
+ * Si l’invite échoue mais l’apprenant a déjà la formation → mark active quand même.
  */
 export const grantTeachizyAccess = inngest.createFunction(
 	{
 		id: 'grant-teachizy-access',
-		retries: 5,
+		retries: 2,
 		triggers: [
 			{ event: 'yousign/signature.done' },
 			{ event: 'enrollment/access.grant' },
@@ -25,75 +33,84 @@ export const grantTeachizyAccess = inngest.createFunction(
 			await alertFinalFailure({
 				title: 'Échec définitif invitation Teachizy',
 				enrollmentId: original.event?.data?.enrollmentId,
-				error: error.message,
+				error: formatErrorDetail(error),
 			});
 		},
 	},
-	async ({ event, step }) => {
+	async ({ event, step, attempt }) => {
 		const { enrollmentId } = event.data;
 
-		const enrollment = await step.run('load-enrollment', async () => {
-			return findEnrollmentByIdOrThrow(enrollmentId);
-		});
-
-		if (enrollment.teachizyInvitedAt && enrollment.accessStatus === 'active') {
-			return { skipped: true, reason: 'already_invited' };
-		}
-
-		if (event.name === 'yousign/signature.done') {
-			await step.run('mark-contract-signed', async () => {
-				await updateEnrollmentYousignMirror(enrollment.id, {
-					yousignStatus: 'done',
-					contractStatus: 'signed',
+		return withJobLifecycleAlerts({
+			attempt,
+			jobLabel: 'Invitation Teachizy',
+			enrollmentId,
+			run: async () => {
+				const enrollment = await step.run('load-enrollment', async () => {
+					return findEnrollmentByIdOrThrow(enrollmentId);
 				});
-				await applyAccessPolicy(enrollment.id);
-			});
-		}
 
-		const fresh = await step.run('reload', async () => {
-			return findEnrollmentByIdOrThrow(enrollmentId);
+				if (enrollment.teachizyInvitedAt && enrollment.accessStatus === 'active') {
+					return { skipped: true, reason: 'already_invited' };
+				}
+
+				if (event.name === 'yousign/signature.done') {
+					await step.run('mark-contract-signed', async () => {
+						await updateEnrollmentYousignMirror(enrollment.id, {
+							yousignStatus: 'done',
+							contractStatus: 'signed',
+						});
+						await applyAccessPolicy(enrollment.id);
+					});
+				}
+
+				const fresh = await step.run('reload', async () => {
+					return findEnrollmentByIdOrThrow(enrollmentId);
+				});
+
+				if (fresh.accessStatus === 'revoked' || fresh.collectionStatus === 'refunded') {
+					return { skipped: true, reason: 'access_revoked' };
+				}
+
+				if (fresh.contractStatus !== 'signed') {
+					return { skipped: true, reason: 'contract_not_signed' };
+				}
+
+				const inviteResult = await step.run('invite-teachizy', async () => {
+					return inviteOrConfirmTeachizy({
+						enrollmentId: fresh.id,
+						email: fresh.user.email,
+						firstName: fresh.user.firstName,
+						lastName: fresh.user.lastName,
+					});
+				});
+
+				await step.run('mark-active', async () => {
+					// step.run sérialise les Date → string : re-hydrater avant Prisma.
+					await markEnrollmentTeachizyActive(fresh.id, {
+						accessGrantedAt: fresh.accessGrantedAt
+							? new Date(fresh.accessGrantedAt)
+							: null,
+						invitedAt: fresh.teachizyInvitedAt
+							? new Date(fresh.teachizyInvitedAt)
+							: null,
+					});
+				});
+
+				await step.run('notify-access-active', async () => {
+					const via =
+						'confirmed' in inviteResult ? ' (déjà présent Teachizy)' : '';
+					await notifyOps({
+						kind: 'access.active',
+						severity: 'info',
+						title: 'Accès Teachizy actif',
+						enrollmentId: fresh.id,
+						email: fresh.user.email,
+						detail: `${fresh.user.firstName} ${fresh.user.lastName}${via}`,
+					});
+				});
+
+				return { invited: true, ...inviteResult };
+			},
 		});
-
-		if (fresh.accessStatus === 'revoked' || fresh.collectionStatus === 'refunded') {
-			return { skipped: true, reason: 'access_revoked' };
-		}
-
-		if (fresh.contractStatus !== 'signed') {
-			return { skipped: true, reason: 'contract_not_signed' };
-		}
-
-		await step.run('invite-teachizy', async () => {
-			await inviteToTeachizy({
-				enrollmentId: fresh.id,
-				email: fresh.user.email,
-				firstName: fresh.user.firstName,
-				lastName: fresh.user.lastName,
-			});
-		});
-
-		await step.run('mark-active', async () => {
-			await getPrisma().enrollment.update({
-				where: { id: fresh.id },
-				data: {
-					accessStatus: 'active',
-					accessGrantedAt: fresh.accessGrantedAt ?? new Date(),
-					accessSuspendedAt: null,
-					teachizyInvitedAt: fresh.teachizyInvitedAt ?? new Date(),
-				},
-			});
-		});
-
-		await step.run('notify-access-active', async () => {
-			await notifyOps({
-				kind: 'access.active',
-				severity: 'info',
-				title: 'Accès Teachizy actif',
-				enrollmentId: fresh.id,
-				email: fresh.user.email,
-				detail: `${fresh.user.firstName} ${fresh.user.lastName}`,
-			});
-		});
-
-		return { invited: true };
 	},
 );

@@ -10,12 +10,24 @@ import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
 export const adminActionZones = ['metier', 'recovery'] as const;
 export type AdminActionZone = (typeof adminActionZones)[number];
 
+/**
+ * Nature d'exécution de l'action — sépare deux contrats d'erreur distincts :
+ * - `sync`  : effet primaire = lecture provider + miroir DB. L'enqueue Inngest
+ *             éventuel est best-effort (une file HS n'échoue pas l'action).
+ * - `flow`  : effet primaire = enqueue Inngest (le job EST l'action). File HS = échec.
+ * - `read`  : lecture pure, aucun effet de bord persistant (ex. copier un lien).
+ */
+export const adminActionExecutions = ['sync', 'flow', 'read'] as const;
+export type AdminActionExecution = (typeof adminActionExecutions)[number];
+
 export const adminActionKeys = [
 	'resend_nda',
 	'retrigger_teachizy',
+	'sync_teachizy',
 	'sync_payment',
 	'sync_yousign',
 	'recreate_nda',
+	'copy_nda_link',
 ] as const;
 
 export type AdminActionKey = (typeof adminActionKeys)[number];
@@ -26,6 +38,7 @@ export interface AdminActionDef {
 	action: AdminActionKey;
 	label: string;
 	zone: AdminActionZone;
+	execution: AdminActionExecution;
 	eyebrow: string;
 	title: string;
 	description: string;
@@ -35,49 +48,76 @@ export interface AdminActionDef {
 /** Descriptions use `{name}` — remplacé côté client. */
 export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
-		action: 'resend_nda',
-		label: 'Renvoyer le lien Yousign',
+		action: 'copy_nda_link',
+		label: 'Copier le lien de signature',
 		zone: 'metier',
+		execution: 'read',
 		eyebrow: 'Signature',
-		title: 'Renvoyer le lien Yousign',
+		title: 'Copier le lien de signature',
 		description:
-			'Renvoyer à {name} le même lien de signature Yousign (réactivation). L’ancien lien reste valide.',
-		confirm: 'Renvoyer le lien',
+			'Récupérer le lien Yousign actuel de {name} et le copier dans le presse-papiers (fetch live, non stocké).',
+		confirm: 'Copier le lien',
 	},
 	{
 		action: 'retrigger_teachizy',
 		label: 'Inviter à la formation',
-		zone: 'metier',
-		eyebrow: 'Accès',
+		zone: 'recovery',
+		execution: 'flow',
+		eyebrow: 'Réparation',
 		title: 'Inviter à la formation',
 		description:
 			'Envoyer / réactiver l’invitation Teachizy pour {name} (selon la politique d’accès).',
 		confirm: 'Inviter',
 	},
 	{
+		action: 'sync_teachizy',
+		label: 'Sync statut Teachizy',
+		zone: 'recovery',
+		execution: 'sync',
+		eyebrow: 'Accès',
+		title: 'Synchroniser Teachizy',
+		description:
+			'Lire le compte Teachizy de {name} et poser accessStatus=active si la formation est déjà là. Aucune invitation envoyée.',
+		confirm: 'Synchroniser',
+	},
+	{
 		action: 'sync_payment',
 		label: 'Sync paiement Stripe',
 		zone: 'recovery',
+		execution: 'sync',
 		eyebrow: 'Réparation',
 		title: 'Synchroniser le paiement',
 		description:
-			'Lire la session Stripe de {name}, aligner la collection en base, et lancer la création du NDA s’il manque encore.',
+			'Lire la session Stripe de {name} et aligner la collection en base. Déclenche la création du NDA s’il manque (si la file est disponible).',
 		confirm: 'Synchroniser',
 	},
 	{
 		action: 'sync_yousign',
 		label: 'Sync statut Yousign',
 		zone: 'recovery',
+		execution: 'sync',
 		eyebrow: 'Réparation',
 		title: 'Synchroniser Yousign',
 		description:
-			'Lire le statut Yousign de {name}, aligner contractStatus / yousignStatus, et inviter Teachizy si le NDA est signé.',
+			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus. Invite Teachizy si le NDA est signé (si la file est disponible).',
 		confirm: 'Synchroniser',
+	},
+	{
+		action: 'resend_nda',
+		label: 'Renvoyer le lien Yousign',
+		zone: 'recovery',
+		execution: 'flow',
+		eyebrow: 'Réparation',
+		title: 'Renvoyer le lien Yousign',
+		description:
+			'Renvoyer à {name} le même lien de signature Yousign (réactivation). L’ancien lien reste valide.',
+		confirm: 'Renvoyer le lien',
 	},
 	{
 		action: 'recreate_nda',
 		label: 'Recréer un lien Yousign',
 		zone: 'recovery',
+		execution: 'flow',
 		eyebrow: 'Réparation',
 		title: 'Recréer un lien Yousign',
 		description:
@@ -119,6 +159,7 @@ type VisibilityInput = Pick<
 	| 'contractStatus'
 	| 'accessStatus'
 	| 'yousignRequestId'
+	| 'yousignSignerId'
 	| 'stripeCheckoutSessionId'
 >;
 
@@ -129,9 +170,17 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 	switch (action) {
 		case 'resend_nda':
 			return isAwaitingNda(e) && Boolean(e.yousignRequestId);
+		case 'copy_nda_link':
+			return (
+				e.contractStatus === 'sent' &&
+				Boolean(e.yousignRequestId) &&
+				Boolean(e.yousignSignerId)
+			);
 		case 'recreate_nda':
 			return paidEnough && e.contractStatus !== 'signed';
 		case 'retrigger_teachizy':
+			return e.accessStatus !== 'revoked' && e.contractStatus === 'signed';
+		case 'sync_teachizy':
 			return e.accessStatus !== 'revoked' && e.contractStatus === 'signed';
 		case 'sync_payment':
 			return Boolean(e.stripeCheckoutSessionId);
@@ -140,6 +189,10 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 		default:
 			return false;
 	}
+}
+
+export function adminActionExecution(action: AdminActionKey): AdminActionExecution {
+	return ADMIN_ACTIONS.find((a) => a.action === action)?.execution ?? 'flow';
 }
 
 export function visibleActions(e: VisibilityInput): AdminActionKey[] {
@@ -151,102 +204,23 @@ export function visibleActionDefs(e: VisibilityInput): AdminActionDef[] {
 	return ADMIN_ACTIONS.filter((a) => allowed.has(a.action));
 }
 
-function actionDef(action: AdminActionKey): AdminActionDef {
-	const def = ADMIN_ACTIONS.find((a) => a.action === action);
-	if (!def) throw new Error(`Unknown admin action: ${action}`);
-	return def;
-}
-
-/** Pipeline-first next step — métier before réparation. */
-export function recommendedAction(e: VisibilityInput): AdminActionDef | null {
-	const allowed = new Set(visibleActions(e));
-	const pick = (key: AdminActionKey) => (allowed.has(key) ? actionDef(key) : null);
-
-	if (
-		e.collectionStatus === 'pending' ||
-		e.collectionStatus === 'past_due' ||
-		e.collectionStatus === 'canceled'
-	) {
-		const sync = pick('sync_payment');
-		if (sync) return sync;
-	}
-
-	if (e.contractStatus === 'sent' || e.contractStatus === 'pending') {
-		const resend = pick('resend_nda');
-		if (resend) return resend;
-		const yousign = pick('sync_yousign');
-		if (yousign) return yousign;
-		const sync = pick('sync_payment');
-		if (sync) return sync;
-	}
-
-	if (e.contractStatus === 'signed' && e.accessStatus !== 'active') {
-		const invite = pick('retrigger_teachizy');
-		if (invite) return invite;
-	}
-
-	if (e.accessStatus === 'suspended') {
-		const invite = pick('retrigger_teachizy');
-		if (invite) return invite;
-	}
-
-	const fallback: AdminActionKey[] = [
-		'sync_payment',
-		'sync_yousign',
-		'resend_nda',
-		'retrigger_teachizy',
-	];
-	for (const key of fallback) {
-		const hit = pick(key);
-		if (hit) return hit;
-	}
-
-	return null;
-}
-
-export function recommendedActionReason(
-	e: VisibilityInput,
-	action: AdminActionKey,
-): string {
-	switch (action) {
-		case 'sync_payment':
-			if (e.collectionStatus === 'past_due') {
-				return 'Impayé détecté — resynchronisez Stripe pour aligner le dossier.';
-			}
-			if (e.collectionStatus === 'canceled') {
-				return 'Paiement annulé côté collection — vérifiez l’état Stripe.';
-			}
-			if (e.contractStatus === 'pending' || e.contractStatus === 'sent') {
-				return 'Signature bloquée — synchronisez Stripe pour débloquer / créer le lien Yousign.';
-			}
-			return 'Paiement en attente — synchronisez Stripe pour débloquer la signature.';
-		case 'resend_nda':
-			return 'Signature en attente — renvoyez le lien Yousign.';
-		case 'sync_yousign':
-			return 'Signature à rattraper — synchronisez Yousign (aligne le statut et invite Teachizy si signé).';
-		case 'retrigger_teachizy':
-			return 'NDA signé — invitez à la formation (force, si le sync n’a pas suffi).';
-		default:
-			return 'Prochaine action recommandée pour ce dossier.';
-	}
-}
+const SIGNATURE_PANEL_ACTIONS = new Set<AdminActionKey>(['copy_nda_link']);
+const ACCESS_PANEL_ACTIONS = new Set<AdminActionKey>([]);
 
 export type PartitionedAdminActions = {
-	recommended: AdminActionDef | null;
-	reason: string | null;
-	secondary: AdminActionDef[];
+	signature: AdminActionDef[];
+	access: AdminActionDef[];
+	recovery: AdminActionDef[];
 };
 
-/** Detail panel: recommended CTA + other visible actions. */
+/** Detail panels: actions grouped by domain. */
 export function partitionVisibleActions(e: VisibilityInput): PartitionedAdminActions {
-	const recommended = recommendedAction(e);
-	const secondary = visibleActionDefs(e).filter(
-		(a) => a.action !== recommended?.action,
-	);
+	const all = visibleActionDefs(e);
+
 	return {
-		recommended,
-		reason: recommended ? recommendedActionReason(e, recommended.action) : null,
-		secondary,
+		signature: all.filter((a) => SIGNATURE_PANEL_ACTIONS.has(a.action)),
+		access: all.filter((a) => ACCESS_PANEL_ACTIONS.has(a.action)),
+		recovery: all.filter((a) => a.zone === 'recovery'),
 	};
 }
 

@@ -3,6 +3,16 @@ import type { AdminActionMetaClient } from '../../lib/admin/actions';
 const confirmBtnPrimary =
 	'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush disabled:pointer-events-none disabled:opacity-50 h-10 px-4 text-sm text-mist bg-ink hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]';
 
+const DETAIL_SWAP_IDS = [
+	'enrollment-header',
+	'pipeline',
+	'paiements',
+	'signature',
+	'acces',
+	'reparations',
+	'historique-wrap',
+] as const;
+
 declare global {
 	interface Window {
 		toast?: (message: string, variant?: string) => void;
@@ -20,6 +30,7 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 
 	let busy = false;
 	let pendingConfirmLabel = 'Confirmer';
+	let bound = false;
 
 	dialog?.addEventListener('cancel', (event) => {
 		if (busy) event.preventDefault();
@@ -107,6 +118,47 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 		});
 	}
 
+	async function refreshDetailPanels() {
+		const root = document.querySelector('[data-enrollment-detail]');
+		if (!root) {
+			location.reload();
+			return;
+		}
+
+		try {
+			const res = await fetch(window.location.href, {
+				headers: { Accept: 'text/html' },
+				credentials: 'same-origin',
+			});
+			if (!res.ok) {
+				location.reload();
+				return;
+			}
+
+			const html = await res.text();
+			const doc = new DOMParser().parseFromString(html, 'text/html');
+
+			const detailRoot = document.querySelector('[data-enrollment-detail]');
+
+			for (const id of DETAIL_SWAP_IDS) {
+				const next = doc.getElementById(id);
+				const current = document.getElementById(id);
+				if (next && current) {
+					current.replaceWith(document.importNode(next, true));
+				} else if (current && !next) {
+					current.remove();
+				} else if (next && !current && detailRoot) {
+					const node = document.importNode(next, true);
+					const anchor = document.getElementById('historique-wrap');
+					if (anchor) anchor.before(node);
+					else detailRoot.append(node);
+				}
+			}
+		} catch {
+			location.reload();
+		}
+	}
+
 	async function runAdminAction(enrollmentId: string, action: string, name: string) {
 		if (!(action in actionMeta)) return false;
 
@@ -126,10 +178,24 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 			closeDialog();
 
 			if (res.ok) {
+				if (typeof json.copyUrl === 'string' && json.copyUrl) {
+					try {
+						await navigator.clipboard.writeText(json.copyUrl);
+						toast(json.message || 'Lien copié.', 'success');
+					} catch {
+						toast(
+							'Lien récupéré mais copie impossible — collez depuis la console réseau.',
+							'error',
+						);
+					}
+					await refreshDetailPanels();
+					return true;
+				}
+
 				const variant =
 					json.toast === 'info' || json.toast === 'error' ? json.toast : 'success';
 				toast(json.message || 'Action effectuée.', variant);
-				window.setTimeout(() => location.reload(), 700);
+				await refreshDetailPanels();
 				return true;
 			}
 
@@ -142,15 +208,36 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 		}
 	}
 
-	document.querySelectorAll('[data-action]').forEach((btn) => {
-		btn.addEventListener('click', async (event) => {
-			event.stopPropagation();
-			const action = btn.getAttribute('data-action');
-			const wrap = btn.closest('[data-action-zone]') ?? btn.closest('[data-enrollment]');
-			const enrollmentId = wrap?.getAttribute('data-enrollment');
-			const name = wrap?.getAttribute('data-name') ?? '';
-			if (!action || !enrollmentId) return;
-			await runAdminAction(enrollmentId, action, name);
-		});
+	if (bound) return;
+	bound = true;
+
+	document.addEventListener('click', async (event) => {
+		const target = event.target;
+		if (!(target instanceof Element)) return;
+
+		const copyBtn = target.closest<HTMLElement>('[data-copy-text]');
+		if (copyBtn) {
+			event.preventDefault();
+			const text = copyBtn.getAttribute('data-copy-text');
+			if (!text) return;
+			try {
+				await navigator.clipboard.writeText(text);
+				toast(copyBtn.getAttribute('data-copy-success') || 'Copié.', 'success');
+			} catch {
+				toast('Copie impossible.', 'error');
+			}
+			return;
+		}
+
+		const btn = target.closest<HTMLElement>('[data-action]');
+		if (!btn) return;
+
+		event.stopPropagation();
+		const action = btn.getAttribute('data-action');
+		const wrap = btn.closest('[data-action-zone]') ?? btn.closest('[data-enrollment]');
+		const enrollmentId = wrap?.getAttribute('data-enrollment');
+		const name = wrap?.getAttribute('data-name') ?? '';
+		if (!action || !enrollmentId) return;
+		await runAdminAction(enrollmentId, action, name);
 	});
 }

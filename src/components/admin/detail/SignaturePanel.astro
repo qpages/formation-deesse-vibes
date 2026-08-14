@@ -1,0 +1,271 @@
+---
+import StatusBadge from '../../ui/StatusBadge.astro';
+import type { AdminActionDef } from '../../../lib/admin/actions';
+import type { AdminEnrollmentDetail } from '../../../lib/admin/enrollments';
+import { signatureDiagnostic } from '../../../lib/admin/pipeline-detail';
+import {
+	CONTRACT_STATUS_LABELS,
+	YOUSIGN_SIGNER_STATUS_LABELS,
+} from '../../../lib/status';
+
+interface Props {
+	detail: AdminEnrollmentDetail;
+	enrollmentId: string;
+	displayName: string;
+	actions?: AdminActionDef[];
+}
+
+const { detail, enrollmentId, displayName, actions = [] } = Astro.props;
+
+function formatDateTime(value: Date | null | undefined) {
+	if (!value) return null;
+	return value.toLocaleString('fr-FR', {
+		dateStyle: 'short',
+		timeStyle: 'short',
+		timeZone: 'Europe/Paris',
+	});
+}
+
+function formatSignedAt(value: Date | null | undefined) {
+	if (!value) return null;
+	const date = value.toLocaleDateString('fr-FR', {
+		day: '2-digit',
+		month: '2-digit',
+		year: 'numeric',
+		timeZone: 'Europe/Paris',
+	});
+	const time = value.toLocaleTimeString('fr-FR', {
+		hour: '2-digit',
+		minute: '2-digit',
+		timeZone: 'Europe/Paris',
+	});
+	return `Signé le ${date} à ${time}`;
+}
+
+type StepState = 'done' | 'current' | 'todo' | 'error';
+
+type TimelineStep = {
+	key: string;
+	label: string;
+	state: StepState;
+	meta: string | null;
+};
+
+const signed = detail.contractStatus === 'signed' || Boolean(detail.ndaSignedAt);
+const opened = Boolean(detail.ndaLinkOpenedAt);
+const notified =
+	Boolean(detail.ndaNotifiedAt) ||
+	detail.yousignSignerStatus === 'notified' ||
+	opened ||
+	signed;
+const deliveryFailed = Boolean(detail.ndaDeliveryFailedAt);
+
+const expiresAt = detail.signatureLinkExpiresAt;
+const expiresLabel = formatDateTime(expiresAt);
+const now = Date.now();
+const expiresMs = expiresAt?.getTime() ?? null;
+const expired =
+	!signed && expiresMs != null && expiresMs < now && detail.contractStatus === 'sent';
+const expiresSoon =
+	!signed &&
+	!expired &&
+	expiresMs != null &&
+	expiresMs - now < 6 * 60 * 60 * 1000 &&
+	detail.contractStatus === 'sent';
+
+const timeline: TimelineStep[] = [
+	{
+		key: 'notified',
+		label: 'Notifié',
+		state: deliveryFailed ? 'error' : notified ? 'done' : 'todo',
+		meta: deliveryFailed
+			? formatDateTime(detail.ndaDeliveryFailedAt)
+			: formatDateTime(detail.ndaNotifiedAt),
+	},
+	{
+		key: 'opened',
+		label: 'Lien ouvert',
+		state: opened ? 'done' : notified && !signed ? 'current' : signed ? 'done' : 'todo',
+		meta: formatDateTime(detail.ndaLinkOpenedAt),
+	},
+	{
+		key: 'signed',
+		label: signed && detail.ndaSignedAt ? formatSignedAt(detail.ndaSignedAt)! : 'Signé',
+		state: signed ? 'done' : opened || notified ? 'current' : 'todo',
+		meta: signed && detail.ndaSignedAt ? null : formatDateTime(detail.ndaSignedAt),
+	},
+];
+
+const diagnostic = signatureDiagnostic(detail);
+const lastErrorAtLabel = formatDateTime(detail.yousignLastErrorAt);
+
+const techRows: Array<{ label: string; value: string }> = [
+	{ label: 'Statut métier', value: CONTRACT_STATUS_LABELS[detail.contractStatus] },
+	{
+		label: 'Signataire Yousign',
+		value: detail.yousignSignerStatus
+			? YOUSIGN_SIGNER_STATUS_LABELS[detail.yousignSignerStatus]
+			: '—',
+	},
+	{ label: 'Lien expire', value: expiresLabel ?? '—' },
+	{
+		label: 'Renvois',
+		value:
+			detail.ndaResendCount > 0
+				? `${detail.ndaResendCount} · dernier ${formatDateTime(detail.ndaLastResendAt) ?? '—'}`
+				: 'Aucun',
+	},
+	{ label: 'Request ID', value: detail.yousignRequestId ?? '—' },
+	{ label: 'Signer ID', value: detail.yousignSignerId ?? '—' },
+	{
+		label: 'Dernière erreur',
+		value: detail.yousignLastError
+			? `${detail.yousignLastError}${lastErrorAtLabel ? ` · ${lastErrorAtLabel}` : ''}`
+			: '—',
+	},
+];
+
+const diagnosticStyles: Record<'error' | 'warn' | 'info', string> = {
+	error: 'border-blush-deep/40 bg-blush/10 text-blush-deep',
+	warn: 'border-gold/50 bg-gold/10 text-ink',
+	info: 'border-ink/15 bg-surface/60 text-ink-soft',
+};
+
+const btnBase =
+	'inline-flex min-h-9 items-center justify-center border border-ink/20 bg-transparent px-3 text-sm font-medium text-ink transition-colors hover:border-ink/40 hover:bg-surface/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
+
+const stepDot: Record<StepState, string> = {
+	done: 'bg-sage',
+	current: 'bg-gold',
+	todo: 'bg-ink/20',
+	error: 'bg-blush-deep',
+};
+
+function stepText(step: TimelineStep): string {
+	if (step.state === 'done') return step.meta ?? 'OK';
+	if (step.state === 'error') return 'Échec livraison';
+	if (step.state === 'current') return 'En cours';
+	return '—';
+}
+
+const linkClass =
+	'text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
+---
+
+<section
+	class="mb-8 scroll-mt-20"
+	id="signature"
+	aria-labelledby="signature-heading"
+	data-action-zone
+	data-enrollment={enrollmentId}
+	data-name={displayName}
+>
+	<div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+		<div class="flex min-w-0 flex-wrap items-center gap-2">
+			<h2 id="signature-heading" class="text-lg font-medium text-ink">Signature</h2>
+			<StatusBadge tone={detail.pipeline.signature.tone}>
+				{CONTRACT_STATUS_LABELS[detail.contractStatus]}
+			</StatusBadge>
+		</div>
+		{
+			actions.length > 0 ? (
+				<div class="flex flex-wrap gap-2">
+					{actions.map((action) => (
+						<button type="button" data-action={action.action} class={btnBase}>
+							{action.label}
+						</button>
+					))}
+				</div>
+			) : null
+		}
+	</div>
+
+	{
+		diagnostic ? (
+			<div class:list={['mb-3 border-l-2 px-3 py-2', diagnosticStyles[diagnostic.level]]}>
+				<p class="text-sm font-medium wrap-break-word">{diagnostic.title}</p>
+				{diagnostic.action ? (
+					<p class="mt-0.5 text-xs opacity-80">{diagnostic.action}</p>
+				) : null}
+			</div>
+		) : null
+	}
+
+	{
+		expiresSoon ? (
+			<p class="mb-3 text-sm text-ink">
+				Expire bientôt{expiresLabel ? ` · ${expiresLabel}` : ''}.
+			</p>
+		) : null
+	}
+
+	<ol class="flex flex-wrap items-center gap-x-1 gap-y-2 text-sm">
+		{
+			timeline.flatMap((step, index) => {
+				const signedDone = step.key === 'signed' && step.state === 'done' && !step.meta;
+				const node = (
+					<li class="flex items-center gap-1.5">
+						<span
+							class:list={['size-2 shrink-0 rounded-full', stepDot[step.state]]}
+							aria-hidden="true"
+						/>
+						{
+							signedDone ? (
+								<span class="tabular-nums text-ink">{step.label}</span>
+							) : (
+								<>
+									<span class="font-medium text-ink">{step.label}</span>
+									<span class="text-ink/50 tabular-nums">{stepText(step)}</span>
+								</>
+							)
+						}
+					</li>
+				);
+				if (index === 0) return [node];
+				return [
+					<li class="px-1 text-ink/25" aria-hidden="true">
+						→
+					</li>,
+					node,
+				];
+			})
+		}
+	</ol>
+
+	<div class="mt-4 flex flex-wrap items-center gap-x-4">
+		<details class="peer group">
+			<summary
+				class:list={[
+					'cursor-pointer list-none',
+					linkClass,
+					'[&::-webkit-details-marker]:hidden',
+				]}
+			>
+				<span class="group-open:hidden">Voir le détail</span>
+				<span class="hidden group-open:inline">Masquer le détail</span>
+			</summary>
+		</details>
+		{
+			detail.yousignUrl ? (
+				<a
+					href={detail.yousignUrl}
+					target="_blank"
+					rel="noopener noreferrer"
+					class={linkClass}
+				>
+					Yousign ↗
+				</a>
+			) : null
+		}
+		<dl class="mt-3 hidden w-full basis-full gap-x-6 gap-y-2 peer-open:grid sm:grid-cols-2">
+			{
+				techRows.map((row) => (
+					<div class="flex min-w-0 gap-2 text-sm">
+						<dt class="shrink-0 text-ink/45">{row.label}</dt>
+						<dd class="min-w-0 break-all text-ink">{row.value}</dd>
+					</div>
+				))
+			}
+		</dl>
+	</div>
+</section>

@@ -1,0 +1,139 @@
+---
+import StatusBadge from '../../ui/StatusBadge.astro';
+import type { AdminLearnerRow } from '../../../lib/admin/teachizy-learners';
+import {
+	formatLearnerDate,
+	formatLearnerDuration,
+	learnerStatusLabel,
+	learnerStatusTone,
+} from '../../../lib/admin/teachizy-learners';
+
+interface Props {
+	rows: AdminLearnerRow[];
+}
+
+const { rows } = Astro.props;
+
+const rowNavClass =
+	'transition-colors hover:bg-ink/2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blush/50';
+---
+
+<ul class="space-y-3 lg:hidden">
+	{
+		rows.map((row) => {
+			const href = row.enrollmentId ? `/admin/enrollments/${row.enrollmentId}` : undefined;
+			return (
+				<li
+					class:list={[
+						'border border-ink/10 bg-white/60 px-4 py-4',
+						href && `cursor-pointer ${rowNavClass}`,
+					]}
+					data-enrollment-href={href}
+					tabindex={href ? 0 : undefined}
+					role={href ? 'link' : undefined}
+					aria-label={href ? `Ouvrir ${row.displayName}` : undefined}
+				>
+					<div class="min-w-0">
+						<p class="font-medium text-ink">{row.displayName}</p>
+						<p class="truncate text-ink-soft">{row.email}</p>
+					</div>
+					<div class="mt-3 flex flex-wrap items-center gap-2">
+						<StatusBadge tone={learnerStatusTone(row.trainingStatus)}>
+							{learnerStatusLabel(row.trainingStatus)}
+						</StatusBadge>
+						{row.accountStatus === 'DISABLED' && (
+							<StatusBadge tone="action">Désactivé</StatusBadge>
+						)}
+					</div>
+					<p class="mt-3 text-sm text-ink">
+						{row.progressionPercent} %
+						<span class="text-ink/45">
+							{' '}
+							· {row.itemsCompleted}/{row.itemsTotal} leçons
+							{row.durationSeconds > 0
+								? ` · ${formatLearnerDuration(row.durationSeconds)}`
+								: ''}
+						</span>
+					</p>
+					<p class="mt-1 text-[11px] text-ink/45">
+						Activité {formatLearnerDate(row.lastActivityAt)} · Connexion{' '}
+						{formatLearnerDate(row.lastLoginAt)}
+					</p>
+				</li>
+			);
+		})
+	}
+</ul>
+
+<div class="hidden overflow-x-auto lg:block">
+	<table class="w-full text-left text-sm">
+		<thead class="border-b border-ink/15 text-[11px] uppercase tracking-[0.12em] text-ink-soft">
+			<tr>
+				<th class="py-3 pr-4 font-medium">Personne</th>
+				<th class="py-3 pr-3 font-medium">Statut</th>
+				<th class="py-3 pr-3 font-medium">Progression</th>
+				<th class="py-3 pr-3 font-medium">Activité</th>
+				<th class="py-3 font-medium">Connexion</th>
+			</tr>
+		</thead>
+		<tbody class="divide-y divide-ink/10">
+			{
+				rows.map((row) => {
+					const href = row.enrollmentId
+						? `/admin/enrollments/${row.enrollmentId}`
+						: undefined;
+					return (
+						<tr
+							class:list={[href && `cursor-pointer ${rowNavClass}`]}
+							data-enrollment-href={href}
+							tabindex={href ? 0 : undefined}
+							role={href ? 'link' : undefined}
+							aria-label={href ? `Ouvrir ${row.displayName}` : undefined}
+						>
+							<td class="py-3.5 pr-4">
+								<div class="min-w-0">
+									<p class="font-medium text-ink">{row.displayName}</p>
+									<p class="truncate text-ink-soft">{row.email}</p>
+								</div>
+							</td>
+							<td class="py-3.5 pr-3">
+								<div class="flex flex-wrap items-center gap-1.5">
+									<StatusBadge tone={learnerStatusTone(row.trainingStatus)}>
+										{learnerStatusLabel(row.trainingStatus)}
+									</StatusBadge>
+									{row.accountStatus === 'DISABLED' && (
+										<StatusBadge tone="action">Désactivé</StatusBadge>
+									)}
+								</div>
+							</td>
+							<td class="py-3.5 pr-3">
+								<div class="min-w-32">
+									<div class="flex items-baseline gap-2">
+										<span class="tabular-nums text-ink">
+											{row.progressionPercent} %
+										</span>
+										<span class="text-[11px] text-ink/45">
+											{row.itemsCompleted}/{row.itemsTotal}
+										</span>
+									</div>
+									<div class="mt-1.5 h-0.5 w-24 bg-ink/10" aria-hidden="true">
+										<div
+											class="h-0.5 bg-ink/55"
+											style={`width: ${Math.min(100, row.progressionPercent)}%`}
+										/>
+									</div>
+								</div>
+							</td>
+							<td class="py-3.5 pr-3 text-ink-soft">
+								{formatLearnerDate(row.lastActivityAt)}
+							</td>
+							<td class="py-3.5 text-ink-soft">
+								{formatLearnerDate(row.lastLoginAt)}
+							</td>
+						</tr>
+					);
+				})
+			}
+		</tbody>
+	</table>
+</div>

@@ -41,6 +41,7 @@ export const POST: APIRoute = async ({ request }) => {
 			ok: true,
 			...(result.message ? { message: result.message } : {}),
 			...(result.toast ? { toast: result.toast } : {}),
+			...(result.copyUrl ? { copyUrl: result.copyUrl } : {}),
 		});
 	} catch (error) {
 		console.error('[admin/action]', error);
