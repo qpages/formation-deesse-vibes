@@ -5,10 +5,12 @@ import {
 	findEnrollmentById,
 	findEnrollmentByScheduleId,
 	findEnrollmentBySubscriptionId,
+	findEnrollmentIdByPaymentIntentId,
 	findEnrollmentIdByStripeInvoiceId,
 } from './enrollment';
 import {
 	confirmPaidCheckout,
+	markEnrollmentRefunded,
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
 	syncSubscriptionState,
@@ -27,6 +29,8 @@ const HANDLED = new Set([
 	'customer.subscription.updated',
 	'customer.subscription.deleted',
 	'subscription_schedule.completed',
+	'charge.refunded',
+	'charge.dispute.created',
 ]);
 
 export function isHandledStripeEventType(eventType: string) {
@@ -78,6 +82,35 @@ export async function resolveEnrollmentFromStripeObject(
 		}
 	}
 
+	return null;
+}
+
+function stripeRefId(ref: unknown): string | undefined {
+	if (!ref) return undefined;
+	if (typeof ref === 'string') return ref;
+	if (
+		typeof ref === 'object' &&
+		'id' in ref &&
+		typeof (ref as { id: unknown }).id === 'string'
+	) {
+		return (ref as { id: string }).id;
+	}
+	return undefined;
+}
+
+/** Corrélation refund/dispute : metadata.enrollmentId d'abord, sinon PaymentIntent. */
+async function resolveEnrollmentIdFromPaymentIntent(
+	metadata: Stripe.Metadata | null | undefined,
+	paymentIntentRef: unknown,
+): Promise<string | null> {
+	if (metadata?.enrollmentId) {
+		const byMeta = await findEnrollmentById(metadata.enrollmentId);
+		if (byMeta) return byMeta.id;
+	}
+	const paymentIntentId = stripeRefId(paymentIntentRef);
+	if (paymentIntentId) {
+		return findEnrollmentIdByPaymentIntentId(paymentIntentId);
+	}
 	return null;
 }
 
@@ -152,6 +185,32 @@ export async function handleStripeProviderEvent(input: {
 	if (eventType === 'subscription_schedule.completed') {
 		const schedule = object as Stripe.SubscriptionSchedule;
 		const result = await markSubscriptionScheduleCompleted(schedule);
+		if (!result.ok) return { ignored: true };
+		return { enrollmentId: result.enrollmentId };
+	}
+
+	if (eventType === 'charge.refunded') {
+		const charge = object as Stripe.Charge;
+		// Refund partiel : on ne révoque pas (reste dû / déjà encaissé en partie).
+		if (!charge.refunded) return { ignored: true };
+		const enrollmentId = await resolveEnrollmentIdFromPaymentIntent(
+			charge.metadata,
+			charge.payment_intent,
+		);
+		if (!enrollmentId) return { ignored: true };
+		const result = await markEnrollmentRefunded(enrollmentId, 'refund');
+		if (!result.ok) return { ignored: true };
+		return { enrollmentId: result.enrollmentId };
+	}
+
+	if (eventType === 'charge.dispute.created') {
+		const dispute = object as Stripe.Dispute;
+		const enrollmentId = await resolveEnrollmentIdFromPaymentIntent(
+			dispute.metadata,
+			dispute.payment_intent,
+		);
+		if (!enrollmentId) return { ignored: true };
+		const result = await markEnrollmentRefunded(enrollmentId, 'dispute');
 		if (!result.ok) return { ignored: true };
 		return { enrollmentId: result.enrollmentId };
 	}

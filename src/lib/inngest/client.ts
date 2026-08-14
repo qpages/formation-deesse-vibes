@@ -23,6 +23,33 @@ export const inngest = new Inngest({
 	isDev,
 });
 
+/**
+ * Résultat d'un enqueue Inngest côté effet secondaire (post-condition).
+ * `skipped` = rien à faire (gates non remplies). `failed` = file indisponible.
+ */
+export type EnqueueResult =
+	| { status: 'enqueued' }
+	| { status: 'skipped' }
+	| { status: 'failed'; error: string };
+
+/**
+ * `inngest.send` qui ne jette jamais : isole une panne de la file (dev sans
+ * `inngest:dev`, réseau) de l'effet primaire déjà persisté en base.
+ * Les appelants « durs » (webhook) re-jettent sur `failed` pour garder le retry.
+ */
+export async function sendInngestSafe(
+	payload: Parameters<typeof inngest.send>[0],
+): Promise<{ status: 'enqueued' } | { status: 'failed'; error: string }> {
+	try {
+		await inngest.send(payload);
+		return { status: 'enqueued' };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error('[inngest.send] échec enqueue', message);
+		return { status: 'failed', error: message };
+	}
+}
+
 export type AppEvents = {
 	'stripe/payment.confirmed': {
 		data: { enrollmentId: string; stripeEventId: string };

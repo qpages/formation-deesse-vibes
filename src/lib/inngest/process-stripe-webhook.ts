@@ -5,6 +5,6 @@ import { handleStripeProviderEvent } from '../services/stripe-events';
 export const processStripeWebhook = createProcessProviderWebhook({
 	id: 'process-stripe-webhook',
 	event: 'provider/stripe-event.received',
-	failureTitle: 'Échec process Stripe webhook',
+	jobLabel: 'Webhook Stripe',
 	handle: handleStripeProviderEvent,
 });
