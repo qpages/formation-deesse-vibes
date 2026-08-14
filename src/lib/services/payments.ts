@@ -14,7 +14,7 @@ import {
 	type PaymentPlanId,
 } from '../payment-plans';
 import { hasOpenOrFailedPayments, isPaidEnough } from '../enrollment-gates';
-import { inngest } from '../inngest/client';
+import { sendInngestSafe, type EnqueueResult } from '../inngest/client';
 import { applyAccessPolicy } from './access';
 import {
 	attachStripeCheckoutSession,
@@ -93,6 +93,7 @@ export type ConfirmCheckoutResult =
 			enrollmentId: string;
 			alreadyConfirmed: boolean;
 			contractStatus: ContractStatus;
+			ndaEnqueue?: EnqueueResult;
 	  }
 	| { ok: false; reason: string };
 
@@ -104,20 +105,27 @@ export type ConfirmCheckoutResult =
 export async function ensureNdaAfterPayment(
 	enrollmentId: string,
 	sourceId: string,
-): Promise<void> {
+	opts: { soft?: boolean } = {},
+): Promise<EnqueueResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);
-	if (!enrollment) return;
-	if (!isPaidEnough(enrollment.collectionStatus)) return;
+	if (!enrollment) return { status: 'skipped' };
+	if (!isPaidEnough(enrollment.collectionStatus)) return { status: 'skipped' };
 	if (enrollment.contractStatus !== 'pending' && enrollment.contractStatus !== 'sent') {
-		return;
+		return { status: 'skipped' };
 	}
-	if (isNdaFullyProvisioned(enrollment)) return;
+	if (isNdaFullyProvisioned(enrollment)) return { status: 'skipped' };
 
-	await inngest.send({
+	const result = await sendInngestSafe({
 		id: `nda-after-payment:${enrollmentId}`,
 		name: 'stripe/payment.confirmed',
 		data: { enrollmentId, stripeEventId: sourceId },
 	});
+
+	// Chemin « dur » (webhook / retour Checkout) : rejeter pour laisser Inngest rejouer.
+	if (result.status === 'failed' && !opts.soft) {
+		throw new Error(`Enqueue NDA échoué: ${result.error}`);
+	}
+	return result;
 }
 
 /** Mark enrollment paid when still pending collection; returns false if already confirmed. */
@@ -605,6 +613,7 @@ export async function startCheckout(input: {
  */
 export async function confirmPaidCheckout(
 	session: Stripe.Checkout.Session,
+	opts: { softEnqueue?: boolean } = {},
 ): Promise<ConfirmCheckoutResult> {
 	const enrollmentId =
 		session.metadata?.enrollmentId ?? session.client_reference_id ?? undefined;
@@ -698,13 +707,16 @@ export async function confirmPaidCheckout(
 	}
 
 	// Même post-condition quel que soit l’appelant (webhook / page / admin).
-	await ensureNdaAfterPayment(enrollmentId, session.id);
+	const ndaEnqueue = await ensureNdaAfterPayment(enrollmentId, session.id, {
+		soft: opts.softEnqueue,
+	});
 
 	return {
 		ok: true,
 		enrollmentId,
 		alreadyConfirmed: !transitioned,
 		contractStatus: fresh.contractStatus,
+		ndaEnqueue,
 	};
 }
 
@@ -777,6 +789,42 @@ export async function markSubscriptionScheduleCompleted(
 	return { ok: true as const, enrollmentId: enrollment.id };
 }
 
+/**
+ * Refund total / dispute Stripe → collectionStatus refunded + révocation accès.
+ * Idempotent : ne renotifie pas si déjà refunded. `recompute` conserve ensuite
+ * ce statut (les syncs invoice suivants ne le réécrasent pas).
+ */
+export async function markEnrollmentRefunded(
+	enrollmentId: string,
+	reason: 'refund' | 'dispute',
+): Promise<{ ok: true; enrollmentId: string } | { ok: false; reason: string }> {
+	const prisma = getPrisma();
+	const enrollment = await findEnrollmentById(enrollmentId);
+	if (!enrollment) {
+		return { ok: false, reason: 'enrollment_not_found' };
+	}
+
+	if (enrollment.collectionStatus !== 'refunded') {
+		const previous = enrollment.collectionStatus;
+		await prisma.enrollment.update({
+			where: { id: enrollmentId },
+			data: { collectionStatus: 'refunded' },
+		});
+		await notifyOps({
+			kind: 'collection.refunded',
+			severity: reason === 'dispute' ? 'critical' : 'warn',
+			title: reason === 'dispute' ? 'Litige Stripe (chargeback)' : 'Collection remboursée',
+			enrollmentId,
+			email: enrollment.user.email,
+			detail: `${previous} → refunded (${reason})`,
+		});
+	}
+
+	await applyAccessPolicy(enrollmentId);
+
+	return { ok: true, enrollmentId };
+}
+
 export async function syncAllSubscriptionInvoices(enrollmentId: string) {
 	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment?.stripeSubscriptionId) {
@@ -811,15 +859,17 @@ export async function syncPaymentFromStripe(enrollmentId: string): Promise<Confi
 		} else {
 			await recomputeEnrollmentCollectionState(enrollmentId);
 		}
-		await ensureNdaAfterPayment(
+		const ndaEnqueue = await ensureNdaAfterPayment(
 			enrollmentId,
 			enrollment.stripeCheckoutSessionId ?? `admin-sync:${enrollmentId}`,
+			{ soft: true },
 		);
 		return {
 			ok: true,
 			enrollmentId,
 			alreadyConfirmed: true,
 			contractStatus: enrollment.contractStatus,
+			ndaEnqueue,
 		};
 	}
 	if (!enrollment.stripeCheckoutSessionId) {
@@ -827,7 +877,7 @@ export async function syncPaymentFromStripe(enrollmentId: string): Promise<Confi
 	}
 
 	const session = await retrieveCheckoutSession(enrollment.stripeCheckoutSessionId);
-	const result = await confirmPaidCheckout(session);
+	const result = await confirmPaidCheckout(session, { softEnqueue: true });
 
 	if (result.ok && enrollment.stripeSubscriptionId) {
 		await syncAllSubscriptionInvoices(enrollmentId);

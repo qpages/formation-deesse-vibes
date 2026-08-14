@@ -78,18 +78,34 @@ export async function createCheckoutSession(input: {
 	});
 }
 
-/**
- * Configure un Subscription Schedule pour terminer l'abonnement après N échéances.
- * Idempotent : ne recrée pas si un schedule existe déjà sur la souscription.
- */
-export async function ensureSubscriptionSchedule(input: {
-	subscriptionId: string;
-	priceId: string;
-	installments: number;
-	existingScheduleId?: string | null;
-}): Promise<string> {
-	const client = getStripe();
+/** Nombre de mois entiers couverts par une phase (borne = end_behavior cancel). */
+function phaseMonths(phase: Stripe.SubscriptionSchedule.Phase): number {
+	const start = new Date(phase.start_date * 1000);
+	const end = new Date(phase.end_date * 1000);
+	return (
+		(end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+		(end.getUTCMonth() - start.getUTCMonth())
+	);
+}
 
+/**
+ * Un schedule est correctement borné ssi il s'arrête (`cancel`) après ≥ N mois.
+ * Le défaut de `from_subscription` est `release` sur une seule échéance → à reconfigurer.
+ */
+function isScheduleBounded(
+	schedule: Stripe.SubscriptionSchedule,
+	installments: number,
+): boolean {
+	if (schedule.end_behavior !== 'cancel') return false;
+	const lastPhase = schedule.phases.at(-1);
+	if (!lastPhase) return false;
+	return phaseMonths(lastPhase) >= installments;
+}
+
+async function resolveScheduleId(
+	client: Stripe,
+	input: { subscriptionId: string; existingScheduleId?: string | null },
+): Promise<string> {
 	if (input.existingScheduleId) {
 		return input.existingScheduleId;
 	}
@@ -101,27 +117,57 @@ export async function ensureSubscriptionSchedule(input: {
 			: subscription.schedule.id;
 	}
 
-	const schedule = await client.subscriptionSchedules.create({
+	const created = await client.subscriptionSchedules.create({
 		from_subscription: input.subscriptionId,
 	});
+	return created.id;
+}
+
+/**
+ * Configure un Subscription Schedule pour terminer l'abonnement après N échéances.
+ * Idempotent MAIS pas aveugle : on relit toujours le schedule et on ne saute la
+ * configuration que s'il est déjà borné (`cancel` + durée ≥ N mois). Un create OK
+ * suivi d'un update KO est donc réparé au passage suivant au lieu d'être ignoré.
+ */
+export async function ensureSubscriptionSchedule(input: {
+	subscriptionId: string;
+	priceId: string;
+	installments: number;
+	existingScheduleId?: string | null;
+}): Promise<string> {
+	const client = getStripe();
+
+	const scheduleId = await resolveScheduleId(client, input);
+	const schedule = await client.subscriptionSchedules.retrieve(scheduleId);
+
+	if (isScheduleBounded(schedule, input.installments)) {
+		return schedule.id;
+	}
 
 	const currentPhase = schedule.phases[0];
 	if (!currentPhase) {
 		throw new Error(`Subscription schedule ${schedule.id} sans phase initiale`);
 	}
 
-	await client.subscriptionSchedules.update(schedule.id, {
+	const updated = await client.subscriptionSchedules.update(schedule.id, {
 		end_behavior: 'cancel',
 		phases: [
 			{
 				items: [{ price: input.priceId, quantity: 1 }],
-				iterations: input.installments,
+				duration: { interval: 'month', interval_count: input.installments },
 				start_date: currentPhase.start_date,
-			} as Stripe.SubscriptionScheduleUpdateParams.Phase,
+			},
 		],
 	});
 
-	return schedule.id;
+	if (!isScheduleBounded(updated, input.installments)) {
+		throw new Error(
+			`Subscription schedule ${updated.id} non borné après update ` +
+				`(end_behavior=${updated.end_behavior}, installments=${input.installments})`,
+		);
+	}
+
+	return updated.id;
 }
 
 export function constructStripeEvent(body: string, signature: string) {
