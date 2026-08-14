@@ -85,6 +85,27 @@ export async function findEnrollmentIdByStripeInvoiceId(invoiceId: string) {
 	return payment?.enrollmentId ?? null;
 }
 
+/**
+ * Résout un enrollment depuis un PaymentIntent Stripe (refund / dispute).
+ * L'enrollment porte le PI du 1er paiement ; les échéances suivantes vivent
+ * sur les lignes Payment — on couvre les deux.
+ */
+export async function findEnrollmentIdByPaymentIntentId(paymentIntentId: string) {
+	const prisma = getPrisma();
+
+	const enrollment = await prisma.enrollment.findFirst({
+		where: { stripePaymentIntentId: paymentIntentId },
+		select: { id: true },
+	});
+	if (enrollment) return enrollment.id;
+
+	const payment = await prisma.payment.findFirst({
+		where: { stripePaymentIntentId: paymentIntentId },
+		select: { enrollmentId: true },
+	});
+	return payment?.enrollmentId ?? null;
+}
+
 /** Load enrollment + payment statuses for access policy evaluation. */
 export async function findEnrollmentForAccessPolicy(enrollmentId: string) {
 	return getPrisma().enrollment.findUniqueOrThrow({

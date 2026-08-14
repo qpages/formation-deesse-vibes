@@ -5,6 +5,6 @@ import { handleYousignProviderEvent } from '../services/yousign-events';
 export const processYousignWebhook = createProcessProviderWebhook({
 	id: 'process-yousign-webhook',
 	event: 'provider/yousign-event.received',
-	failureTitle: 'Échec process Yousign webhook',
+	jobLabel: 'Webhook Yousign',
 	handle: handleYousignProviderEvent,
 });

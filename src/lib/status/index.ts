@@ -12,11 +12,14 @@ export {
 	COLLECTION_STATUS_LABELS,
 	CONTRACT_STATUS_LABELS,
 	PAYMENT_STATUS_LABELS,
+	YOUSIGN_SIGNER_STATUS_LABELS,
 	YOUSIGN_STATUS_LABELS,
 } from './labels';
 
 export {
+	contractStatusFromYousignRequest,
 	mapYousignApiStatus,
+	mapYousignSignerApiStatus,
 	YOUSIGN_FAILURE,
 	yousignStatusFromEvent,
 } from './yousign';

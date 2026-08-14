@@ -48,6 +48,20 @@ enum YousignRequestStatus {
   error
 }
 
+/// Miroir 1:1 du status Signer API Yousign.
+/// @see https://developers.yousign.com/docs/signer-1
+enum YousignSignerStatus {
+  initiated
+  notified
+  verified
+  consent_given
+  processing
+  declined
+  signed
+  aborted
+  error
+}
+
 enum PaymentPlanId {
   unique
   x2
@@ -134,12 +148,20 @@ model Enrollment {
   stripeSubscriptionId    String? @unique
   stripeScheduleId        String? @unique
 
-  yousignRequestId String?               @unique
-  yousignSignerId  String?
-  yousignStatus    YousignRequestStatus?
-  ndaResendCount   Int                   @default(0)
-  ndaResendDay     DateTime?
-  ndaLastResendAt  DateTime?
+  yousignRequestId     String?               @unique
+  yousignSignerId      String?
+  yousignStatus        YousignRequestStatus?
+  yousignSignerStatus  YousignSignerStatus?
+  signatureLinkExpiresAt DateTime?
+  ndaNotifiedAt        DateTime?
+  ndaLinkOpenedAt      DateTime?
+  ndaSignedAt          DateTime?
+  ndaDeliveryFailedAt  DateTime?
+  ndaResendCount       Int                   @default(0)
+  ndaResendDay         DateTime?
+  ndaLastResendAt      DateTime?
+  yousignLastError     String?
+  yousignLastErrorAt   DateTime?
 
   accessGrantedAt   DateTime?
   accessSuspendedAt DateTime?

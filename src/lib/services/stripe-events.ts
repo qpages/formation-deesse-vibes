@@ -1,6 +1,5 @@
 import type Stripe from 'stripe';
 import { decryptPayload } from '../crypto';
-import { inngest } from '../inngest/client';
 import {
 	findEnrollmentByCheckoutSession,
 	findEnrollmentById,
@@ -82,18 +81,6 @@ export async function resolveEnrollmentFromStripeObject(
 	return null;
 }
 
-async function emitPaymentConfirmed(enrollmentId: string, stripeEventId: string) {
-	const enrollment = await findEnrollmentById(enrollmentId);
-	if (!enrollment) return;
-	if (enrollment.contractStatus !== 'pending' && enrollment.contractStatus !== 'sent') {
-		return;
-	}
-	await inngest.send({
-		name: 'stripe/payment.confirmed',
-		data: { enrollmentId, stripeEventId },
-	});
-}
-
 export async function handleStripeProviderEvent(input: {
 	providerEventId: string;
 	eventType: string;
@@ -115,7 +102,6 @@ export async function handleStripeProviderEvent(input: {
 
 	const eventType = input.eventType;
 	const object = raw.data.object;
-	const stripeEventId = input.providerEventId;
 
 	if (PAID_CHECKOUT_EVENTS.has(eventType)) {
 		const session = object as Stripe.Checkout.Session;
@@ -124,7 +110,7 @@ export async function handleStripeProviderEvent(input: {
 			return { enrollmentId: session.metadata?.enrollmentId, ignored: true };
 		}
 		if (!result.ok) throw new Error(result.reason);
-		await emitPaymentConfirmed(result.enrollmentId, stripeEventId);
+		// NDA enqueue = post-condition de confirmPaidCheckout (pas ici).
 		return { enrollmentId: result.enrollmentId };
 	}
 

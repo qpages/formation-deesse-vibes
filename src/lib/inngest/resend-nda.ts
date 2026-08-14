@@ -1,5 +1,14 @@
-import { canResendNda, findEnrollmentByIdOrThrow, markNdaResent } from '../services/enrollment';
-import { alertFinalFailure } from '../services/slack';
+import {
+	canResendNda,
+	findEnrollmentByIdOrThrow,
+	markNdaResent,
+	recordYousignError,
+} from '../services/enrollment';
+import {
+	alertFinalFailure,
+	formatErrorDetail,
+	withJobLifecycleAlerts,
+} from '../services/slack';
 import { reactivateNda } from '../yousign';
 import { inngest } from './client';
 
@@ -11,33 +20,45 @@ export const resendNda = inngest.createFunction(
 		triggers: [{ event: 'admin/resend-nda' }],
 		onFailure: async ({ event, error }) => {
 			const original = event.data as { event?: { data?: { enrollmentId?: string } } };
+			const enrollmentId = original.event?.data?.enrollmentId;
+			const detail = formatErrorDetail(error);
+			if (enrollmentId) {
+				await recordYousignError(enrollmentId, `Renvoi NDA — ${detail}`);
+			}
 			await alertFinalFailure({
-				title: 'Échec renvoi NDA',
-				enrollmentId: original.event?.data?.enrollmentId,
-				error: error.message,
+				title: 'Échec définitif renvoi NDA',
+				enrollmentId,
+				error: detail,
 			});
 		},
 	},
-	async ({ event, step }) => {
+	async ({ event, step, attempt }) => {
 		const { enrollmentId } = event.data;
 
-		const allowed = await step.run('gate-resend', async () => {
-			const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
-			return canResendNda(enrollment);
-		});
-		if (!allowed.ok) {
-			return { skipped: true, reason: allowed.reason };
-		}
+		return withJobLifecycleAlerts({
+			attempt,
+			jobLabel: 'Renvoi NDA',
+			enrollmentId,
+			run: async () => {
+				const allowed = await step.run('gate-resend', async () => {
+					const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
+					return canResendNda(enrollment);
+				});
+				if (!allowed.ok) {
+					return { skipped: true, reason: allowed.reason };
+				}
 
-		await step.run('reactivate-and-mark', async () => {
-			const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
-			if (!enrollment.yousignRequestId) {
-				throw new Error('no_yousign_request');
-			}
-			await reactivateNda(enrollment.yousignRequestId);
-			await markNdaResent(enrollment);
-		});
+				await step.run('reactivate-and-mark', async () => {
+					const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
+					if (!enrollment.yousignRequestId) {
+						throw new Error('no_yousign_request');
+					}
+					await reactivateNda(enrollment.yousignRequestId);
+					await markNdaResent(enrollment);
+				});
 
-		return { ok: true };
+				return { ok: true };
+			},
+		});
 	},
 );
