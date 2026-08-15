@@ -14,13 +14,16 @@ import Input from '../../ui/Input.astro';
 </form>
 
 <script>
+	import { lockFormSubmit } from '../../../lib/client/lock-submit';
+
 	const form = document.getElementById('magic-form') as HTMLFormElement | null;
-	const submit = document.getElementById('magic-submit') as HTMLButtonElement | null;
 
 	form?.addEventListener('submit', async (event) => {
 		event.preventDefault();
-		if (!form || !submit) return;
-		submit.disabled = true;
+		if (!form) return;
+		const lock = lockFormSubmit(form, { busyLabel: 'Envoi…' });
+		if (!lock.locked) return;
+
 		const email = String(new FormData(form).get('magicEmail') ?? '');
 		try {
 			const res = await fetch('/api/magic-link/request', {
@@ -31,6 +34,7 @@ import Input from '../../ui/Input.astro';
 			const json = await res.json();
 			if (!res.ok) {
 				window.toast?.(json.error || 'Impossible d’envoyer le lien.', 'error');
+				lock.unlock();
 				return;
 			}
 			window.toast?.(
@@ -38,10 +42,10 @@ import Input from '../../ui/Input.astro';
 					'Si une inscription correspond à cet e-mail, vous recevrez un lien dans quelques instants.',
 				'success',
 			);
+			window.setTimeout(() => lock.unlock(), 8_000);
 		} catch {
 			window.toast?.('Impossible d’envoyer le lien pour le moment.', 'error');
-		} finally {
-			submit.disabled = false;
+			lock.unlock();
 		}
 	});
 </script>

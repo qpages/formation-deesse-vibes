@@ -34,14 +34,18 @@ const { lockedEmail } = Astro.props;
 
 	<PaymentPlanSelector />
 
-	<div class="space-y-3 border-t border-ink/10 pt-5 text-sm text-ink-soft">
+	<div class="border-ink/10 text-ink-soft space-y-3 border-t pt-5 text-sm">
 		<label class="flex gap-3">
 			<input type="checkbox" name="consentLegal" value="true" required class="mt-1" />
 			<span>
 				J’accepte les{' '}
-				<a href="/cgv" class="underline underline-offset-2 hover:text-ink">conditions générales de vente</a>
+				<a href="/cgv" class="hover:text-ink underline underline-offset-2"
+					>conditions générales de vente</a
+				>
 				{' '}et la{' '}
-				<a href="/confidentialite" class="underline underline-offset-2 hover:text-ink">politique de confidentialité</a>.
+				<a href="/confidentialite" class="hover:text-ink underline underline-offset-2"
+					>politique de confidentialité</a
+				>.
 			</span>
 		</label>
 		<label class="flex gap-3">
@@ -51,21 +55,20 @@ const { lockedEmail } = Astro.props;
 				paiement.
 			</span>
 		</label>
-		<details class="rounded-sm border border-ink/10 bg-surface/50 px-4 py-3">
-			<summary class="cursor-pointer text-sm text-ink-soft hover:text-ink">
+		<details class="border-ink/10 bg-surface/50 rounded-sm border px-4 py-3">
+			<summary class="text-ink-soft hover:text-ink cursor-pointer text-sm">
 				Aperçu de l’accord de confidentialité
 			</summary>
-			<div class="mt-3 space-y-3 text-sm leading-relaxed text-ink-soft">
+			<div class="text-ink-soft mt-3 space-y-3 text-sm leading-relaxed">
 				<p>
-					Avant de recevoir vos accès, vous signerez un accord de confidentialité (NDA) via
-					Yousign, par e-mail, sans création de compte.
+					Avant de recevoir vos accès, vous signerez un accord de confidentialité (NDA) via Yousign,
+					par e-mail, sans création de compte.
 				</p>
 				<ul class="list-disc space-y-1.5 pl-5">
 					<li>Protection du contenu pédagogique et des outils Matrice Évolution</li>
 					<li>Interdiction de redistribution non autorisée</li>
 					<li>
-						Conservation du document signé chez Yousign (nous stockons uniquement
-						l’identifiant)
+						Conservation du document signé chez Yousign (nous stockons uniquement l’identifiant)
 					</li>
 				</ul>
 			</div>
@@ -78,15 +81,15 @@ const { lockedEmail } = Astro.props;
 </form>
 
 <script>
+	import { lockFormSubmit } from '../../../lib/client/lock-submit';
+
 	const form = document.getElementById('checkout-form') as HTMLFormElement | null;
-	const submit = document.getElementById('checkout-submit') as HTMLButtonElement | null;
 
 	form?.addEventListener('submit', async (event) => {
 		event.preventDefault();
-		if (!form || !submit) return;
-
-		submit.disabled = true;
-		submit.textContent = 'Redirection…';
+		if (!form) return;
+		const lock = lockFormSubmit(form, { busyLabel: 'Redirection…' });
+		if (!lock.locked) return;
 
 		const data = new FormData(form);
 		const consentLegal = data.get('consentLegal') === 'true';
@@ -110,12 +113,8 @@ const { lockedEmail } = Astro.props;
 			if (!res.ok) throw new Error(json.error || 'Erreur de paiement');
 			window.location.href = json.url;
 		} catch (error) {
-			window.toast?.(
-				error instanceof Error ? error.message : 'Une erreur est survenue.',
-				'error',
-			);
-			submit.disabled = false;
-			submit.textContent = 'Je m’inscris';
+			window.toast?.(error instanceof Error ? error.message : 'Une erreur est survenue.', 'error');
+			lock.unlock();
 		}
 	});
 </script>

@@ -1,10 +1,11 @@
 import type { APIRoute } from 'astro';
 import { json } from '../../../lib/http';
+import { RATE_LIMITS, clientIp, enforceRateLimit, rateLimitKey } from '../../../lib/rate-limit';
 import { requestMagicLink } from '../../../lib/services/enrollment';
 import { formatErrorDetail, notifyOps } from '../../../lib/services/slack';
 import { magicLinkSchema } from '../../../lib/validation';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
 	let email: string | undefined;
 	try {
 		const body = await request.json();
@@ -14,15 +15,18 @@ export const POST: APIRoute = async ({ request }) => {
 		}
 
 		email = parsed.data.email;
+		const limited = enforceRateLimit(
+			rateLimitKey(RATE_LIMITS.magicLink, [clientIp(request, clientAddress), email]),
+			RATE_LIMITS.magicLink,
+		);
+		if (limited) return limited;
 		const result = await requestMagicLink(email);
 		await notifyOps({
 			kind: 'auth.magic_link_requested',
 			severity: 'info',
 			title: 'Demande de lien de connexion',
 			email,
-			detail: result.sent
-				? 'e-mail envoyé'
-				: 'pas d’envoi (inconnu ou inscription pending)',
+			detail: result.sent ? 'e-mail envoyé' : 'pas d’envoi (inconnu ou inscription pending)',
 		});
 		return json({
 			ok: true,
