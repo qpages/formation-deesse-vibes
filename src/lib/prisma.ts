@@ -1,5 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { resolveDatabaseUrl } from './database-url';
 
 const PRISMA_CLIENT_REV = 'yousignLastError';
 
@@ -9,10 +10,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createClient() {
-	const connectionString = import.meta.env.DATABASE_URL ?? process.env.DATABASE_URL;
-	if (!connectionString) {
-		throw new Error('DATABASE_URL is required');
-	}
+	const connectionString = resolveDatabaseUrl();
 	const adapter = new PrismaPg({ connectionString });
 	return new PrismaClient({ adapter });
 }

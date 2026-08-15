@@ -8,14 +8,13 @@ import pg from 'pg';
 import Stripe from 'stripe';
 
 const REQUIRED_ALWAYS = [
-	'DATABASE_URL',
 	'STRIPE_SECRET_KEY',
 	'STRIPE_WEBHOOK_SECRET',
 	'STRIPE_PRICE_ID',
 	'YOUSIGN_API_KEY',
 	'YOUSIGN_TEMPLATE_ID',
 	'YOUSIGN_WEBHOOK_SECRET',
-	'RESEND_API_KEY',
+	'BREVO_API_KEY',
 	'MAGIC_LINK_SECRET',
 	'SESSION_SECRET',
 	'PAYLOAD_ENCRYPTION_KEY',
@@ -39,7 +38,11 @@ function blank(value) {
 /** @returns {{ key: string, message: string }[]} */
 export function checkRequiredEnv(env = process.env, { prod = isProd } = {}) {
 	const issues = [];
-	const keys = prod ? [...REQUIRED_ALWAYS, ...REQUIRED_PROD] : [...REQUIRED_ALWAYS];
+	const keys = [
+		prod ? 'PRODUCTION_DATABASE_URL' : 'DEV_DATABASE_URL',
+		...REQUIRED_ALWAYS,
+		...(prod ? REQUIRED_PROD : []),
+	];
 
 	for (const key of keys) {
 		if (blank(env[key])) {
@@ -81,9 +84,10 @@ async function withTimeout(label, ms, fn) {
 	}
 }
 
-async function probeDatabase(env) {
+async function probeDatabase(env, prod) {
+	const key = prod ? 'PRODUCTION_DATABASE_URL' : 'DEV_DATABASE_URL';
 	const client = new pg.Client({
-		connectionString: env.DATABASE_URL,
+		connectionString: env[key],
 		connectionTimeoutMillis: PROBE_MS,
 	});
 	try {
@@ -94,7 +98,7 @@ async function probeDatabase(env) {
 		return null;
 	} catch (error) {
 		return {
-			key: 'DATABASE_URL',
+			key,
 			message: error instanceof Error ? error.message : String(error),
 		};
 	} finally {
@@ -149,9 +153,9 @@ async function probeYousign(env) {
 	}
 }
 
-export async function probeConnections(env = process.env) {
+export async function probeConnections(env = process.env, { prod = isProd } = {}) {
 	const results = await Promise.all([
-		probeDatabase(env),
+		probeDatabase(env, prod),
 		probeStripe(env),
 		probeYousign(env),
 	]);
@@ -161,7 +165,7 @@ export async function probeConnections(env = process.env) {
 export async function runBootCheck(env = process.env, { prod = isProd } = {}) {
 	const issues = [...checkRequiredEnv(env, { prod })];
 	if (issues.length === 0) {
-		issues.push(...(await probeConnections(env)));
+		issues.push(...(await probeConnections(env, { prod })));
 	}
 	return issues;
 }
