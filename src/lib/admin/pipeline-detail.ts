@@ -24,7 +24,7 @@ export type EnrollmentHeadline = {
 
 type BottleneckInput = Pick<
 	AdminEnrollmentDetail,
-	'collectionStatus' | 'contractStatus' | 'accessStatus'
+	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'yousignLastError'
 >;
 
 /** Première étape qui bloque paiement → signature → accès. null = dossier fluide. */
@@ -71,16 +71,26 @@ export function enrollmentHeadline(detail: BottleneckInput): EnrollmentHeadline 
 	}
 
 	if (bottleneck === 'signature') {
-		if (detail.contractStatus === 'sent') {
-			return { label: 'En attente · NDA à signer', tone: 'action' };
+		if (detail.contractStatus === 'pending' && detail.yousignLastError) {
+			return { label: 'Signature en erreur', tone: 'action' };
 		}
-		if (detail.contractStatus === 'error' || detail.contractStatus === 'expired') {
-			return {
-				label: `Signature · ${CONTRACT_STATUS_LABELS[detail.contractStatus].toLowerCase()}`,
-				tone: 'action',
-			};
+
+		switch (detail.contractStatus) {
+			case 'pending':
+				return { label: 'NDA à envoyer', tone: 'progress' };
+			case 'sent':
+				return { label: 'NDA à signer', tone: 'action' };
+			case 'expired':
+				return { label: 'NDA expiré', tone: 'action' };
+			case 'error':
+				return { label: 'Signature en erreur', tone: 'action' };
+			case 'declined':
+				return { label: 'NDA refusé', tone: 'action' };
+			case 'canceled':
+				return { label: 'NDA annulé', tone: 'neutral' };
+			case 'signed':
+				return { label: 'NDA signé', tone: 'success' };
 		}
-		return { label: 'Bloqué · signature', tone: 'progress' };
 	}
 
 	if (detail.accessStatus === 'suspended') {
@@ -187,6 +197,10 @@ function formatShortDateTime(value: Date | null | undefined): string | null {
 function buildSignatureHint(detail: AdminEnrollmentDetail): string {
 	if (detail.collectionStatus === 'pending' || detail.collectionStatus === 'canceled') {
 		return 'Bloqué — paiement requis';
+	}
+
+	if (detail.yousignLastError) {
+		return 'Échec Yousign · recréer le lien';
 	}
 
 	if (detail.contractStatus === 'signed') {

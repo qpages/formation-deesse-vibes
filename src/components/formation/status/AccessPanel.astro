@@ -1,18 +1,15 @@
 ---
-import type { StepKey, StepState } from '../../../lib/status';
 import type { EnrollmentWithUser } from '../../../lib/services/enrollment';
 import { getEnv } from '../../../lib/env';
 import CheckoutForm from '../landing/CheckoutForm.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
 import StatusPanel from './StatusPanel.astro';
-import Stepper from './Stepper.astro';
 
 const adminContactEmail = getEnv().PUBLIC_ADMIN_CONTACT_EMAIL;
 
 interface Props {
 	showFunnel: boolean;
 	enrollment: EnrollmentWithUser | null;
-	steps: Record<StepKey, StepState>;
 	ndaSignUrl?: string | null;
 	invoiceLinks?: { installmentNumber: number; url: string }[];
 	flash?: string | null;
@@ -24,7 +21,6 @@ interface Props {
 const {
 	showFunnel,
 	enrollment,
-	steps,
 	ndaSignUrl = null,
 	invoiceLinks = [],
 	flash = null,
@@ -39,15 +35,9 @@ const funnelFlash = showFunnel ? flash : null;
 
 {
 	showFunnel ? (
-		<div id="access-funnel" class="space-y-8">
-			<div>
-				<Stepper />
-			</div>
-
-			<div class="border-t border-ink/10 pt-8">
-				<h3 class="mb-5 font-display text-3xl text-ink">Démarrer ma formation</h3>
-				<div
-					class="inline-flex rounded-sm border border-ink/15 p-1"
+		<div id="access-funnel">
+			<div
+				class="inline-flex rounded-sm border border-ink/15 p-1"
 					role="tablist"
 					aria-label="Choisir votre parcours"
 				>
@@ -110,17 +100,12 @@ const funnelFlash = showFunnel ? flash : null;
 					</p>
 					<MagicLinkForm />
 				</div>
-			</div>
 		</div>
 	) : (
 		<div id="access-tracking" class="space-y-8">
 			{enrollment && (
 				<>
 					<div>
-						<Stepper steps={steps} />
-					</div>
-
-					<div class="pt-8">
 						<StatusPanel
 							enrollment={enrollment}
 							ndaSignUrl={ndaSignUrl}

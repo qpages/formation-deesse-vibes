@@ -11,7 +11,7 @@ interface Props {
 }
 
 const { enrollmentId, displayName, partition } = Astro.props;
-const { recovery } = partition;
+const { actions } = partition;
 
 const btnGhost =
 	'inline-flex min-h-9 items-center justify-center gap-1.5 px-2 text-sm text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
@@ -33,26 +33,26 @@ const kindMeta: Record<AdminActionExecution, { tag: string; hint: string; cls: s
 ---
 
 {
-	recovery.length > 0 ? (
+	actions.length > 0 ? (
 		<section
-			id="reparations"
+			id="actions"
 			class="mb-8 scroll-mt-20"
-			aria-labelledby="reparations-heading"
+			aria-labelledby="actions-heading"
 			data-action-zone
 			data-enrollment={enrollmentId}
 			data-name={displayName}
 		>
 			<details class="group">
 				<summary class="flex cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush [&::-webkit-details-marker]:hidden">
-					<h2 id="reparations-heading" class="text-lg font-medium text-ink">
-						Réparations
-						<span class="ml-1.5 text-sm font-normal text-ink/40">{recovery.length}</span>
+					<h2 id="actions-heading" class="text-lg font-medium text-ink">
+						Actions
+						<span class="ml-1.5 text-sm font-normal text-ink/40">{actions.length}</span>
 					</h2>
 					<span class="text-sm text-ink/40 group-open:hidden">afficher</span>
 					<span class="hidden text-sm text-ink/40 group-open:inline">masquer</span>
 				</summary>
 				<div class="mt-3 flex flex-wrap gap-1">
-					{recovery.map((action) => (
+					{actions.map((action) => (
 						<button type="button" data-action={action.action} class={btnGhost}>
 							{action.label}
 							<span

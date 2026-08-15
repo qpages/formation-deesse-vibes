@@ -131,6 +131,7 @@ export function toAdminEnrollmentRow(
 			contractStatus: row.contractStatus,
 			accessStatus: row.accessStatus,
 			yousignStatus: row.yousignStatus,
+			yousignLastError: row.yousignLastError,
 		}),
 		paymentSummary,
 		stripeUrl: stripeDashboardUrl({

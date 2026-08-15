@@ -10,6 +10,7 @@ import {
 } from './enrollment';
 import {
 	confirmPaidCheckout,
+	ensureNdaAfterPayment,
 	markEnrollmentRefunded,
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
@@ -154,6 +155,9 @@ export async function handleStripeProviderEvent(input: {
 			return { ignored: true };
 		}
 		if (!result.ok) throw new Error(result.reason);
+		await ensureNdaAfterPayment(result.enrollmentId, invoice.id ?? input.providerEventId, {
+			soft: true,
+		});
 		return { enrollmentId: result.enrollmentId };
 	}
 

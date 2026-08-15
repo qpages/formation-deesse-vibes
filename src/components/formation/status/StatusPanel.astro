@@ -26,8 +26,6 @@ const orthogonal = {
 };
 const action = primaryAction(orthogonal, ndaSignUrl);
 const message = statusMessage(orthogonal);
-const panelTitle =
-	enrollment.accessStatus === 'active' ? 'Accès prêt' : 'Votre inscription';
 const showSignCard = Boolean(ndaSignUrl);
 const poll = shouldPollEnrollment({
 	...orthogonal,
@@ -47,12 +45,11 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	data-poll-interval={ENROLLMENT_POLL_INTERVAL_MS}
 	data-poll-max={ENROLLMENT_POLL_MAX_MS}
 >
-	<div class="space-y-2">
-		<h3 class="font-display text-3xl text-ink">{panelTitle}</h3>
-		{showSignCard && (
+	{
+		showSignCard && (
 			<p class="text-ink-soft">Le lien de signature est prêt.</p>
-		)}
-	</div>
+		)
+	}
 
 	{
 		flash && (

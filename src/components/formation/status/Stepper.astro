@@ -1,44 +1,28 @@
 ---
-import StatusBadge from '../../ui/StatusBadge.astro';
-import { stepLabel, type StepKey, type StepState } from '../../../lib/status';
-
-interface Props {
-	steps: Record<StepKey, StepState>;
-}
-
-const { steps } = Astro.props;
-const showBadges = Boolean(steps);
-
-const items: Array<{ key: StepKey; title: string; text: string }> = [
+const items: Array<{ title: string; text: string; logo?: string }> = [
 	{
-		key: 'paiement',
 		title: 'Vous payez en ligne sur Stripe',
 		text: 'Règlement sécurisé via la plateforme de paiement Stripe.',
 	},
 	{
-		key: 'nda',
 		title: 'Vous signez l’accord par e-mail',
 		text: 'Signature électronique de l’accord de confidentialité via Yousign, envoyée dès confirmation du paiement.',
 	},
 	{
-		key: 'acces',
 		title: 'Vous recevez vos accès Teachizy',
 		text: 'L’invitation Teachizy avec vos identifiants vous est envoyée dès que la signature est confirmée.',
+		logo: '/icons/teachizy-mark.png',
 	},
 ];
-
-function tone(state: StepState) {
-	if (state === 'termine') return 'success' as const;
-	if (state === 'action_requise') return 'action' as const;
-	if (state === 'en_cours') return 'progress' as const;
-	return 'neutral' as const;
-}
 ---
 
 <ol class="grid gap-10 sm:grid-cols-3 sm:gap-12">
 	{
 		items.map((item, index) => {
-			const state = steps?.[item.key];
+			const lastSpace = item.title.lastIndexOf(' ');
+			const lead = item.logo && lastSpace > 0 ? item.title.slice(0, lastSpace + 1) : item.title;
+			const tail = item.logo && lastSpace > 0 ? item.title.slice(lastSpace + 1) : null;
+
 			return (
 				<li>
 					<div class="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-x-4 gap-y-4">
@@ -48,10 +32,21 @@ function tone(state: StepState) {
 						>
 							{index + 1}
 						</span>
-						<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-							<h3 class="font-display text-xl leading-snug text-ink sm:text-2xl">{item.title}</h3>
-							{showBadges && state && <StatusBadge tone={tone(state)}>{stepLabel(state)}</StatusBadge>}
-						</div>
+						<h3 class="min-w-0 font-display text-xl leading-snug text-ink sm:text-2xl">
+							{lead}
+							{tail && item.logo ? (
+								<span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+									{tail}
+									<img
+										src={item.logo}
+										alt=""
+										width="28"
+										height="28"
+										class="size-6 shrink-0 rounded-md object-cover sm:size-7"
+									/>
+								</span>
+							) : null}
+						</h3>
 						<div class="col-span-2 border-t border-ink/12 pt-3">
 							<p class="pl-16 text-sm leading-relaxed text-ink-soft">{item.text}</p>
 						</div>

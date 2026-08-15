@@ -6,6 +6,7 @@ vi.mock('../crypto', () => ({
 
 const {
 	confirmPaidCheckout,
+	ensureNdaAfterPayment,
 	markEnrollmentRefunded,
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
@@ -14,6 +15,7 @@ const {
 	findEnrollmentIdByPaymentIntentId,
 } = vi.hoisted(() => ({
 	confirmPaidCheckout: vi.fn(),
+	ensureNdaAfterPayment: vi.fn(),
 	markEnrollmentRefunded: vi.fn(),
 	markSubscriptionScheduleCompleted: vi.fn(),
 	syncStripeInvoice: vi.fn(),
@@ -24,6 +26,7 @@ const {
 
 vi.mock('./payments', () => ({
 	confirmPaidCheckout,
+	ensureNdaAfterPayment,
 	markEnrollmentRefunded,
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
@@ -57,6 +60,35 @@ describe('isHandledStripeEventType', () => {
 	it('gère les events refund / dispute', () => {
 		expect(isHandledStripeEventType('charge.refunded')).toBe(true);
 		expect(isHandledStripeEventType('charge.dispute.created')).toBe(true);
+	});
+});
+
+describe('handleStripeProviderEvent — invoice.paid', () => {
+	it('après sync, enqueue NDA en soft (ensureNdaAfterPayment)', async () => {
+		syncStripeInvoice.mockResolvedValue({ ok: true, enrollmentId: 'enr_1' });
+		ensureNdaAfterPayment.mockResolvedValue({ status: 'enqueued' });
+
+		const result = await handleStripeProviderEvent(
+			event('invoice.paid', {
+				object: 'invoice',
+				id: 'in_123',
+			}),
+		);
+
+		expect(syncStripeInvoice).toHaveBeenCalled();
+		expect(ensureNdaAfterPayment).toHaveBeenCalledWith('enr_1', 'in_123', { soft: true });
+		expect(result).toEqual({ enrollmentId: 'enr_1' });
+	});
+
+	it('enrollment introuvable → ignoré, pas d’enqueue NDA', async () => {
+		syncStripeInvoice.mockResolvedValue({ ok: false, reason: 'enrollment_not_found' });
+
+		const result = await handleStripeProviderEvent(
+			event('invoice.paid', { object: 'invoice', id: 'in_404' }),
+		);
+
+		expect(ensureNdaAfterPayment).not.toHaveBeenCalled();
+		expect(result).toEqual({ ignored: true });
 	});
 });
 

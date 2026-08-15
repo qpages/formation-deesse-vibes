@@ -82,6 +82,7 @@ export function stepLabel(state: StepState): string {
 /** Colonnes admin : Paiement / Signature / Accès depuis les 3 enums. */
 export function adminPipelineBadges(input: OrthogonalStatuses & {
 	yousignStatus?: YousignRequestStatus | null;
+	yousignLastError?: string | null;
 }): {
 	paiement: { label: string; tone: BadgeTone };
 	signature: { label: string; tone: BadgeTone };
@@ -125,6 +126,8 @@ export function adminPipelineBadges(input: OrthogonalStatuses & {
 		signature = { label: 'Signé', tone: 'success' };
 	} else if (input.yousignStatus === 'ongoing' || input.contractStatus === 'sent') {
 		signature = { label: 'En attente', tone: 'action' };
+	} else if (input.yousignLastError && input.contractStatus === 'pending') {
+		signature = { label: 'Erreur', tone: 'action' };
 	} else if (steps.nda === 'en_cours') {
 		signature = { label: 'En cours', tone: 'progress' };
 	}

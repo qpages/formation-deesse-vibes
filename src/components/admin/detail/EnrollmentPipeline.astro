@@ -35,9 +35,6 @@ const toneDot: Record<PipelineStageCard['tone'], string> = {
 							<span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
 								<span class="text-sm font-medium text-ink">{stage.title}</span>
 								<span class="text-sm">{stage.label}</span>
-								{stage.blocking ? (
-									<span class="text-xs font-medium text-blush-deep">bloque</span>
-								) : null}
 							</span>
 							<span class="mt-1 block truncate text-xs text-ink/45 group-hover:text-ink/60">
 								{stage.hint}

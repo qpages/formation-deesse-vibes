@@ -7,7 +7,7 @@ import type {
 } from '../../generated/prisma/client';
 import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
 
-export const adminActionZones = ['metier', 'recovery'] as const;
+export const adminActionZones = ['metier', 'actions'] as const;
 export type AdminActionZone = (typeof adminActionZones)[number];
 
 /**
@@ -61,9 +61,9 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
 		action: 'retrigger_teachizy',
 		label: 'Inviter à la formation',
-		zone: 'recovery',
+		zone: 'actions',
 		execution: 'flow',
-		eyebrow: 'Réparation',
+		eyebrow: 'Action',
 		title: 'Inviter à la formation',
 		description:
 			'Envoyer / réactiver l’invitation Teachizy pour {name} (selon la politique d’accès).',
@@ -72,7 +72,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
 		action: 'sync_teachizy',
 		label: 'Sync statut Teachizy',
-		zone: 'recovery',
+		zone: 'actions',
 		execution: 'sync',
 		eyebrow: 'Accès',
 		title: 'Synchroniser Teachizy',
@@ -83,9 +83,9 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
 		action: 'sync_payment',
 		label: 'Sync paiement Stripe',
-		zone: 'recovery',
+		zone: 'actions',
 		execution: 'sync',
-		eyebrow: 'Réparation',
+		eyebrow: 'Action',
 		title: 'Synchroniser le paiement',
 		description:
 			'Lire la session Stripe de {name} et aligner la collection en base. Déclenche la création du NDA s’il manque (si la file est disponible).',
@@ -94,9 +94,9 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
 		action: 'sync_yousign',
 		label: 'Sync statut Yousign',
-		zone: 'recovery',
+		zone: 'actions',
 		execution: 'sync',
-		eyebrow: 'Réparation',
+		eyebrow: 'Action',
 		title: 'Synchroniser Yousign',
 		description:
 			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus. Invite Teachizy si le NDA est signé (si la file est disponible).',
@@ -105,9 +105,9 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
 		action: 'resend_nda',
 		label: 'Renvoyer le lien Yousign',
-		zone: 'recovery',
+		zone: 'actions',
 		execution: 'flow',
-		eyebrow: 'Réparation',
+		eyebrow: 'Action',
 		title: 'Renvoyer le lien Yousign',
 		description:
 			'Renvoyer à {name} le même lien de signature Yousign (réactivation). L’ancien lien reste valide.',
@@ -116,9 +116,9 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 	{
 		action: 'recreate_nda',
 		label: 'Recréer un lien Yousign',
-		zone: 'recovery',
+		zone: 'actions',
 		execution: 'flow',
-		eyebrow: 'Réparation',
+		eyebrow: 'Action',
 		title: 'Recréer un lien Yousign',
 		description:
 			'Créer une nouvelle demande Yousign pour {name}. L’ancien lien ne sera plus valide.',
@@ -127,7 +127,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 ];
 
 export const METIER_ACTIONS = ADMIN_ACTIONS.filter((a) => a.zone === 'metier');
-export const RECOVERY_ACTIONS = ADMIN_ACTIONS.filter((a) => a.zone === 'recovery');
+export const ZONE_ACTIONS = ADMIN_ACTIONS.filter((a) => a.zone === 'actions');
 
 export type AdminActionMetaClient = Record<
 	AdminActionKey,
@@ -210,7 +210,7 @@ const ACCESS_PANEL_ACTIONS = new Set<AdminActionKey>([]);
 export type PartitionedAdminActions = {
 	signature: AdminActionDef[];
 	access: AdminActionDef[];
-	recovery: AdminActionDef[];
+	actions: AdminActionDef[];
 };
 
 /** Detail panels: actions grouped by domain. */
@@ -220,7 +220,7 @@ export function partitionVisibleActions(e: VisibilityInput): PartitionedAdminAct
 	return {
 		signature: all.filter((a) => SIGNATURE_PANEL_ACTIONS.has(a.action)),
 		access: all.filter((a) => ACCESS_PANEL_ACTIONS.has(a.action)),
-		recovery: all.filter((a) => a.zone === 'recovery'),
+		actions: all.filter((a) => a.zone === 'actions'),
 	};
 }
 

@@ -9,7 +9,7 @@ const DETAIL_SWAP_IDS = [
 	'paiements',
 	'signature',
 	'acces',
-	'reparations',
+	'actions',
 	'historique-wrap',
 ] as const;
 

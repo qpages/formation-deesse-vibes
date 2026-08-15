@@ -126,9 +126,24 @@ async function readErrorBody(response: Response): Promise<string> {
  * Invite un apprenant directement sur Teachizy via leur API REST.
  * @see https://developer.teachizy.fr/
  */
+function isAlreadyEnrolled(customer: TeachizyCustomer, trainingUuid: string): boolean {
+	const training = customer.trainings.find((row) => row.training.uuid === trainingUuid);
+	return Boolean(training && !training.blocked_at && customer.status !== 'DISABLED');
+}
+
 export async function inviteToTeachizy(input: TeachizyInviteInput): Promise<void> {
 	requireEnv('TEACHIZY_API_KEY');
 	const trainingUuid = requireEnv('TEACHIZY_TRAINING_UUID');
+
+	const existing = await getTeachizyCustomerByEmail(input.email);
+	if (existing && isAlreadyEnrolled(existing, trainingUuid)) {
+		console.log('[Teachizy] already enrolled — skip invite', {
+			enrollmentId: input.enrollmentId,
+			email: input.email,
+			trainingUuid,
+		});
+		return;
+	}
 
 	console.log('[Teachizy] Sending invitation', {
 		enrollmentId: input.enrollmentId,
