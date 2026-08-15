@@ -1,0 +1,65 @@
+# Playwright P0/P1 against a local Astro + Postgres. Not on PRs.
+# Stripe / Brevo / Inngest are mocked via E2E_MOCK_PROVIDERS.
+name: E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'
+  push:
+    branches: [master]
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: deesse
+          POSTGRES_PASSWORD: deesse
+          POSTGRES_DB: formation_deesse_vibes
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U deesse -d formation_deesse_vibes"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      DEV_DATABASE_URL: postgresql://deesse:deesse@localhost:5432/formation_deesse_vibes
+      PUBLIC_SITE_URL: http://127.0.0.1:4322
+      E2E_MOCK_PROVIDERS: '1'
+      INNGEST_DEV: '1'
+      SLACK_WEBHOOK_URL: ''
+      STRIPE_SECRET_KEY: sk_test_e2e_mock_not_a_live_key_xxxxx
+      STRIPE_WEBHOOK_SECRET: whsec_e2e_playwright_dummy_secret_xx
+      STRIPE_PRICE_ID: price_e2e_mock
+      SESSION_SECRET: e2e-session-secret-must-be-32-chars-min
+      MAGIC_LINK_SECRET: e2e-magic-link-secret-32-chars-minxx
+      PAYLOAD_ENCRYPTION_KEY: e2e-payload-encryption-key-32char
+      ADMIN_EMAIL: admin@deesse-vibes.com
+      ADMIN_PASSWORD: e2e-admin-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:deploy
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

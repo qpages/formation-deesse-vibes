@@ -17,6 +17,7 @@ Suivi sur la même page via lien magique Resend. Accès Teachizy uniquement via 
 - [Documentation API Teachizy](https://developer.teachizy.fr/)
 - [Dashboard Prisma](https://console.prisma.io/m6drw0l75hj6xaykknxtzga2/dashboard)
 - [Dashboard Inngest (production)](https://app.inngest.com/env/production)
+- [SonarCloud](https://sonarcloud.io/project/overview?id=qpages_formation-deesse-vibes)
 
 ## Démarrage
 
