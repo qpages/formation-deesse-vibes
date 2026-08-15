@@ -1,0 +1,136 @@
+---
+const modules = [
+	{
+		title: 'Introduction & fondements de la Matrice',
+		blurb: 'La méthode, le calcul manuel, et comment suivre la formation.',
+	},
+	{
+		title: 'Les zones de la Matrice',
+		blurb: 'Lecture des zones du schéma et de ce que chacune décrit.',
+	},
+	{
+		title: 'Les 22 énergies',
+		blurb: 'Les 22 énergies, une par une, de 1 à 22.',
+	},
+	{
+		title: 'Talents, portrait, zone de confort et code 18-9-9',
+		blurb: 'Talents, communication en société, zone portrait et code 18-9-9.',
+	},
+	{
+		title: 'Relationnel & intime',
+		blurb: 'Partenaire idéal, attitude relationnelle et programme intime.',
+	},
+	{
+		title: 'Dettes karmiques, alliance des ancêtres & missions',
+		blurb: 'Scénarios karmiques, buts / missions, et méthodes de coaching.',
+	},
+	{
+		title: 'Parents / enfants',
+		blurb: 'Relation aux parents, relation aux enfants, personnalité des enfants.',
+	},
+	{
+		title: 'Conseil, posture de coach et branding',
+		blurb: 'Mener une consultation de coach-analyste et le branding lié aux énergies.',
+	},
+	{
+		title: 'Mindset de coach',
+		blurb: 'La posture intérieure du coach-analyste.',
+	},
+	{
+		title: 'Alliance & prévisionnel',
+		blurb: 'Alliances année / mois / journée, et lecture des couples.',
+	},
+	{
+		title: 'Chakras / carte santé',
+		blurb: 'Carte santé, chakras de la Matrice, et les programmes.',
+	},
+];
+---
+
+<div class="grid items-start gap-6 sm:grid-cols-[minmax(0,16.5rem)_1fr] sm:gap-10 lg:gap-14">
+	<figure class="mx-auto w-full max-w-sm sm:mx-0 sm:max-w-none">
+		<div class="overflow-hidden rounded-sm border border-ink/10 bg-surface shadow-soft">
+			<img
+				src="/images/matrice-evolution.png"
+				alt="Visuel Matrice Évolution — Jessica Stamck"
+				width="600"
+				height="600"
+				class="aspect-square h-auto w-full object-contain"
+				loading="lazy"
+				decoding="async"
+			/>
+		</div>
+		<figcaption class="mt-3 text-sm italic text-ink-soft">
+			Matrice Évolution · Jessica Stamck
+		</figcaption>
+	</figure>
+
+	<div class="programme-scroller relative min-h-0">
+		<ol
+			class="programme-list h-[26rem] overflow-y-auto overscroll-contain divide-y divide-ink/10 border-t border-ink/10 pr-2 sm:h-[28rem]"
+			tabindex="0"
+			aria-label="Modules de la formation"
+		>
+			{
+				modules.map((item, index) => (
+					<li class="grid grid-cols-[2.75rem_1fr] gap-4 py-4 sm:grid-cols-[3.25rem_1fr] sm:gap-5 sm:py-5">
+						<span
+							class="pt-0.5 font-display text-xl tabular-nums text-gold sm:text-2xl"
+							aria-hidden="true"
+						>
+							{String(index + 1).padStart(2, '0')}
+						</span>
+						<div>
+							<h3 class="font-display text-xl leading-snug text-ink sm:text-2xl">
+								<span class="sr-only">Module {index + 1} — </span>
+								{item.title}
+							</h3>
+							<p class="mt-1.5 max-w-prose text-sm leading-relaxed text-ink-soft sm:text-base">
+								{item.blurb}
+							</p>
+						</div>
+					</li>
+				))
+			}
+		</ol>
+	</div>
+</div>
+
+<style>
+	.programme-scroller::after {
+		content: "";
+		pointer-events: none;
+		position: absolute;
+		inset-inline: 0;
+		bottom: 0;
+		height: 2.25rem;
+		background: linear-gradient(to top, var(--color-mist), transparent);
+	}
+
+	.programme-list {
+		scrollbar-width: thin;
+		scrollbar-color: rgb(184 149 108 / 0.55) transparent;
+	}
+
+	.programme-list::-webkit-scrollbar {
+		width: 6px;
+	}
+
+	.programme-list::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.programme-list::-webkit-scrollbar-thumb {
+		background: rgb(184 149 108 / 0.5);
+		border-radius: 999px;
+	}
+
+	.programme-list::-webkit-scrollbar-thumb:hover {
+		background: rgb(184 149 108 / 0.75);
+	}
+
+	.programme-list:focus-visible {
+		outline: 2px solid var(--color-blush);
+		outline-offset: 3px;
+	}
+</style>

@@ -2,9 +2,12 @@
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import Section from '../components/ui/Section.astro';
 import Hero from '../components/formation/landing/Hero.astro';
+import Programme from '../components/formation/landing/Programme.astro';
 import AccessPanel from '../components/formation/status/AccessPanel.astro';
+import Stepper from '../components/formation/status/Stepper.astro';
 import Faq from '../components/formation/landing/Faq.astro';
 import { resolveHomeEnrollment } from '../lib/pages/resolve-home-enrollment';
+import { TEACHIZY_ACADEMY_URL } from '../lib/status';
 
 export const prerender = false;
 
@@ -24,29 +27,51 @@ const {
 	flash,
 	checkoutCancel,
 	showTracking,
-	steps,
 	ndaSignUrl,
 	invoiceLinks,
 	magicLinkFailed,
 } = view;
 
-const sectionDescription = 'Suivez votre parcours en temps réel.';
+const accessTitle = showTracking
+	? enrollment?.accessStatus === 'active'
+		? 'Accès prêt'
+		: 'Votre inscription'
+	: 'Démarrer ma formation';
+
+const heroCta =
+	enrollment?.accessStatus === 'active'
+		? { label: 'Accéder à la formation', href: TEACHIZY_ACADEMY_URL, external: true }
+		: showTracking
+			? { label: 'Voir mon inscription', href: '#acces', external: false }
+			: { label: "M'inscrire à la formation", href: '#acces', external: false };
 ---
 
 <MarketingLayout>
-	<Hero showJoinCta={!showTracking} ctaHref="#acces" />
+	<Hero ctaHref={heroCta.href} ctaLabel={heroCta.label} ctaExternal={heroCta.external} />
 
 	<Section
-		id="acces"
-		eyebrow="Accès"
-		title="Comment ça fonctionne ?"
-		description={sectionDescription}
+		id="programme"
+		eyebrow="Programme"
+		title="Ce que vous allez apprendre"
+		description="Onze modules pour que vous puissiez apprendre à lire et interpréter la matrice évolution."
 		class="border-b border-ink/8"
 	>
+		<Programme />
+	</Section>
+
+	<Section
+		id="fonctionnement"
+		eyebrow="Parcours"
+		title="Comment ça fonctionne ?"
+		class="border-b border-ink/8"
+	>
+		<Stepper />
+	</Section>
+
+	<Section id="acces" eyebrow="Inscription" title={accessTitle} class="border-b border-ink/8">
 		<AccessPanel
 			showFunnel={!showTracking}
 			enrollment={enrollment}
-			steps={steps}
 			ndaSignUrl={ndaSignUrl}
 			invoiceLinks={invoiceLinks}
 			flash={flash}
