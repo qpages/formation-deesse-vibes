@@ -180,11 +180,15 @@ Admin `/admin` : `ADMIN_EMAIL` / `ADMIN_PASSWORD` + JWT
 
 ## Inngest
 
-| Fonction | Event | Rôle |
-| --- | --- | --- |
-| `createNdaAfterPayment` | `stripe/payment.confirmed` | Crée / active le NDA (5 retries, alerte Slack) |
-| `grantTeachizyAccess` | `yousign/signature.done` / `enrollment/access.grant` | Invite Teachizy (5 retries, alerte Slack) |
-| `purgeWebhookPayloads` | cron `0 3 * * *` | Efface les payloads chiffrés > 30 j |
+| Fonction | Events | Cron | Retries | Rôle |
+| --- | --- | --- | --- | --- |
+| `processStripeWebhook` | `provider/stripe-event.received` | — | 2 | Traite un `ProviderEvent` Stripe (idempotent) |
+| `processYousignWebhook` | `provider/yousign-event.received` | — | 2 | Traite un `ProviderEvent` Yousign (idempotent) |
+| `createNdaAfterPayment` | `stripe/payment.confirmed`, `admin/recreate-nda` | — | 2 | Crée / active le NDA (alerte Slack) |
+| `grantTeachizyAccess` | `yousign/signature.done`, `enrollment/access.grant` | — | 2 | Invite Teachizy (alerte Slack) |
+| `resendNda` | `admin/resend-nda` | — | 3 | Renvoie le lien Yousign |
+| `reconcileEnrollments` | `ops/reconcile-enrollments` | `0 4 * * *` | 2 | Ré-applique `applyAccessPolicy` |
+| `purgeWebhookPayloads` | `ops/purge-webhook-payloads` | `0 3 * * *` | 2 | Null les payloads chiffrés > 30 j |
 
 **Handoffs async (invariants 1–2 ci-dessous) :** sans enqueue, la DB peut être à jour et l’élève quand même bloqué.
 
