@@ -10,6 +10,7 @@ import {
 	consumeMagicLink,
 	findEnrollmentByCheckoutSession,
 	findEnrollmentById,
+	peekMagicLink,
 	resolveNdaSignUrl,
 	type EnrollmentWithUser,
 } from '../services/enrollment';
@@ -44,8 +45,8 @@ export type HomeEnrollmentView = {
 
 export type HomeEnrollmentResult =
 	| { kind: 'redirect'; redirectTo: string; setCookie: string | null }
+	| { kind: 'confirm_magic_link'; token: string }
 	| { kind: 'page'; view: HomeEnrollmentView };
-
 
 async function cookieEnrollmentId(cookieHeader: string | null): Promise<string | null> {
 	const cookieToken = parseCookie(cookieHeader, TRACKING_COOKIE);
@@ -53,7 +54,7 @@ async function cookieEnrollmentId(cookieHeader: string | null): Promise<string |
 	return verifyEnrollmentSessionToken(cookieToken);
 }
 
-async function resolveMagicLinkRedirect(
+export async function completeMagicLinkConsume(
 	token: string,
 	cookieHeader: string | null,
 ): Promise<{ redirectTo: string; setCookie: string | null }> {
@@ -61,24 +62,22 @@ async function resolveMagicLinkRedirect(
 	const sessionEnrollmentId = await cookieEnrollmentId(cookieHeader);
 	const outcome = decideMagicLinkOutcome(lookup, sessionEnrollmentId);
 
-	if (outcome.action === 'set_session') {
-		const enrollment = await findEnrollmentById(outcome.enrollmentId);
-		await notifyOps({
-			kind: 'auth.magic_link_consumed',
-			severity: 'info',
-			title: 'Connexion via lien magique',
-			enrollmentId: outcome.enrollmentId,
-			email: enrollment?.user.email,
-		});
-		return {
-			redirectTo: outcome.redirectTo,
-			setCookie: enrollmentCookieOptions(
-				await createEnrollmentSessionToken(outcome.enrollmentId),
-			),
-		};
+	if (outcome.action !== 'set_session') {
+		return { redirectTo: outcome.redirectTo, setCookie: null };
 	}
 
-	return { redirectTo: outcome.redirectTo, setCookie: null };
+	const enrollment = await findEnrollmentById(outcome.enrollmentId);
+	await notifyOps({
+		kind: 'auth.magic_link_consumed',
+		severity: 'info',
+		title: 'Connexion via lien magique',
+		enrollmentId: outcome.enrollmentId,
+		email: enrollment?.user.email,
+	});
+	return {
+		redirectTo: outcome.redirectTo,
+		setCookie: enrollmentCookieOptions(await createEnrollmentSessionToken(outcome.enrollmentId)),
+	};
 }
 
 /** Orchestration page d’accueil : session, reconcile Checkout, NDA, factures. */
@@ -98,8 +97,13 @@ export async function resolveHomeEnrollment(input: {
 
 	try {
 		if (token) {
-			const magic = await resolveMagicLinkRedirect(token, cookieHeader);
-			return { kind: 'redirect', ...magic };
+			const lookup = await peekMagicLink(token);
+			const sessionEnrollmentId = await cookieEnrollmentId(cookieHeader);
+			const outcome = decideMagicLinkOutcome(lookup, sessionEnrollmentId);
+			if (outcome.action === 'set_session') {
+				return { kind: 'confirm_magic_link', token };
+			}
+			return { kind: 'redirect', redirectTo: outcome.redirectTo, setCookie: null };
 		}
 
 		if (!enrollment && sessionId) {
@@ -120,9 +124,7 @@ export async function resolveHomeEnrollment(input: {
 		// Filet : Stripe a encaissé mais le webhook a loupé
 		const checkoutToSync =
 			sessionId ??
-			(enrollment?.collectionStatus === 'pending'
-				? enrollment.stripeCheckoutSessionId
-				: null);
+			(enrollment?.collectionStatus === 'pending' ? enrollment.stripeCheckoutSessionId : null);
 		if (checkoutToSync && (!enrollment || enrollment.collectionStatus === 'pending')) {
 			try {
 				const stripeSession = await retrieveCheckoutSession(checkoutToSync);
@@ -130,9 +132,7 @@ export async function resolveHomeEnrollment(input: {
 				if (confirmed.ok) {
 					enrollment = await findEnrollmentById(confirmed.enrollmentId);
 					if (enrollment && !setCookie) {
-						setCookie = enrollmentCookieOptions(
-							await createEnrollmentSessionToken(enrollment.id),
-						);
+						setCookie = enrollmentCookieOptions(await createEnrollmentSessionToken(enrollment.id));
 					}
 				}
 			} catch (error) {
@@ -141,11 +141,7 @@ export async function resolveHomeEnrollment(input: {
 		}
 
 		// Filet 2 : payé en DB, NDA jamais enqueue (ex. confirm avant ce fix)
-		if (
-			enrollment &&
-			isAwaitingNda(enrollment) &&
-			!isNdaFullyProvisioned(enrollment)
-		) {
+		if (enrollment && isAwaitingNda(enrollment) && !isNdaFullyProvisioned(enrollment)) {
 			try {
 				await ensureNdaAfterPayment(
 					enrollment.id,
@@ -184,8 +180,7 @@ export async function resolveHomeEnrollment(input: {
 		enrollment.accessStatus === 'revoked' ||
 		(enrollment.collectionStatus === 'pending' && !enrollment.stripeCheckoutSessionId);
 
-	const showTracking =
-		!checkoutCancel && Boolean(enrollment) && (!showFunnel || awaitingWebhook);
+	const showTracking = !checkoutCancel && Boolean(enrollment) && (!showFunnel || awaitingWebhook);
 
 	const steps = enrollment
 		? stepStates({
@@ -196,10 +191,7 @@ export async function resolveHomeEnrollment(input: {
 		: { paiement: 'a_faire' as const, nda: 'a_faire' as const, acces: 'a_faire' as const };
 
 	let ndaSignUrl: string | null = null;
-	if (
-		enrollment &&
-		isAwaitingNda(enrollment)
-	) {
+	if (enrollment && isAwaitingNda(enrollment)) {
 		try {
 			ndaSignUrl = await resolveNdaSignUrl(enrollment);
 		} catch {

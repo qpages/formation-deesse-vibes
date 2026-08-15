@@ -1,0 +1,54 @@
+---
+import Button from '../../ui/Button.astro';
+import Container from '../../ui/Container.astro';
+
+interface Props {
+	token: string;
+}
+
+const { token } = Astro.props;
+---
+
+<section class="bg-ink text-mist relative overflow-hidden">
+	<div
+		class="absolute inset-0 bg-[radial-gradient(ellipse_at_16%_10%,rgb(196_120_106/0.2),transparent_42%),linear-gradient(145deg,#17120f_0%,#241c18_58%,#18130f_100%)]"
+		aria-hidden="true"
+	>
+	</div>
+	<Container class="relative z-10 max-w-lg pt-32 pb-16 sm:pt-36">
+		<p class="text-gold-soft text-[11px] font-medium tracking-[0.28em] uppercase">Connexion</p>
+		<h1 class="font-display text-mist mt-4 text-4xl leading-tight sm:text-5xl">Se connecter</h1>
+		<p class="text-mist/72 mt-4 text-base leading-relaxed">
+			Confirmez pour ouvrir votre espace d’inscription. Cette étape évite qu’un aperçu automatique
+			de messagerie consomme votre lien.
+		</p>
+		<form id="magic-confirm" method="post" action="/api/magic-link/consume" class="mt-8">
+			<input type="hidden" name="token" value={token} />
+			<Button type="submit" variant="primary" size="md" id="magic-confirm-submit">
+				Se connecter
+			</Button>
+		</form>
+	</Container>
+</section>
+
+<script>
+	import { lockFormSubmit } from '../../../lib/client/lock-submit';
+
+	const form = document.getElementById('magic-confirm') as HTMLFormElement | null;
+	form?.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		if (!form) return;
+		const lock = lockFormSubmit(form, { busyLabel: 'Connexion…' });
+		if (!lock.locked) return;
+
+		try {
+			const res = await fetch(form.action, {
+				method: 'POST',
+				body: new FormData(form),
+			});
+			window.location.assign(res.url || '/?connected=1');
+		} catch {
+			lock.unlock();
+		}
+	});
+</script>

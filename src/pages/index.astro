@@ -6,6 +6,7 @@ import Programme from '../components/formation/landing/Programme.astro';
 import AccessPanel from '../components/formation/status/AccessPanel.astro';
 import Stepper from '../components/formation/status/Stepper.astro';
 import Faq from '../components/formation/landing/Faq.astro';
+import MagicLinkConfirm from '../components/formation/status/MagicLinkConfirm.astro';
 import { resolveHomeEnrollment } from '../lib/pages/resolve-home-enrollment';
 
 export const prerender = false;
@@ -27,21 +28,20 @@ if (resolved.kind === 'redirect') {
 	return response;
 }
 
-const view = resolved.view;
+const confirmToken = resolved.kind === 'confirm_magic_link' ? resolved.token : null;
+const view = resolved.kind === 'page' ? resolved.view : null;
 
-if (view.setCookie) {
+if (view?.setCookie) {
 	Astro.response.headers.append('Set-Cookie', view.setCookie);
 }
 
-const {
-	enrollment,
-	flash,
-	checkoutCancel,
-	showTracking,
-	ndaSignUrl,
-	invoiceLinks,
-	magicLinkFailed,
-} = view;
+const enrollment = view?.enrollment ?? null;
+const flash = view?.flash ?? null;
+const checkoutCancel = view?.checkoutCancel ?? false;
+const showTracking = view?.showTracking ?? false;
+const ndaSignUrl = view?.ndaSignUrl ?? null;
+const invoiceLinks = view?.invoiceLinks ?? [];
+const magicLinkFailed = view?.magicLinkFailed ?? false;
 
 const accessTitle = showTracking
 	? enrollment?.accessStatus === 'active'
@@ -54,42 +54,50 @@ const heroCta = showTracking
 	: { label: "M'inscrire à la formation", href: '#acces', external: false };
 ---
 
-<MarketingLayout>
-	<Hero ctaHref={heroCta.href} ctaLabel={heroCta.label} ctaExternal={heroCta.external} />
+<MarketingLayout title={confirmToken ? 'Se connecter' : undefined}>
+	{
+		confirmToken ? (
+			<MagicLinkConfirm token={confirmToken} />
+		) : (
+			<>
+				<Hero ctaHref={heroCta.href} ctaLabel={heroCta.label} ctaExternal={heroCta.external} />
 
-	<Section
-		id="programme"
-		eyebrow="Programme"
-		title="Ce que vous allez apprendre"
-		description="Onze modules pour que vous puissiez apprendre à lire et interpréter la matrice évolution."
-		class="border-b border-ink/8 py-8 sm:py-10"
-	>
-		<Programme />
-	</Section>
+				<Section
+					id="programme"
+					eyebrow="Programme"
+					title="Ce que vous allez apprendre"
+					description="Onze modules pour que vous puissiez apprendre à lire et interpréter la matrice évolution."
+					class="border-ink/8 border-b py-8 sm:py-10"
+				>
+					<Programme />
+				</Section>
 
-	<Section
-		id="fonctionnement"
-		eyebrow="Parcours"
-		title="Comment ça fonctionne ?"
-		class="border-b border-ink/8"
-	>
-		<Stepper />
-	</Section>
+				<Section
+					id="fonctionnement"
+					eyebrow="Parcours"
+					title="Comment ça fonctionne ?"
+					class="border-ink/8 border-b"
+				>
+					<Stepper />
+				</Section>
 
-	<Section id="acces" eyebrow="Inscription" title={accessTitle} class="border-b border-ink/8">
-		<AccessPanel
-			showFunnel={!showTracking}
-			enrollment={enrollment}
-			ndaSignUrl={ndaSignUrl}
-			invoiceLinks={invoiceLinks}
-			flash={flash}
-			checkoutCancel={checkoutCancel}
-			magicLinkFailed={magicLinkFailed}
-			defaultTab={magicLinkFailed ? 'retrouver' : 'nouveau'}
-		/>
-	</Section>
+				<Section id="acces" eyebrow="Inscription" title={accessTitle} class="border-ink/8 border-b">
+					<AccessPanel
+						showFunnel={!showTracking}
+						enrollment={enrollment}
+						ndaSignUrl={ndaSignUrl}
+						invoiceLinks={invoiceLinks}
+						flash={flash}
+						checkoutCancel={checkoutCancel}
+						magicLinkFailed={magicLinkFailed}
+						defaultTab={magicLinkFailed ? 'retrouver' : 'nouveau'}
+					/>
+				</Section>
 
-	<Section id="faq" eyebrow="Questions" title="FAQ">
-		<Faq />
-	</Section>
+				<Section id="faq" eyebrow="Questions" title="FAQ">
+					<Faq />
+				</Section>
+			</>
+		)
+	}
 </MarketingLayout>

@@ -12,10 +12,7 @@ import { getPaymentPlan } from '../payment-plans';
 import { getPrisma } from '../prisma';
 import { getSignatureLink } from '../yousign';
 import { sendMagicLinkEmail } from './brevo';
-import {
-	findEnrollmentByEmail,
-	withUser,
-} from './enrollment-queries';
+import { findEnrollmentByEmail, withUser } from './enrollment-queries';
 
 export type { EnrollmentWithUser } from './enrollment-queries';
 export {
@@ -73,12 +70,8 @@ export async function updateEnrollmentYousignMirror(
 		data: {
 			...(data.yousignStatus !== undefined ? { yousignStatus: data.yousignStatus } : {}),
 			...(data.contractStatus ? { contractStatus: data.contractStatus } : {}),
-			...(data.yousignRequestId !== undefined
-				? { yousignRequestId: data.yousignRequestId }
-				: {}),
-			...(data.yousignSignerId !== undefined
-				? { yousignSignerId: data.yousignSignerId }
-				: {}),
+			...(data.yousignRequestId !== undefined ? { yousignRequestId: data.yousignRequestId } : {}),
+			...(data.yousignSignerId !== undefined ? { yousignSignerId: data.yousignSignerId } : {}),
 			...(data.yousignSignerStatus !== undefined
 				? { yousignSignerStatus: data.yousignSignerStatus }
 				: {}),
@@ -86,16 +79,12 @@ export async function updateEnrollmentYousignMirror(
 				? { signatureLinkExpiresAt: data.signatureLinkExpiresAt }
 				: {}),
 			...(data.ndaNotifiedAt !== undefined ? { ndaNotifiedAt: data.ndaNotifiedAt } : {}),
-			...(data.ndaLinkOpenedAt !== undefined
-				? { ndaLinkOpenedAt: data.ndaLinkOpenedAt }
-				: {}),
+			...(data.ndaLinkOpenedAt !== undefined ? { ndaLinkOpenedAt: data.ndaLinkOpenedAt } : {}),
 			...(data.ndaSignedAt !== undefined ? { ndaSignedAt: data.ndaSignedAt } : {}),
 			...(data.ndaDeliveryFailedAt !== undefined
 				? { ndaDeliveryFailedAt: data.ndaDeliveryFailedAt }
 				: {}),
-			...(data.yousignLastError !== undefined
-				? { yousignLastError: data.yousignLastError }
-				: {}),
+			...(data.yousignLastError !== undefined ? { yousignLastError: data.yousignLastError } : {}),
 			...(data.yousignLastErrorAt !== undefined
 				? { yousignLastErrorAt: data.yousignLastErrorAt }
 				: {}),
@@ -186,10 +175,7 @@ export async function createPendingEnrollment(input: {
 	const existingPaid = await prisma.enrollment.findFirst({
 		where: {
 			user: { email },
-			OR: [
-				{ collectionStatus: { not: 'pending' } },
-				{ accessStatus: { not: 'not_eligible' } },
-			],
+			OR: [{ collectionStatus: { not: 'pending' } }, { accessStatus: { not: 'not_eligible' } }],
 		},
 	});
 	if (existingPaid) {
@@ -269,42 +255,51 @@ export async function requestMagicLink(email: string) {
 	return { ok: true as const, sent: true as const };
 }
 
-/** Lookup one-time token. Consumes unused valid links; used links stay used. */
-export async function consumeMagicLink(token: string): Promise<
+export type MagicLinkLookup =
 	| { status: 'unused'; enrollmentId: string }
 	| { status: 'used'; enrollmentId: string }
-	| { status: 'invalid' }
-> {
-	const tokenHash = hashToken(token);
-	const prisma = getPrisma();
-	const link = await prisma.magicLink.findUnique({
-		where: { tokenHash },
-	});
+	| { status: 'invalid' };
 
-	if (!link) {
-		return { status: 'invalid' };
-	}
-
-	if (link.usedAt) {
-		return { status: 'used', enrollmentId: link.enrollmentId };
-	}
-
-	if (link.expiresAt < new Date()) {
-		return { status: 'invalid' };
-	}
-
-	await prisma.magicLink.update({
-		where: { id: link.id },
-		data: { usedAt: new Date() },
-	});
-
+function toMagicLinkLookup(
+	link: {
+		usedAt: Date | null;
+		expiresAt: Date;
+		enrollmentId: string;
+	} | null,
+): MagicLinkLookup {
+	if (!link) return { status: 'invalid' };
+	if (link.usedAt) return { status: 'used', enrollmentId: link.enrollmentId };
+	if (link.expiresAt < new Date()) return { status: 'invalid' };
 	return { status: 'unused', enrollmentId: link.enrollmentId };
 }
 
-export async function canResendNda(enrollment: Enrollment): Promise<
-	| { ok: true }
-	| { ok: false; reason: string }
-> {
+/** Lookup without marking usedAt (prefetch-safe). */
+export async function peekMagicLink(token: string): Promise<MagicLinkLookup> {
+	const link = await getPrisma().magicLink.findUnique({
+		where: { tokenHash: hashToken(token) },
+	});
+	return toMagicLinkLookup(link);
+}
+
+/** Consume unused valid token once (updateMany + usedAt: null). */
+export async function consumeMagicLink(token: string): Promise<MagicLinkLookup> {
+	const tokenHash = hashToken(token);
+	const prisma = getPrisma();
+	const now = new Date();
+	const consumed = await prisma.magicLink.updateMany({
+		where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
+		data: { usedAt: now },
+	});
+	if (consumed.count === 1) {
+		const link = await prisma.magicLink.findUnique({ where: { tokenHash } });
+		return link ? { status: 'unused', enrollmentId: link.enrollmentId } : { status: 'invalid' };
+	}
+	return peekMagicLink(token);
+}
+
+export async function canResendNda(
+	enrollment: Enrollment,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
 	if (!isAwaitingNda(enrollment)) {
 		return { ok: false, reason: 'Le NDA n’est pas en attente de signature.' };
 	}
