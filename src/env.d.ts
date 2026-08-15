@@ -1,7 +1,8 @@
 /// <reference types="astro/client" />
 
 interface ImportMetaEnv {
-	readonly DATABASE_URL?: string;
+	readonly DEV_DATABASE_URL?: string;
+	readonly PRODUCTION_DATABASE_URL?: string;
 	readonly STRIPE_SECRET_KEY?: string;
 	readonly STRIPE_WEBHOOK_SECRET?: string;
 	readonly STRIPE_PRICE_ID?: string;
@@ -14,8 +15,8 @@ interface ImportMetaEnv {
 	readonly YOUSIGN_TEMPLATE_ID?: string;
 	readonly YOUSIGN_WEBHOOK_SECRET?: string;
 	readonly YOUSIGN_API_BASE?: string;
-	readonly RESEND_API_KEY?: string;
-	readonly RESEND_FROM?: string;
+	readonly BREVO_API_KEY?: string;
+	readonly BREVO_FROM?: string;
 	readonly MAGIC_LINK_SECRET?: string;
 	readonly SESSION_SECRET?: string;
 	readonly PAYLOAD_ENCRYPTION_KEY?: string;

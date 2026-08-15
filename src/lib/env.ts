@@ -3,7 +3,6 @@ import { z } from 'zod';
 const optionalUrl = z.string().url().optional().or(z.literal('').transform(() => undefined));
 
 const serverSchema = z.object({
-	DATABASE_URL: z.string().min(1).optional(),
 	STRIPE_SECRET_KEY: z.string().optional(),
 	STRIPE_WEBHOOK_SECRET: z.string().optional(),
 	STRIPE_PRICE_ID: z.string().default('price_1TzdF3L7BRlbDDBVihIiFWwp'),
@@ -17,8 +16,8 @@ const serverSchema = z.object({
 	YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
 	YOUSIGN_API_BASE: z.string().url().default('https://api-sandbox.yousign.app/v3'),
 	YOUSIGN_SIGNER_LABEL: z.string().default('signer'),
-	RESEND_API_KEY: z.string().optional(),
-	RESEND_FROM: z.string().default('formation@deesse-vibes.com'),
+	BREVO_API_KEY: z.string().optional(),
+	BREVO_FROM: z.string().default('formation@deesse-vibes.com'),
 	MAGIC_LINK_SECRET: z.string().min(32).optional(),
 	SESSION_SECRET: z.string().min(32).optional(),
 	PAYLOAD_ENCRYPTION_KEY: z.string().min(32).optional(),
@@ -49,7 +48,6 @@ let cached: ServerEnv | null = null;
 export function getEnv(): ServerEnv {
 	if (cached) return cached;
 	cached = serverSchema.parse({
-		DATABASE_URL: import.meta.env.DATABASE_URL ?? process.env.DATABASE_URL,
 		STRIPE_SECRET_KEY: import.meta.env.STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY,
 		STRIPE_WEBHOOK_SECRET:
 			import.meta.env.STRIPE_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET,
@@ -72,8 +70,8 @@ export function getEnv(): ServerEnv {
 		YOUSIGN_API_BASE: import.meta.env.YOUSIGN_API_BASE ?? process.env.YOUSIGN_API_BASE,
 		YOUSIGN_SIGNER_LABEL:
 			import.meta.env.YOUSIGN_SIGNER_LABEL ?? process.env.YOUSIGN_SIGNER_LABEL,
-		RESEND_API_KEY: import.meta.env.RESEND_API_KEY ?? process.env.RESEND_API_KEY,
-		RESEND_FROM: import.meta.env.RESEND_FROM ?? process.env.RESEND_FROM,
+		BREVO_API_KEY: import.meta.env.BREVO_API_KEY ?? process.env.BREVO_API_KEY,
+		BREVO_FROM: import.meta.env.BREVO_FROM ?? process.env.BREVO_FROM,
 		MAGIC_LINK_SECRET: import.meta.env.MAGIC_LINK_SECRET ?? process.env.MAGIC_LINK_SECRET,
 		SESSION_SECRET: import.meta.env.SESSION_SECRET ?? process.env.SESSION_SECRET,
 		PAYLOAD_ENCRYPTION_KEY:

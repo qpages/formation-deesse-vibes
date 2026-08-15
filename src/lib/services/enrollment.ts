@@ -11,7 +11,7 @@ import { getEnv } from '../env';
 import { getPaymentPlan } from '../payment-plans';
 import { getPrisma } from '../prisma';
 import { getSignatureLink } from '../yousign';
-import { sendMagicLinkEmail } from './resend';
+import { sendMagicLinkEmail } from './brevo';
 import {
 	findEnrollmentByEmail,
 	withUser,
@@ -110,12 +110,19 @@ const YOUSIGN_ERROR_MAX_LEN = 1000;
 /** Persiste la dernière erreur Yousign pour diagnostic admin. Ne throw jamais. */
 export async function recordYousignError(enrollmentId: string, message: string) {
 	try {
-		await getPrisma().enrollment.update({
+		const prisma = getPrisma();
+		const data = {
+			yousignLastError: message.slice(0, YOUSIGN_ERROR_MAX_LEN),
+			yousignLastErrorAt: new Date(),
+		};
+		await prisma.enrollment.update({
 			where: { id: enrollmentId },
-			data: {
-				yousignLastError: message.slice(0, YOUSIGN_ERROR_MAX_LEN),
-				yousignLastErrorAt: new Date(),
-			},
+			data,
+		});
+		// Création jamais aboutie : pending + erreur ≠ « à envoyer ».
+		await prisma.enrollment.updateMany({
+			where: { id: enrollmentId, contractStatus: 'pending' },
+			data: { contractStatus: 'error' },
 		});
 	} catch (error) {
 		console.error('[recordYousignError] persist failed', error);

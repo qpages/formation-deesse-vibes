@@ -17,7 +17,8 @@ export { resendNda } from './resend-nda';
 export const purgeWebhookPayloads = inngest.createFunction(
 	{
 		id: 'purge-webhook-payloads',
-		triggers: [{ cron: '0 3 * * *' }],
+		retries: 2,
+		triggers: [{ cron: '0 3 * * *' }, { event: 'ops/purge-webhook-payloads' }],
 	},
 	async ({ step }) => {
 		await step.run('purge', () => purgeOldWebhookPayloads());
