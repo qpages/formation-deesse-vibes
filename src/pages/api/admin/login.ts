@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { authenticateAdmin } from '../../../lib/auth/admin';
 import { adminCookieOptions, createAdminSessionToken } from '../../../lib/auth/session';
 import { json } from '../../../lib/http';
+import { notifyOps } from '../../../lib/services/slack';
 import { adminLoginSchema } from '../../../lib/validation';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -18,6 +19,12 @@ export const POST: APIRoute = async ({ request }) => {
 		}
 
 		const token = await createAdminSessionToken(user.email);
+		await notifyOps({
+			kind: 'admin.login',
+			severity: 'info',
+			title: 'Connexion admin',
+			email: user.email,
+		});
 		return json({ ok: true }, 200, {
 			'Set-Cookie': adminCookieOptions(token),
 		});

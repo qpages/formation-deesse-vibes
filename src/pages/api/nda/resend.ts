@@ -12,6 +12,7 @@ import {
 	canResendNda,
 	findEnrollmentById,
 } from '../../../lib/services/enrollment';
+import { notifyOps } from '../../../lib/services/slack';
 
 export const POST: APIRoute = async ({ request }) => {
 	try {
@@ -52,6 +53,15 @@ export const POST: APIRoute = async ({ request }) => {
 		await inngest.send({
 			name: 'admin/resend-nda',
 			data: { enrollmentId: enrollment.id },
+		});
+
+		await notifyOps({
+			kind: 'nda.resend_requested',
+			severity: 'info',
+			title: 'Renvoi NDA demandé',
+			enrollmentId: enrollment.id,
+			email: enrollment.user.email,
+			detail: adminEmail ? `via=admin (${adminEmail})` : 'via=élève',
 		});
 
 		return json({ ok: true, message: 'L’accord a été renvoyé par e-mail (Yousign).' });

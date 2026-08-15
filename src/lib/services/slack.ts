@@ -19,6 +19,11 @@ export type OpsKind =
 	| 'job.recovered'
 	| 'job.final_failure'
 	| 'admin.action'
+	| 'admin.login'
+	| 'auth.magic_link_requested'
+	| 'auth.magic_link_consumed'
+	| 'nda.resend_requested'
+	| 'ops.api_error'
 	| 'ops.reconcile_issues';
 
 export type OpsNotifyInput = {
