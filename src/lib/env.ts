@@ -43,6 +43,9 @@ const serverSchema = z.object({
 
 export type ServerEnv = z.infer<typeof serverSchema>;
 
+/** Vite compile-time: true only for `astro dev` / `vite --mode development`. */
+export const isDev = import.meta.env.DEV;
+
 let cached: ServerEnv | null = null;
 
 export function getEnv(): ServerEnv {
