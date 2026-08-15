@@ -12,7 +12,8 @@ import {
 	PAYMENT_STATUS_LABELS,
 	type PaymentTrackingState,
 } from '../status';
-import { retrieveInvoice, stripeDashboardUrl } from '../stripe';
+import { hydrateInvoiceUrls } from '../services/payments';
+import { stripeDashboardUrl } from '../stripe';
 
 export type AdminPaymentRow = {
 	id: string;
@@ -54,43 +55,6 @@ export type AdminPaymentSummary = {
 	invoices: AdminInvoiceLink[];
 	payments: AdminPaymentRow[];
 };
-
-async function hydrateInvoiceUrls(payments: Payment[]): Promise<Payment[]> {
-	const missing = payments.filter(
-		(payment) =>
-			payment.stripeInvoiceId &&
-			(!payment.invoicePdfUrl || !payment.hostedInvoiceUrl),
-	);
-	if (missing.length === 0) return payments;
-
-	const prisma = getPrisma();
-	const byId = new Map(payments.map((payment) => [payment.id, payment]));
-
-	await Promise.all(
-		missing.map(async (payment) => {
-			try {
-				const invoice = await retrieveInvoice(payment.stripeInvoiceId!);
-				const invoicePdfUrl = invoice.invoice_pdf ?? payment.invoicePdfUrl;
-				const hostedInvoiceUrl = invoice.hosted_invoice_url ?? payment.hostedInvoiceUrl;
-				if (
-					invoicePdfUrl === payment.invoicePdfUrl &&
-					hostedInvoiceUrl === payment.hostedInvoiceUrl
-				) {
-					return;
-				}
-				const updated = await prisma.payment.update({
-					where: { id: payment.id },
-					data: { invoicePdfUrl, hostedInvoiceUrl },
-				});
-				byId.set(payment.id, updated);
-			} catch (error) {
-				console.error('[admin payments] hydrate invoice', payment.stripeInvoiceId, error);
-			}
-		}),
-	);
-
-	return payments.map((payment) => byId.get(payment.id) ?? payment);
-}
 
 export function buildAdminPaymentSummary(
 	enrollment: Enrollment,

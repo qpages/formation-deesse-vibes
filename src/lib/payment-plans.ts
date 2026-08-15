@@ -81,6 +81,16 @@ export function formatMoney(cents: number, currency = 'eur'): string {
 	}).format(cents / 100);
 }
 
+export function paidInvoiceLabel(
+	amountCents: number,
+	paidAt: Date | null,
+	currency = 'eur',
+): string {
+	const amount = formatMoney(amountCents, currency);
+	if (!paidAt) return `Facture de ${amount}`;
+	return `Facture de ${amount} payé le ${paidAt.toLocaleDateString('fr-FR')}`;
+}
+
 export function stripePriceIdForPlan(plan: PaymentPlan): string {
 	const env = getEnv();
 

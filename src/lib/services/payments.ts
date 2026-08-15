@@ -3,12 +3,14 @@ import type {
 	CollectionStatus,
 	ContractStatus,
 	Enrollment,
+	Payment,
 	PaymentStatus,
 	SubscriptionStatus,
 } from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
 import {
 	getPaymentPlan,
+	paidInvoiceLabel,
 	resolvePaymentPlan,
 	stripePriceIdForPlan,
 	type PaymentPlanId,
@@ -32,6 +34,7 @@ import {
 	getStripe,
 	listSubscriptionInvoices,
 	retrieveCheckoutSession,
+	retrieveInvoice,
 	retrieveSubscription,
 } from '../stripe';
 import { isNdaFullyProvisioned } from '../yousign';
@@ -886,26 +889,62 @@ export async function syncPaymentFromStripe(enrollmentId: string): Promise<Confi
 	return result;
 }
 
-/** Liens facture PDF / page hébergée pour le client (paiements payés uniquement). */
-export async function listPaidInvoiceLinks(enrollmentId: string) {
+export type PaidInvoiceLink = {
+	installmentNumber: number;
+	label: string;
+	viewUrl: string | null;
+	downloadUrl: string | null;
+};
+
+/** Recharge les URLs Stripe (PDF signé + page hébergée) si une des deux manque. */
+export async function hydrateInvoiceUrls(payments: Payment[]): Promise<Payment[]> {
+	const missing = payments.filter(
+		(payment) =>
+			payment.stripeInvoiceId && (!payment.invoicePdfUrl || !payment.hostedInvoiceUrl),
+	);
+	if (missing.length === 0) return payments;
+
+	const prisma = getPrisma();
+	const byId = new Map(payments.map((payment) => [payment.id, payment]));
+
+	await Promise.all(
+		missing.map(async (payment) => {
+			try {
+				const invoice = await retrieveInvoice(payment.stripeInvoiceId!);
+				const invoicePdfUrl = invoice.invoice_pdf ?? payment.invoicePdfUrl;
+				const hostedInvoiceUrl = invoice.hosted_invoice_url ?? payment.hostedInvoiceUrl;
+				if (
+					invoicePdfUrl === payment.invoicePdfUrl &&
+					hostedInvoiceUrl === payment.hostedInvoiceUrl
+				) {
+					return;
+				}
+				const updated = await prisma.payment.update({
+					where: { id: payment.id },
+					data: { invoicePdfUrl, hostedInvoiceUrl },
+				});
+				byId.set(payment.id, updated);
+			} catch (error) {
+				console.error('[payments] hydrate invoice', payment.stripeInvoiceId, error);
+			}
+		}),
+	);
+
+	return payments.map((payment) => byId.get(payment.id) ?? payment);
+}
+
+/** Une ligne par paiement réussi : voir (page Stripe) + télécharger (PDF). */
+export async function listPaidInvoiceLinks(enrollmentId: string): Promise<PaidInvoiceLink[]> {
 	const payments = await getPrisma().payment.findMany({
 		where: { enrollmentId, status: 'paid' },
 		orderBy: { installmentNumber: 'asc' },
-		select: {
-			installmentNumber: true,
-			invoicePdfUrl: true,
-			hostedInvoiceUrl: true,
-		},
 	});
+	const hydrated = await hydrateInvoiceUrls(payments);
 
-	return payments
-		.map((payment) => {
-			const url = payment.invoicePdfUrl ?? payment.hostedInvoiceUrl;
-			if (!url) return null;
-			return {
-				installmentNumber: payment.installmentNumber,
-				url,
-			};
-		})
-		.filter((row): row is { installmentNumber: number; url: string } => Boolean(row));
+	return hydrated.map((payment) => ({
+		installmentNumber: payment.installmentNumber,
+		label: paidInvoiceLabel(payment.amountCents, payment.paidAt, payment.currency),
+		viewUrl: payment.hostedInvoiceUrl,
+		downloadUrl: payment.invoicePdfUrl,
+	}));
 }
