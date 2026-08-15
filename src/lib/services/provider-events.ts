@@ -1,15 +1,21 @@
-import type { Provider } from '../../generated/prisma/client';
+import type { Provider, ProviderEventStatus } from '../../generated/prisma/client';
 import { encryptPayload } from '../crypto';
 import { getPrisma } from '../prisma';
 
-/** Insert inbox event (status=received). Duplicate unique → created:false. */
+export type RecordedProviderEvent = {
+	created: boolean;
+	id?: string;
+	status?: ProviderEventStatus;
+};
+
+/** Insert inbox event (status=received). Duplicate unique → created:false + existing row. */
 export async function recordProviderEvent(input: {
 	provider: Provider;
 	providerEventId: string;
 	eventType: string;
 	enrollmentId?: string;
 	payload: unknown;
-}): Promise<{ created: boolean; id?: string }> {
+}): Promise<RecordedProviderEvent> {
 	const prisma = getPrisma();
 	try {
 		const row = await prisma.providerEvent.create({
@@ -22,7 +28,7 @@ export async function recordProviderEvent(input: {
 				payloadCipherText: encryptPayload(JSON.stringify(input.payload)),
 			},
 		});
-		return { created: true, id: row.id };
+		return { created: true, id: row.id, status: row.status };
 	} catch (error) {
 		if (
 			typeof error === 'object' &&
@@ -30,7 +36,15 @@ export async function recordProviderEvent(input: {
 			'code' in error &&
 			(error as { code: string }).code === 'P2002'
 		) {
-			return { created: false };
+			const existing = await prisma.providerEvent.findUnique({
+				where: {
+					provider_providerEventId: {
+						provider: input.provider,
+						providerEventId: input.providerEventId,
+					},
+				},
+			});
+			return { created: false, id: existing?.id, status: existing?.status };
 		}
 		throw error;
 	}

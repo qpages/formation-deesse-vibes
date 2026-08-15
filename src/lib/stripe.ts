@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { e2eMockProviders } from './e2e-providers';
 import { getEnv, requireEnv } from './env';
 import { getPaymentPlan, type PaymentPlanId, stripePriceIdForPlan } from './payment-plans';
 
@@ -31,6 +32,25 @@ export async function createCheckoutSession(input: {
 		paymentPlan: plan.id,
 		installmentsTotal: String(plan.installments),
 	};
+
+	if (e2eMockProviders()) {
+		const id = `cs_test_e2e_${input.enrollmentId}`;
+		return {
+			id,
+			object: 'checkout.session',
+			url: `https://checkout.stripe.com/c/pay/${id}`,
+			status: 'open',
+			payment_status: 'unpaid',
+			mode: plan.mode === 'payment' ? 'payment' : 'subscription',
+			amount_total: plan.installmentAmountCents,
+			currency: 'eur',
+			metadata: {
+				enrollmentId: input.enrollmentId,
+				paymentPlan: plan.id,
+			},
+			client_reference_id: input.enrollmentId,
+		} as unknown as Stripe.Checkout.Session;
+	}
 
 	if (plan.mode === 'payment') {
 		return client.checkout.sessions.create({
@@ -83,8 +103,7 @@ function phaseMonths(phase: Stripe.SubscriptionSchedule.Phase): number {
 	const start = new Date(phase.start_date * 1000);
 	const end = new Date(phase.end_date * 1000);
 	return (
-		(end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
-		(end.getUTCMonth() - start.getUTCMonth())
+		(end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth())
 	);
 }
 
@@ -92,10 +111,7 @@ function phaseMonths(phase: Stripe.SubscriptionSchedule.Phase): number {
  * Un schedule est correctement borné ssi il s'arrête (`cancel`) après ≥ N mois.
  * Le défaut de `from_subscription` est `release` sur une seule échéance → à reconfigurer.
  */
-function isScheduleBounded(
-	schedule: Stripe.SubscriptionSchedule,
-	installments: number,
-): boolean {
+function isScheduleBounded(schedule: Stripe.SubscriptionSchedule, installments: number): boolean {
 	if (schedule.end_behavior !== 'cancel') return false;
 	const lastPhase = schedule.phases.at(-1);
 	if (!lastPhase) return false;
@@ -171,11 +187,7 @@ export async function ensureSubscriptionSchedule(input: {
 }
 
 export function constructStripeEvent(body: string, signature: string) {
-	return getStripe().webhooks.constructEvent(
-		body,
-		signature,
-		requireEnv('STRIPE_WEBHOOK_SECRET'),
-	);
+	return getStripe().webhooks.constructEvent(body, signature, requireEnv('STRIPE_WEBHOOK_SECRET'));
 }
 
 function dashboardBase(): string {
@@ -214,11 +226,30 @@ export function stripeDashboardUrl(input: {
 }
 
 export async function retrieveCheckoutSession(sessionId: string) {
+	if (e2eMockProviders()) {
+		const enrollmentId = sessionId.startsWith('cs_test_e2e_')
+			? sessionId.slice('cs_test_e2e_'.length)
+			: undefined;
+		return {
+			id: sessionId,
+			object: 'checkout.session',
+			status: 'complete',
+			payment_status: 'paid',
+			mode: 'payment',
+			amount_total: 184_900,
+			currency: 'eur',
+			metadata: enrollmentId ? { enrollmentId, paymentPlan: 'unique' } : {},
+			client_reference_id: enrollmentId ?? null,
+		} as unknown as Stripe.Checkout.Session;
+	}
 	return getStripe().checkout.sessions.retrieve(sessionId);
 }
 
 /** Expire une session open. No-op si déjà complete / expired. */
 export async function expireCheckoutSession(sessionId: string) {
+	if (e2eMockProviders()) {
+		return { id: sessionId, status: 'expired' } as unknown as Stripe.Checkout.Session;
+	}
 	try {
 		return await getStripe().checkout.sessions.expire(sessionId);
 	} catch (error) {

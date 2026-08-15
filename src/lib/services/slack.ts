@@ -1,3 +1,4 @@
+import { e2eMockProviders } from '../e2e-providers';
 import { getEnv } from '../env';
 
 export type OpsSeverity = 'info' | 'warn' | 'critical';
@@ -55,8 +56,39 @@ export function formatErrorDetail(error: unknown): string {
 	return cause ? `${error.message} — ${cause}` : error.message;
 }
 
+/** Clics user répétés : 1 alerte Slack par fenêtre (best-effort multi-instance). */
+export const OPS_ALERT_DEDUPE_MS: Partial<Record<OpsKind, number>> = {
+	'admin.login': 2 * 60 * 1000,
+	'auth.magic_link_requested': 60 * 1000,
+};
+
+const lastOpsAlertAt = new Map<string, number>();
+
+export function opsAlertDedupeKey(
+	input: Pick<OpsNotifyInput, 'kind' | 'email' | 'enrollmentId'>,
+): string {
+	return [input.kind, input.email ?? '', input.enrollmentId ?? ''].join('|');
+}
+
+export function shouldSendOpsAlert(input: OpsNotifyInput, now = Date.now()): boolean {
+	const windowMs = OPS_ALERT_DEDUPE_MS[input.kind];
+	if (!windowMs) return true;
+	const key = opsAlertDedupeKey(input);
+	const prev = lastOpsAlertAt.get(key);
+	if (prev != null && now - prev < windowMs) return false;
+	lastOpsAlertAt.set(key, now);
+	return true;
+}
+
+export function resetOpsAlertDedupeForTests() {
+	lastOpsAlertAt.clear();
+}
+
 /** Facade: seul point d’I/O Slack (Incoming Webhook). Ne throw jamais. */
 export async function notifyOps(input: OpsNotifyInput): Promise<void> {
+	if (e2eMockProviders()) return;
+	if (!shouldSendOpsAlert(input)) return;
+
 	const lines = [
 		`[${input.severity}] ${input.kind} — ${input.title}`,
 		input.enrollmentId ? `Inscription: ${input.enrollmentId}` : null,

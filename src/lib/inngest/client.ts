@@ -1,4 +1,5 @@
 import { Inngest } from 'inngest';
+import { e2eMockProviders } from '../e2e-providers';
 import { env } from '../env';
 
 /**
@@ -14,7 +15,8 @@ import { env } from '../env';
  * - Requiert INNGEST_EVENT_KEY
  * - Auto-découverte via l'endpoint /api/inngest
  */
-const isDev = env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.MODE === 'development';
+const isDev =
+	env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.MODE === 'development';
 
 export const inngest = new Inngest({
 	id: 'formation-deesse-vibes',
@@ -28,9 +30,7 @@ export const inngest = new Inngest({
  * `skipped` = rien à faire (gates non remplies). `failed` = file indisponible.
  */
 export type EnqueueResult =
-	| { status: 'enqueued' }
-	| { status: 'skipped' }
-	| { status: 'failed'; error: string };
+	{ status: 'enqueued' } | { status: 'skipped' } | { status: 'failed'; error: string };
 
 /**
  * `inngest.send` qui ne jette jamais : isole une panne de la file (dev sans
@@ -40,6 +40,9 @@ export type EnqueueResult =
 export async function sendInngestSafe(
 	payload: Parameters<typeof inngest.send>[0],
 ): Promise<{ status: 'enqueued' } | { status: 'failed'; error: string }> {
+	if (e2eMockProviders()) {
+		return { status: 'enqueued' };
+	}
 	try {
 		await inngest.send(payload);
 		return { status: 'enqueued' };

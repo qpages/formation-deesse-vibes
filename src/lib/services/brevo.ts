@@ -1,3 +1,4 @@
+import { e2eMockProviders } from '../e2e-providers';
 import { FORMATION, getEnv, requireEnv } from '../env';
 
 const BREVO_SMTP_URL = 'https://api.brevo.com/v3/smtp/email';
@@ -10,11 +11,11 @@ function escapeHtml(value: string) {
 		.replaceAll('"', '&quot;');
 }
 
-export async function sendMagicLinkEmail(input: {
-	to: string;
-	firstName: string;
-	url: string;
-}) {
+export async function sendMagicLinkEmail(input: { to: string; firstName: string; url: string }) {
+	if (e2eMockProviders()) {
+		return;
+	}
+
 	const env = getEnv();
 	const apiKey = requireEnv('BREVO_API_KEY');
 	const htmlUrl = escapeHtml(input.url);

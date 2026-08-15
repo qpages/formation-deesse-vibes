@@ -1,8 +1,6 @@
 import type { APIRoute } from 'astro';
-import { inngest } from '../../../lib/inngest/client';
-import { json } from '../../../lib/http';
-import { recordProviderEvent } from '../../../lib/services/enrollment';
 import type { YousignWebhookPayload } from '../../../lib/services/yousign-events';
+import { acknowledgeProviderEvent } from '../../../lib/webhooks/acknowledge-provider-event';
 import { verifyYousignSignature } from '../../../lib/yousign';
 
 /**
@@ -11,8 +9,7 @@ import { verifyYousignSignature } from '../../../lib/yousign';
 export const POST: APIRoute = async ({ request }) => {
 	const rawBody = await request.text();
 	const signature =
-		request.headers.get('x-yousign-signature-256') ??
-		request.headers.get('x-yousign-signature');
+		request.headers.get('x-yousign-signature-256') ?? request.headers.get('x-yousign-signature');
 
 	if (!verifyYousignSignature(rawBody, signature)) {
 		return new Response('Invalid signature', { status: 400 });
@@ -29,21 +26,10 @@ export const POST: APIRoute = async ({ request }) => {
 	const eventId =
 		payload.event_id ?? `${eventType}:${payload.data?.signature_request?.id ?? 'none'}`;
 
-	const { created, id } = await recordProviderEvent({
+	return acknowledgeProviderEvent({
 		provider: 'yousign',
 		providerEventId: eventId,
 		eventType,
 		payload,
 	});
-
-	if (!created || !id) {
-		return json({ received: true, duplicate: true });
-	}
-
-	await inngest.send({
-		name: 'provider/yousign-event.received',
-		data: { providerEventId: id },
-	});
-
-	return json({ received: true });
 };
