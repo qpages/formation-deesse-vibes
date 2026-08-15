@@ -19,8 +19,14 @@ import {
 	listPaidInvoiceLinks,
 	retrieveCheckoutSession,
 } from '../services/payments';
+import { notifyOps } from '../services/slack';
 import { checkoutSuccessFlash, stepStates } from '../status';
 import { isNdaFullyProvisioned } from '../yousign';
+import {
+	decideMagicLinkOutcome,
+	MAGIC_LINK_CONNECTED_FLASH,
+	MAGIC_LINK_INVALID_FLASH,
+} from './magic-link-outcome';
 
 export type HomeEnrollmentView = {
 	enrollment: EnrollmentWithUser | null;
@@ -36,14 +42,55 @@ export type HomeEnrollmentView = {
 	magicLinkFailed: boolean;
 };
 
+export type HomeEnrollmentResult =
+	| { kind: 'redirect'; redirectTo: string; setCookie: string | null }
+	| { kind: 'page'; view: HomeEnrollmentView };
+
+
+async function cookieEnrollmentId(cookieHeader: string | null): Promise<string | null> {
+	const cookieToken = parseCookie(cookieHeader, TRACKING_COOKIE);
+	if (!cookieToken) return null;
+	return verifyEnrollmentSessionToken(cookieToken);
+}
+
+async function resolveMagicLinkRedirect(
+	token: string,
+	cookieHeader: string | null,
+): Promise<{ redirectTo: string; setCookie: string | null }> {
+	const lookup = await consumeMagicLink(token);
+	const sessionEnrollmentId = await cookieEnrollmentId(cookieHeader);
+	const outcome = decideMagicLinkOutcome(lookup, sessionEnrollmentId);
+
+	if (outcome.action === 'set_session') {
+		const enrollment = await findEnrollmentById(outcome.enrollmentId);
+		await notifyOps({
+			kind: 'auth.magic_link_consumed',
+			severity: 'info',
+			title: 'Connexion via lien magique',
+			enrollmentId: outcome.enrollmentId,
+			email: enrollment?.user.email,
+		});
+		return {
+			redirectTo: outcome.redirectTo,
+			setCookie: enrollmentCookieOptions(
+				await createEnrollmentSessionToken(outcome.enrollmentId),
+			),
+		};
+	}
+
+	return { redirectTo: outcome.redirectTo, setCookie: null };
+}
+
 /** Orchestration page d’accueil : session, reconcile Checkout, NDA, factures. */
 export async function resolveHomeEnrollment(input: {
 	cookieHeader: string | null;
 	token: string | null;
 	sessionId: string | null;
 	checkout: string | null;
-}): Promise<HomeEnrollmentView> {
-	const { cookieHeader, token, sessionId, checkout } = input;
+	connected: string | null;
+	link: string | null;
+}): Promise<HomeEnrollmentResult> {
+	const { cookieHeader, token, sessionId, checkout, connected, link } = input;
 
 	let enrollment: EnrollmentWithUser | null = null;
 	let flash: string | null = null;
@@ -51,14 +98,8 @@ export async function resolveHomeEnrollment(input: {
 
 	try {
 		if (token) {
-			enrollment = await consumeMagicLink(token);
-			if (enrollment) {
-				const sessionToken = await createEnrollmentSessionToken(enrollment.id);
-				setCookie = enrollmentCookieOptions(sessionToken);
-				flash = 'Lien magique validé. Voici l’état de votre inscription.';
-			} else {
-				flash = 'Ce lien est invalide ou a expiré. Demandez-en un nouveau ci-dessous.';
-			}
+			const magic = await resolveMagicLinkRedirect(token, cookieHeader);
+			return { kind: 'redirect', ...magic };
 		}
 
 		if (!enrollment && sessionId) {
@@ -70,12 +111,9 @@ export async function resolveHomeEnrollment(input: {
 		}
 
 		if (!enrollment) {
-			const cookieToken = parseCookie(cookieHeader, TRACKING_COOKIE);
-			if (cookieToken) {
-				const enrollmentId = await verifyEnrollmentSessionToken(cookieToken);
-				if (enrollmentId) {
-					enrollment = await findEnrollmentById(enrollmentId);
-				}
+			const enrollmentId = await cookieEnrollmentId(cookieHeader);
+			if (enrollmentId) {
+				enrollment = await findEnrollmentById(enrollmentId);
 			}
 		}
 
@@ -124,6 +162,10 @@ export async function resolveHomeEnrollment(input: {
 				contractStatus: enrollment.contractStatus,
 				accessStatus: enrollment.accessStatus,
 			});
+		} else if (connected === '1') {
+			flash = MAGIC_LINK_CONNECTED_FLASH;
+		} else if (link === 'invalid') {
+			flash = MAGIC_LINK_INVALID_FLASH;
 		}
 	} catch (error) {
 		console.error('[index] enrollment lookup', error);
@@ -171,16 +213,19 @@ export async function resolveHomeEnrollment(input: {
 			: [];
 
 	return {
-		enrollment,
-		flash,
-		setCookie,
-		checkoutCancel,
-		awaitingWebhook,
-		showFunnel,
-		showTracking,
-		steps,
-		ndaSignUrl,
-		invoiceLinks,
-		magicLinkFailed: Boolean(token && !enrollment),
+		kind: 'page',
+		view: {
+			enrollment,
+			flash,
+			setCookie,
+			checkoutCancel,
+			awaitingWebhook,
+			showFunnel,
+			showTracking,
+			steps,
+			ndaSignUrl,
+			invoiceLinks,
+			magicLinkFailed: link === 'invalid',
+		},
 	};
 }

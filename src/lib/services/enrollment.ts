@@ -244,7 +244,7 @@ export class DuplicateEnrollmentError extends Error {
 export async function requestMagicLink(email: string) {
 	const enrollment = await findEnrollmentByEmail(email);
 	if (!enrollment || enrollment.collectionStatus === 'pending') {
-		return { ok: true as const };
+		return { ok: true as const, sent: false as const };
 	}
 
 	const token = generateToken();
@@ -266,19 +266,31 @@ export async function requestMagicLink(email: string) {
 		url,
 	});
 
-	return { ok: true as const };
+	return { ok: true as const, sent: true as const };
 }
 
-export async function consumeMagicLink(token: string) {
+/** Lookup one-time token. Consumes unused valid links; used links stay used. */
+export async function consumeMagicLink(token: string): Promise<
+	| { status: 'unused'; enrollmentId: string }
+	| { status: 'used'; enrollmentId: string }
+	| { status: 'invalid' }
+> {
 	const tokenHash = hashToken(token);
 	const prisma = getPrisma();
 	const link = await prisma.magicLink.findUnique({
 		where: { tokenHash },
-		include: { enrollment: withUser },
 	});
 
-	if (!link || link.usedAt || link.expiresAt < new Date()) {
-		return null;
+	if (!link) {
+		return { status: 'invalid' };
+	}
+
+	if (link.usedAt) {
+		return { status: 'used', enrollmentId: link.enrollmentId };
+	}
+
+	if (link.expiresAt < new Date()) {
+		return { status: 'invalid' };
 	}
 
 	await prisma.magicLink.update({
@@ -286,7 +298,7 @@ export async function consumeMagicLink(token: string) {
 		data: { usedAt: new Date() },
 	});
 
-	return link.enrollment;
+	return { status: 'unused', enrollmentId: link.enrollmentId };
 }
 
 export async function canResendNda(enrollment: Enrollment): Promise<

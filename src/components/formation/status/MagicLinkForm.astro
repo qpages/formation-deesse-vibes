@@ -1,5 +1,4 @@
 ---
-import Alert from '../../ui/Alert.astro';
 import Button from '../../ui/Button.astro';
 import FormField from '../../ui/FormField.astro';
 import Input from '../../ui/Input.astro';
@@ -9,42 +8,38 @@ import Input from '../../ui/Input.astro';
 	<FormField label="Votre e-mail d’inscription" name="magicEmail">
 		<Input type="email" name="magicEmail" required autocomplete="email" />
 	</FormField>
-	<Button type="submit" variant="primary" size="lg" id="magic-submit">
+	<Button type="submit" variant="primary" size="md" class="w-full sm:w-auto" id="magic-submit">
 		Retrouver mon inscription
 	</Button>
-	<div id="magic-feedback" class="hidden">
-		<Alert variant="error"><span id="magic-feedback-text"></span></Alert>
-	</div>
 </form>
 
 <script>
 	const form = document.getElementById('magic-form') as HTMLFormElement | null;
 	const submit = document.getElementById('magic-submit') as HTMLButtonElement | null;
-	const box = document.getElementById('magic-feedback');
-	const text = document.getElementById('magic-feedback-text');
 
 	form?.addEventListener('submit', async (event) => {
 		event.preventDefault();
 		if (!form || !submit) return;
 		submit.disabled = true;
-		box?.classList.add('hidden');
 		const email = String(new FormData(form).get('magicEmail') ?? '');
 		try {
-			const res = await fetch('/api/session/login', {
+			const res = await fetch('/api/magic-link/request', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ email }),
 			});
 			const json = await res.json();
 			if (!res.ok) {
-				if (text) text.textContent = json.error || 'Connexion impossible.';
-				box?.classList.remove('hidden');
+				window.toast?.(json.error || 'Impossible d’envoyer le lien.', 'error');
 				return;
 			}
-			window.location.assign('/');
+			window.toast?.(
+				json.message ||
+					'Si une inscription correspond à cet e-mail, vous recevrez un lien dans quelques instants.',
+				'success',
+			);
 		} catch {
-			if (text) text.textContent = 'Impossible de vous connecter pour le moment.';
-			box?.classList.remove('hidden');
+			window.toast?.('Impossible d’envoyer le lien pour le moment.', 'error');
 		} finally {
 			submit.disabled = false;
 		}

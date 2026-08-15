@@ -7,16 +7,27 @@ import AccessPanel from '../components/formation/status/AccessPanel.astro';
 import Stepper from '../components/formation/status/Stepper.astro';
 import Faq from '../components/formation/landing/Faq.astro';
 import { resolveHomeEnrollment } from '../lib/pages/resolve-home-enrollment';
-import { TEACHIZY_ACADEMY_URL } from '../lib/status';
 
 export const prerender = false;
 
-const view = await resolveHomeEnrollment({
+const resolved = await resolveHomeEnrollment({
 	cookieHeader: Astro.request.headers.get('cookie'),
 	token: Astro.url.searchParams.get('token'),
 	sessionId: Astro.url.searchParams.get('session_id'),
 	checkout: Astro.url.searchParams.get('checkout'),
+	connected: Astro.url.searchParams.get('connected'),
+	link: Astro.url.searchParams.get('link'),
 });
+
+if (resolved.kind === 'redirect') {
+	const response = Astro.redirect(resolved.redirectTo, 303);
+	if (resolved.setCookie) {
+		response.headers.append('Set-Cookie', resolved.setCookie);
+	}
+	return response;
+}
+
+const view = resolved.view;
 
 if (view.setCookie) {
 	Astro.response.headers.append('Set-Cookie', view.setCookie);
@@ -38,12 +49,9 @@ const accessTitle = showTracking
 		: 'Votre inscription'
 	: 'Démarrer ma formation';
 
-const heroCta =
-	enrollment?.accessStatus === 'active'
-		? { label: 'Accéder à la formation', href: TEACHIZY_ACADEMY_URL, external: true }
-		: showTracking
-			? { label: 'Voir mon inscription', href: '#acces', external: false }
-			: { label: "M'inscrire à la formation", href: '#acces', external: false };
+const heroCta = showTracking
+	? { label: 'Voir mon inscription', href: '#acces', external: false }
+	: { label: "M'inscrire à la formation", href: '#acces', external: false };
 ---
 
 <MarketingLayout>
@@ -54,7 +62,7 @@ const heroCta =
 		eyebrow="Programme"
 		title="Ce que vous allez apprendre"
 		description="Onze modules pour que vous puissiez apprendre à lire et interpréter la matrice évolution."
-		class="border-b border-ink/8"
+		class="border-b border-ink/8 py-8 sm:py-10"
 	>
 		<Programme />
 	</Section>
