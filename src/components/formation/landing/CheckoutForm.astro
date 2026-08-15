@@ -1,5 +1,4 @@
 ---
-import Alert from '../../ui/Alert.astro';
 import Button from '../../ui/Button.astro';
 import FormField from '../../ui/FormField.astro';
 import Input from '../../ui/Input.astro';
@@ -73,11 +72,7 @@ const { lockedEmail } = Astro.props;
 		</details>
 	</div>
 
-	<div id="checkout-error" class="hidden">
-		<Alert variant="error"><span id="checkout-error-text"></span></Alert>
-	</div>
-
-	<Button type="submit" size="lg" class="w-full sm:w-auto" id="checkout-submit">
+	<Button type="submit" size="md" class="w-full sm:w-auto" id="checkout-submit">
 		Je m’inscris
 	</Button>
 </form>
@@ -85,14 +80,11 @@ const { lockedEmail } = Astro.props;
 <script>
 	const form = document.getElementById('checkout-form') as HTMLFormElement | null;
 	const submit = document.getElementById('checkout-submit') as HTMLButtonElement | null;
-	const errorBox = document.getElementById('checkout-error');
-	const errorText = document.getElementById('checkout-error-text');
 
 	form?.addEventListener('submit', async (event) => {
 		event.preventDefault();
 		if (!form || !submit) return;
 
-		errorBox?.classList.add('hidden');
 		submit.disabled = true;
 		submit.textContent = 'Redirection…';
 
@@ -118,11 +110,10 @@ const { lockedEmail } = Astro.props;
 			if (!res.ok) throw new Error(json.error || 'Erreur de paiement');
 			window.location.href = json.url;
 		} catch (error) {
-			if (errorText) {
-				errorText.textContent =
-					error instanceof Error ? error.message : 'Une erreur est survenue.';
-			}
-			errorBox?.classList.remove('hidden');
+			window.toast?.(
+				error instanceof Error ? error.message : 'Une erreur est survenue.',
+				'error',
+			);
 			submit.disabled = false;
 			submit.textContent = 'Je m’inscris';
 		}

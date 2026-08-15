@@ -168,15 +168,20 @@ export function checkoutSuccessFlash(input: OrthogonalStatuses): string | null {
 	return null;
 }
 
-export function statusMessage(input: OrthogonalStatuses): string | null {
+export function statusMessage(input: OrthogonalStatuses): string[] | null {
 	if (input.accessStatus === 'active') {
-		return 'Un email Teachizy avec vos identifiants vous a été envoyé. Si vous ne le retrouvez pas, cliquez sur « Mot de passe oublié » sur la page de connexion.';
+		return [
+			'Un email Teachizy avec vos identifiants vous a été envoyé.',
+			'Si vous ne le retrouvez pas, cliquez sur « Mot de passe oublié » sur la page de connexion.',
+		];
 	}
 	if (input.accessStatus === 'pending' && input.contractStatus === 'signed') {
-		return 'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation — cette page se met à jour automatiquement.';
+		return [
+			'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation — cette page se met à jour automatiquement.',
+		];
 	}
 	if (input.accessStatus === 'suspended') {
-		return 'Votre accès est temporairement suspendu suite à un impayé. Régularisez pour le rétablir.';
+		return ['Votre accès est temporairement suspendu suite à un impayé. Régularisez pour le rétablir.'];
 	}
 	if (input.accessStatus === 'revoked' || input.collectionStatus === 'refunded') {
 		return null;
@@ -205,7 +210,7 @@ export function primaryAction(
 	if (input.accessStatus === 'active') {
 		return {
 			kind: 'open_platform',
-			label: 'Entrer dans la formation',
+			label: 'Accéder à la formation',
 			href: TEACHIZY_ACADEMY_URL,
 		};
 	}

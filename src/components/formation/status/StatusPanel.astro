@@ -15,10 +15,9 @@ import SignLinkCard from './SignLinkCard.astro';
 interface Props {
 	enrollment: Enrollment;
 	ndaSignUrl?: string | null;
-	flash?: string | null;
 }
 
-const { enrollment, ndaSignUrl, flash } = Astro.props;
+const { enrollment, ndaSignUrl } = Astro.props;
 const orthogonal = {
 	collectionStatus: enrollment.collectionStatus,
 	contractStatus: enrollment.contractStatus,
@@ -38,7 +37,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 ---
 
 <div
-	class="space-y-6"
+	class="space-y-4"
 	id="status-panel"
 	data-fingerprint={pollFingerprint}
 	data-poll={poll ? 'true' : 'false'}
@@ -48,12 +47,6 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	{
 		showSignCard && (
 			<p class="text-ink-soft">Le lien de signature est prêt.</p>
-		)
-	}
-
-	{
-		flash && (
-			<Alert variant="success">{flash}</Alert>
 		)
 	}
 
@@ -81,7 +74,50 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 			</p>
 		)
 	}
-	{message && <p class="text-ink-soft">{message}</p>}
+	{
+		!showSignCard && action.kind === 'open_platform' ? (
+			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
+				{message && (
+					<div class="max-w-prose space-y-1.5">
+						<p class="text-lg font-normal leading-snug text-ink-soft sm:text-xl">
+							{message[0]}
+						</p>
+						{message[1] && (
+							<p class="text-sm leading-relaxed text-ink-soft sm:text-[0.9375rem]">
+								{message[1]}
+							</p>
+						)}
+					</div>
+				)}
+				<Button
+					href={action.href}
+					size="md"
+					variant="primary"
+					class="shrink-0 self-start sm:self-center"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					{action.label}
+				</Button>
+			</div>
+		) : (
+			message && (
+				<div class="max-w-prose space-y-1.5">
+					{message.map((line) => (
+						<p class="text-sm text-ink-soft">{line}</p>
+					))}
+				</div>
+			)
+		)
+	}
+
+	{
+		!showSignCard && action.kind === 'refresh' && (
+			<Button href="/#acces" size="md" variant="primary" id="status-refresh">
+				{action.label}
+			</Button>
+		)
+	}
 	{
 		closed && (
 			<Alert variant="info">
@@ -91,29 +127,6 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	}
 
 	{showSignCard && ndaSignUrl && <SignLinkCard signUrl={ndaSignUrl} />}
-
-	{
-		!showSignCard && (action.kind === 'refresh' || action.kind === 'open_platform') && (
-			<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-				{action.kind === 'refresh' && (
-					<Button href="/#acces" size="lg" variant="primary" id="status-refresh">
-						{action.label}
-					</Button>
-				)}
-				{action.kind === 'open_platform' && (
-					<Button
-						href={action.href}
-						size="lg"
-						variant="primary"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						{action.label}
-					</Button>
-				)}
-			</div>
-		)
-	}
 </div>
 
 <script>
