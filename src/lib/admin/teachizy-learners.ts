@@ -14,11 +14,7 @@ import {
 export const LEARNERS_PAGE_SIZE = 25;
 
 export type LearnerTrainingStatus =
-	| 'not_started'
-	| 'in_progress'
-	| 'completed'
-	| 'blocked'
-	| 'expired';
+	'not_started' | 'in_progress' | 'completed' | 'blocked' | 'expired';
 
 export type AdminLearnerRow = {
 	uuid: string;
@@ -74,14 +70,13 @@ const STATUS_LABELS: Record<LearnerTrainingStatus, string> = {
 	expired: 'Expiré',
 };
 
-const STATUS_TONES: Record<LearnerTrainingStatus, 'neutral' | 'progress' | 'success' | 'action'> =
-	{
-		not_started: 'neutral',
-		in_progress: 'progress',
-		completed: 'success',
-		blocked: 'action',
-		expired: 'action',
-	};
+const STATUS_TONES: Record<LearnerTrainingStatus, 'neutral' | 'progress' | 'success' | 'action'> = {
+	not_started: 'neutral',
+	in_progress: 'progress',
+	completed: 'success',
+	blocked: 'action',
+	expired: 'action',
+};
 
 export function learnerStatusLabel(status: LearnerTrainingStatus | null): string {
 	if (!status) return '—';
@@ -95,11 +90,7 @@ export function learnerStatusTone(
 	return STATUS_TONES[status];
 }
 
-export function adminLearnersHref(input: {
-	q?: string;
-	page?: number;
-	status?: string;
-}): string {
+export function adminLearnersHref(input: { q?: string; page?: number; status?: string }): string {
 	const params = new URLSearchParams();
 	const q = input.q?.trim() ?? '';
 	if (q) params.set('q', q);
@@ -169,11 +160,7 @@ function displayName(customer: TeachizyCustomer): string {
 }
 
 function customerMatchesQuery(customer: TeachizyCustomer, q: string): boolean {
-	const tokens = q
-		.trim()
-		.split(/\s+/)
-		.filter(Boolean)
-		.slice(0, 5);
+	const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
 	if (tokens.length === 0) return true;
 
 	const haystack = [customer.email, customer.firstname, customer.lastname]
@@ -211,8 +198,7 @@ function toDetail(
 	enrollmentId: string | null,
 ): AdminLearnerDetail {
 	const training = pickTraining(customer, trainingUuid);
-	const quiz =
-		training && training.quiz_total_percent >= 0 ? training.quiz_total_percent : null;
+	const quiz = training && training.quiz_total_percent >= 0 ? training.quiz_total_percent : null;
 
 	return {
 		uuid: customer.uuid,
@@ -352,11 +338,7 @@ export async function listAdminTeachizyLearners(filters: {
 			}
 
 			const ids = await enrollmentIdsByEmail([customer.email]);
-			const row = toRow(
-				customer,
-				trainingUuid,
-				ids.get(customer.email.toLowerCase()) ?? null,
-			);
+			const row = toRow(customer, trainingUuid, ids.get(customer.email.toLowerCase()) ?? null);
 			return {
 				...filters,
 				page: 1,

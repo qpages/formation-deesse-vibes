@@ -9,7 +9,8 @@
 	class="pointer-events-none fixed inset-x-0 bottom-0 z-60 flex flex-col items-end gap-2 p-4 sm:p-6"
 	aria-live="polite"
 	aria-relevant="additions"
-></div>
+>
+</div>
 
 <style>
 	@keyframes toast-in {
@@ -51,14 +52,6 @@
 </style>
 
 <script>
-	type ToastVariant = 'success' | 'error' | 'info';
-
-	declare global {
-		interface Window {
-			toast: (message: string, variant?: ToastVariant) => void;
-		}
-	}
-
 	const variantClass: Record<ToastVariant, string> = {
 		success: 'border-sage/55 bg-surface text-ink shadow-soft',
 		error: 'border-blush-deep/50 bg-surface text-ink shadow-soft',
@@ -74,17 +67,18 @@
 	window.toast = (message, variant = 'info') => {
 		const host = document.getElementById('toast-host');
 		if (!host) return;
+		const kind: ToastVariant = variant ?? 'info';
 
 		const el = document.createElement('div');
 		el.role = 'status';
 		el.className = [
 			'toast-item pointer-events-auto flex w-[min(100%,22rem)] items-start gap-3',
 			'rounded-sm border px-4 py-3.5 text-sm leading-snug',
-			variantClass[variant],
+			variantClass[kind],
 		].join(' ');
 
 		const accent = document.createElement('span');
-		accent.className = `mt-1.5 size-1.5 shrink-0 rounded-full ${accentClass[variant]}`;
+		accent.className = `mt-1.5 size-1.5 shrink-0 rounded-full ${accentClass[kind]}`;
 		accent.setAttribute('aria-hidden', 'true');
 
 		const text = document.createElement('p');

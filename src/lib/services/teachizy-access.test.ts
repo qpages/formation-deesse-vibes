@@ -30,10 +30,7 @@ vi.mock('../env', () => ({
 	getEnv: () => ({ TEACHIZY_TRAINING_UUID: 'training-1' }),
 }));
 
-import {
-	inviteOrConfirmTeachizy,
-	syncTeachizyAccess,
-} from './teachizy-access';
+import { inviteOrConfirmTeachizy, syncTeachizyAccess } from './teachizy-access';
 
 function enrollment(overrides: Record<string, unknown> = {}) {
 	return {

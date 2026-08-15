@@ -172,9 +172,7 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 			return isAwaitingNda(e) && Boolean(e.yousignRequestId);
 		case 'copy_nda_link':
 			return (
-				e.contractStatus === 'sent' &&
-				Boolean(e.yousignRequestId) &&
-				Boolean(e.yousignSignerId)
+				e.contractStatus === 'sent' && Boolean(e.yousignRequestId) && Boolean(e.yousignSignerId)
 			);
 		case 'recreate_nda':
 			return paidEnough && e.contractStatus !== 'signed';

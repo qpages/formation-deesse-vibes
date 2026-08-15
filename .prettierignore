@@ -1,0 +1,13 @@
+dist
+.astro
+.vercel
+node_modules
+src/generated
+test-results
+playwright-report
+package-lock.json
+pnpm-lock.yaml
+prisma/migrations
+*.md
+.env
+.env.*

@@ -15,35 +15,40 @@ const {
 } = Astro.props;
 ---
 
-<section class="relative overflow-hidden bg-ink text-mist">
+<section class="bg-ink text-mist relative overflow-hidden">
 	<div
 		class="absolute inset-0 bg-[radial-gradient(ellipse_at_16%_10%,rgb(196_120_106/0.2),transparent_42%),radial-gradient(ellipse_at_88%_45%,rgb(184_149_108/0.13),transparent_38%),linear-gradient(145deg,#17120f_0%,#241c18_58%,#18130f_100%)]"
 		aria-hidden="true"
 	>
 	</div>
 
-	<Container class="relative grid min-h-142.5 items-center gap-10 pb-12 pt-28 sm:min-h-155 sm:grid-cols-[1.15fr_0.85fr] sm:gap-8 sm:pb-16 sm:pt-24">
+	<Container
+		class="relative grid min-h-142.5 items-center gap-10 pt-28 pb-12 sm:min-h-155 sm:grid-cols-[1.15fr_0.85fr] sm:gap-8 sm:pt-24 sm:pb-16"
+	>
 		<div class="relative z-10">
 			<p
-				class="animate-rise text-[11px] font-medium uppercase tracking-[0.28em] text-gold-soft"
+				class="animate-rise text-gold-soft text-[11px] font-medium tracking-[0.28em] uppercase"
 				style="animation-delay: 60ms"
 			>
 				Formation en ligne sur la plateforme Teachizy
 			</p>
 			<h1
-				class="animate-rise mt-5 max-w-2xl font-display text-5xl leading-[0.94] tracking-[-0.02em] text-mist sm:text-6xl md:text-7xl text-balance"
+				class="animate-rise font-display text-mist mt-5 max-w-2xl text-5xl leading-[0.94] tracking-[-0.02em] text-balance sm:text-6xl md:text-7xl"
 				style="animation-delay: 140ms"
 			>
-				Matrice <span class="italic text-gold-soft">Évolution</span>
+				Matrice <span class="text-gold-soft italic">Évolution</span>
 			</h1>
 			<p
-				class="animate-rise mt-6 max-w-lg text-base leading-relaxed text-mist/72 sm:text-lg"
+				class="animate-rise text-mist/72 mt-6 max-w-lg text-base leading-relaxed sm:text-lg"
 				style="animation-delay: 220ms"
 			>
-				Une méthode à intégrer à votre rythme, dans un espace en ligne confidentiel.
-				Un parcours simple vous mène du paiement à la formation.
+				Une méthode à intégrer à votre rythme, dans un espace en ligne confidentiel. Un parcours
+				simple vous mène du paiement à la formation.
 			</p>
-			<div class="animate-rise mt-8 flex flex-wrap items-center gap-3" style="animation-delay: 300ms">
+			<div
+				class="animate-rise mt-8 flex flex-wrap items-center gap-3"
+				style="animation-delay: 300ms"
+			>
 				<Button
 					href={ctaHref}
 					variant="primary"
@@ -95,8 +100,12 @@ const {
 		aspect-ratio: 1;
 		border-radius: 50%;
 		padding: 0.35rem;
-		background:
-			linear-gradient(145deg, rgb(212 188 154 / 0.55), rgb(196 120 106 / 0.35) 45%, rgb(184 149 108 / 0.2));
+		background: linear-gradient(
+			145deg,
+			rgb(212 188 154 / 0.55),
+			rgb(196 120 106 / 0.35) 45%,
+			rgb(184 149 108 / 0.2)
+		);
 		box-shadow:
 			0 0 0 1px rgb(212 188 154 / 0.18),
 			0 28px 70px rgb(0 0 0 / 0.35),
@@ -104,7 +113,7 @@ const {
 	}
 
 	.hero-portrait__frame::before {
-		content: "";
+		content: '';
 		position: absolute;
 		inset: -18%;
 		border-radius: 50%;

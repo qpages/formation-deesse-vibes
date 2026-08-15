@@ -3,10 +3,7 @@ import StatusBadge from '../../ui/StatusBadge.astro';
 import type { AdminActionDef } from '../../../lib/admin/actions';
 import type { AdminEnrollmentDetail } from '../../../lib/admin/enrollments';
 import { signatureDiagnostic } from '../../../lib/admin/pipeline-detail';
-import {
-	CONTRACT_STATUS_LABELS,
-	YOUSIGN_SIGNER_STATUS_LABELS,
-} from '../../../lib/status';
+import { CONTRACT_STATUS_LABELS, YOUSIGN_SIGNER_STATUS_LABELS } from '../../../lib/status';
 
 interface Props {
 	detail: AdminEnrollmentDetail;
@@ -54,18 +51,14 @@ type TimelineStep = {
 const signed = detail.contractStatus === 'signed' || Boolean(detail.ndaSignedAt);
 const opened = Boolean(detail.ndaLinkOpenedAt);
 const notified =
-	Boolean(detail.ndaNotifiedAt) ||
-	detail.yousignSignerStatus === 'notified' ||
-	opened ||
-	signed;
+	Boolean(detail.ndaNotifiedAt) || detail.yousignSignerStatus === 'notified' || opened || signed;
 const deliveryFailed = Boolean(detail.ndaDeliveryFailedAt);
 
 const expiresAt = detail.signatureLinkExpiresAt;
 const expiresLabel = formatDateTime(expiresAt);
 const now = Date.now();
 const expiresMs = expiresAt?.getTime() ?? null;
-const expired =
-	!signed && expiresMs != null && expiresMs < now && detail.contractStatus === 'sent';
+const expired = !signed && expiresMs != null && expiresMs < now && detail.contractStatus === 'sent';
 const expiresSoon =
 	!signed &&
 	!expired &&
@@ -162,7 +155,7 @@ const linkClass =
 >
 	<div class="mb-3 flex flex-wrap items-center justify-between gap-2">
 		<div class="flex min-w-0 flex-wrap items-center gap-2">
-			<h2 id="signature-heading" class="text-lg font-medium text-ink">Signature</h2>
+			<h2 id="signature-heading" class="text-ink text-lg font-medium">Signature</h2>
 			<StatusBadge tone={detail.pipeline.signature.tone}>
 				{CONTRACT_STATUS_LABELS[detail.contractStatus]}
 			</StatusBadge>
@@ -184,18 +177,14 @@ const linkClass =
 		diagnostic ? (
 			<div class:list={['mb-3 border-l-2 px-3 py-2', diagnosticStyles[diagnostic.level]]}>
 				<p class="text-sm font-medium wrap-break-word">{diagnostic.title}</p>
-				{diagnostic.action ? (
-					<p class="mt-0.5 text-xs opacity-80">{diagnostic.action}</p>
-				) : null}
+				{diagnostic.action ? <p class="mt-0.5 text-xs opacity-80">{diagnostic.action}</p> : null}
 			</div>
 		) : null
 	}
 
 	{
 		expiresSoon ? (
-			<p class="mb-3 text-sm text-ink">
-				Expire bientôt{expiresLabel ? ` · ${expiresLabel}` : ''}.
-			</p>
+			<p class="text-ink mb-3 text-sm">Expire bientôt{expiresLabel ? ` · ${expiresLabel}` : ''}.</p>
 		) : null
 	}
 
@@ -209,21 +198,19 @@ const linkClass =
 							class:list={['size-2 shrink-0 rounded-full', stepDot[step.state]]}
 							aria-hidden="true"
 						/>
-						{
-							signedDone ? (
-								<span class="tabular-nums text-ink">{step.label}</span>
-							) : (
-								<>
-									<span class="font-medium text-ink">{step.label}</span>
-									<span class="text-ink/50 tabular-nums">{stepText(step)}</span>
-								</>
-							)
-						}
+						{signedDone ? (
+							<span class="text-ink tabular-nums">{step.label}</span>
+						) : (
+							<>
+								<span class="text-ink font-medium">{step.label}</span>
+								<span class="text-ink/50 tabular-nums">{stepText(step)}</span>
+							</>
+						)}
 					</li>
 				);
 				if (index === 0) return [node];
 				return [
-					<li class="px-1 text-ink/25" aria-hidden="true">
+					<li class="text-ink/25 px-1" aria-hidden="true">
 						→
 					</li>,
 					node,
@@ -235,11 +222,7 @@ const linkClass =
 	<div class="mt-4 flex flex-wrap items-center gap-x-4">
 		<details class="peer group">
 			<summary
-				class:list={[
-					'cursor-pointer list-none',
-					linkClass,
-					'[&::-webkit-details-marker]:hidden',
-				]}
+				class:list={['cursor-pointer list-none', linkClass, '[&::-webkit-details-marker]:hidden']}
 			>
 				<span class="group-open:hidden">Voir le détail</span>
 				<span class="hidden group-open:inline">Masquer le détail</span>
@@ -247,12 +230,7 @@ const linkClass =
 		</details>
 		{
 			detail.yousignUrl ? (
-				<a
-					href={detail.yousignUrl}
-					target="_blank"
-					rel="noopener noreferrer"
-					class={linkClass}
-				>
+				<a href={detail.yousignUrl} target="_blank" rel="noopener noreferrer" class={linkClass}>
 					Yousign ↗
 				</a>
 			) : null
@@ -261,8 +239,8 @@ const linkClass =
 			{
 				techRows.map((row) => (
 					<div class="flex min-w-0 gap-2 text-sm">
-						<dt class="shrink-0 text-ink/45">{row.label}</dt>
-						<dd class="min-w-0 break-all text-ink">{row.value}</dd>
+						<dt class="text-ink/45 shrink-0">{row.label}</dt>
+						<dd class="text-ink min-w-0 break-all">{row.value}</dd>
 					</div>
 				))
 			}

@@ -28,8 +28,7 @@ const REQUIRED_PROD = ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'];
 const SECRET_MIN = ['MAGIC_LINK_SECRET', 'SESSION_SECRET', 'PAYLOAD_ENCRYPTION_KEY'];
 const PROBE_MS = 8_000;
 
-const isProd =
-	process.argv.includes('--prod') || process.env.NODE_ENV === 'production';
+const isProd = process.argv.includes('--prod') || process.env.NODE_ENV === 'production';
 
 function blank(value) {
 	return value === undefined || value === null || value === '';
@@ -78,7 +77,7 @@ async function withTimeout(label, ms, fn) {
 		]);
 	} catch (error) {
 		const detail = error instanceof Error ? error.message : String(error);
-		throw new Error(`${label}: ${detail}`);
+		throw new Error(`${label}: ${detail}`, { cause: error });
 	} finally {
 		if (timer) clearTimeout(timer);
 	}
@@ -135,9 +134,7 @@ async function probeYousign(env) {
 				throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
 			}
 			const body = await res.json();
-			const ids = Array.isArray(body?.data)
-				? body.data.map((t) => t?.id).filter(Boolean)
-				: [];
+			const ids = Array.isArray(body?.data) ? body.data.map((t) => t?.id).filter(Boolean) : [];
 			if (!ids.includes(env.YOUSIGN_TEMPLATE_ID)) {
 				throw new Error(
 					`template ${env.YOUSIGN_TEMPLATE_ID} introuvable (vérifie YOUSIGN_TEMPLATE_ID)`,
@@ -189,8 +186,7 @@ async function main() {
 
 const isDirectRun =
 	process.argv[1] &&
-	(process.argv[1].endsWith('boot-check.mjs') ||
-		process.argv[1].endsWith('boot-check.js'));
+	(process.argv[1].endsWith('boot-check.mjs') || process.argv[1].endsWith('boot-check.js'));
 
 if (isDirectRun) {
 	main().catch((error) => {

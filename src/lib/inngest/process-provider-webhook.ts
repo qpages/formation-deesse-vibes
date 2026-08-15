@@ -4,16 +4,10 @@ import {
 	markProviderEventIgnored,
 	markProviderEventProcessed,
 } from '../services/provider-events';
-import {
-	alertFinalFailure,
-	formatErrorDetail,
-	withJobLifecycleAlerts,
-} from '../services/slack';
+import { alertFinalFailure, formatErrorDetail, withJobLifecycleAlerts } from '../services/slack';
 import { inngest, type AppEvents } from './client';
 
-type ProviderEventName =
-	| 'provider/stripe-event.received'
-	| 'provider/yousign-event.received';
+type ProviderEventName = 'provider/stripe-event.received' | 'provider/yousign-event.received';
 
 type HandleResult = { enrollmentId?: string; ignored?: boolean };
 

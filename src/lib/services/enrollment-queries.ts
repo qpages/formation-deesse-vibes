@@ -68,10 +68,7 @@ export async function findEnrollmentByYousignRequestOrExternalId(
 ) {
 	return getPrisma().enrollment.findFirst({
 		where: {
-			OR: [
-				{ yousignRequestId: requestId },
-				...(externalId ? [{ id: externalId }] : []),
-			],
+			OR: [{ yousignRequestId: requestId }, ...(externalId ? [{ id: externalId }] : [])],
 		},
 		...withUser,
 	});

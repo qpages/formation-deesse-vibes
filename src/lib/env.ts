@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-const optionalUrl = z.string().url().optional().or(z.literal('').transform(() => undefined));
+const optionalUrl = z
+	.string()
+	.url()
+	.optional()
+	.or(z.literal('').transform(() => undefined));
 
 const serverSchema = z.object({
 	STRIPE_SECRET_KEY: z.string().optional(),
@@ -63,16 +67,13 @@ export function getEnv(): ServerEnv {
 		STRIPE_PRICE_X2: import.meta.env.STRIPE_PRICE_X2 ?? process.env.STRIPE_PRICE_X2,
 		STRIPE_PRICE_X4: import.meta.env.STRIPE_PRICE_X4 ?? process.env.STRIPE_PRICE_X4,
 		STRIPE_PRICE_X6: import.meta.env.STRIPE_PRICE_X6 ?? process.env.STRIPE_PRICE_X6,
-		STRIPE_AMOUNT_CENTS:
-			import.meta.env.STRIPE_AMOUNT_CENTS ?? process.env.STRIPE_AMOUNT_CENTS,
+		STRIPE_AMOUNT_CENTS: import.meta.env.STRIPE_AMOUNT_CENTS ?? process.env.STRIPE_AMOUNT_CENTS,
 		YOUSIGN_API_KEY: import.meta.env.YOUSIGN_API_KEY ?? process.env.YOUSIGN_API_KEY,
-		YOUSIGN_TEMPLATE_ID:
-			import.meta.env.YOUSIGN_TEMPLATE_ID ?? process.env.YOUSIGN_TEMPLATE_ID,
+		YOUSIGN_TEMPLATE_ID: import.meta.env.YOUSIGN_TEMPLATE_ID ?? process.env.YOUSIGN_TEMPLATE_ID,
 		YOUSIGN_WEBHOOK_SECRET:
 			import.meta.env.YOUSIGN_WEBHOOK_SECRET ?? process.env.YOUSIGN_WEBHOOK_SECRET,
 		YOUSIGN_API_BASE: import.meta.env.YOUSIGN_API_BASE ?? process.env.YOUSIGN_API_BASE,
-		YOUSIGN_SIGNER_LABEL:
-			import.meta.env.YOUSIGN_SIGNER_LABEL ?? process.env.YOUSIGN_SIGNER_LABEL,
+		YOUSIGN_SIGNER_LABEL: import.meta.env.YOUSIGN_SIGNER_LABEL ?? process.env.YOUSIGN_SIGNER_LABEL,
 		BREVO_API_KEY: import.meta.env.BREVO_API_KEY ?? process.env.BREVO_API_KEY,
 		BREVO_FROM: import.meta.env.BREVO_FROM ?? process.env.BREVO_FROM,
 		MAGIC_LINK_SECRET: import.meta.env.MAGIC_LINK_SECRET ?? process.env.MAGIC_LINK_SECRET,
@@ -81,8 +82,7 @@ export function getEnv(): ServerEnv {
 			import.meta.env.PAYLOAD_ENCRYPTION_KEY ?? process.env.PAYLOAD_ENCRYPTION_KEY,
 		INNGEST_DEV: import.meta.env.INNGEST_DEV ?? process.env.INNGEST_DEV,
 		INNGEST_EVENT_KEY: import.meta.env.INNGEST_EVENT_KEY ?? process.env.INNGEST_EVENT_KEY,
-		INNGEST_SIGNING_KEY:
-			import.meta.env.INNGEST_SIGNING_KEY ?? process.env.INNGEST_SIGNING_KEY,
+		INNGEST_SIGNING_KEY: import.meta.env.INNGEST_SIGNING_KEY ?? process.env.INNGEST_SIGNING_KEY,
 		TEACHIZY_API_KEY: import.meta.env.TEACHIZY_API_KEY ?? process.env.TEACHIZY_API_KEY,
 		TEACHIZY_API_BASE: import.meta.env.TEACHIZY_API_BASE ?? process.env.TEACHIZY_API_BASE,
 		TEACHIZY_TRAINING_UUID:
@@ -92,8 +92,7 @@ export function getEnv(): ServerEnv {
 		ADMIN_PASSWORD: import.meta.env.ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD,
 		PUBLIC_SITE_URL: import.meta.env.PUBLIC_SITE_URL ?? process.env.PUBLIC_SITE_URL,
 		PUBLIC_ADMIN_CONTACT_EMAIL:
-			import.meta.env.PUBLIC_ADMIN_CONTACT_EMAIL ??
-			process.env.PUBLIC_ADMIN_CONTACT_EMAIL,
+			import.meta.env.PUBLIC_ADMIN_CONTACT_EMAIL ?? process.env.PUBLIC_ADMIN_CONTACT_EMAIL,
 		PUBLIC_WHATSAPP_NUMBER:
 			import.meta.env.PUBLIC_WHATSAPP_NUMBER ?? process.env.PUBLIC_WHATSAPP_NUMBER,
 	});

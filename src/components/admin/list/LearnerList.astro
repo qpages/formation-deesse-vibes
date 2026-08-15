@@ -25,7 +25,7 @@ const rowNavClass =
 			return (
 				<li
 					class:list={[
-						'border border-ink/10 bg-white/60 px-4 py-4',
+						'border-ink/10 border bg-white/60 px-4 py-4',
 						href && `cursor-pointer ${rowNavClass}`,
 					]}
 					data-enrollment-href={href}
@@ -34,28 +34,24 @@ const rowNavClass =
 					aria-label={href ? `Ouvrir ${row.displayName}` : undefined}
 				>
 					<div class="min-w-0">
-						<p class="font-medium text-ink">{row.displayName}</p>
-						<p class="truncate text-ink-soft">{row.email}</p>
+						<p class="text-ink font-medium">{row.displayName}</p>
+						<p class="text-ink-soft truncate">{row.email}</p>
 					</div>
 					<div class="mt-3 flex flex-wrap items-center gap-2">
 						<StatusBadge tone={learnerStatusTone(row.trainingStatus)}>
 							{learnerStatusLabel(row.trainingStatus)}
 						</StatusBadge>
-						{row.accountStatus === 'DISABLED' && (
-							<StatusBadge tone="action">Désactivé</StatusBadge>
-						)}
+						{row.accountStatus === 'DISABLED' && <StatusBadge tone="action">Désactivé</StatusBadge>}
 					</div>
-					<p class="mt-3 text-sm text-ink">
+					<p class="text-ink mt-3 text-sm">
 						{row.progressionPercent} %
 						<span class="text-ink/45">
 							{' '}
 							· {row.itemsCompleted}/{row.itemsTotal} leçons
-							{row.durationSeconds > 0
-								? ` · ${formatLearnerDuration(row.durationSeconds)}`
-								: ''}
+							{row.durationSeconds > 0 ? ` · ${formatLearnerDuration(row.durationSeconds)}` : ''}
 						</span>
 					</p>
-					<p class="mt-1 text-[11px] text-ink/45">
+					<p class="text-ink/45 mt-1 text-[11px]">
 						Activité {formatLearnerDate(row.lastActivityAt)} · Connexion{' '}
 						{formatLearnerDate(row.lastLoginAt)}
 					</p>
@@ -67,7 +63,7 @@ const rowNavClass =
 
 <div class="hidden overflow-x-auto lg:block">
 	<table class="w-full text-left text-sm">
-		<thead class="border-b border-ink/15 text-[11px] uppercase tracking-[0.12em] text-ink-soft">
+		<thead class="border-ink/15 text-ink-soft border-b text-[11px] tracking-[0.12em] uppercase">
 			<tr>
 				<th class="py-3 pr-4 font-medium">Personne</th>
 				<th class="py-3 pr-3 font-medium">Statut</th>
@@ -76,12 +72,10 @@ const rowNavClass =
 				<th class="py-3 font-medium">Connexion</th>
 			</tr>
 		</thead>
-		<tbody class="divide-y divide-ink/10">
+		<tbody class="divide-ink/10 divide-y">
 			{
 				rows.map((row) => {
-					const href = row.enrollmentId
-						? `/admin/enrollments/${row.enrollmentId}`
-						: undefined;
+					const href = row.enrollmentId ? `/admin/enrollments/${row.enrollmentId}` : undefined;
 					return (
 						<tr
 							class:list={[href && `cursor-pointer ${rowNavClass}`]}
@@ -92,8 +86,8 @@ const rowNavClass =
 						>
 							<td class="py-3.5 pr-4">
 								<div class="min-w-0">
-									<p class="font-medium text-ink">{row.displayName}</p>
-									<p class="truncate text-ink-soft">{row.email}</p>
+									<p class="text-ink font-medium">{row.displayName}</p>
+									<p class="text-ink-soft truncate">{row.email}</p>
 								</div>
 							</td>
 							<td class="py-3.5 pr-3">
@@ -109,27 +103,21 @@ const rowNavClass =
 							<td class="py-3.5 pr-3">
 								<div class="min-w-32">
 									<div class="flex items-baseline gap-2">
-										<span class="tabular-nums text-ink">
-											{row.progressionPercent} %
-										</span>
-										<span class="text-[11px] text-ink/45">
+										<span class="text-ink tabular-nums">{row.progressionPercent} %</span>
+										<span class="text-ink/45 text-[11px]">
 											{row.itemsCompleted}/{row.itemsTotal}
 										</span>
 									</div>
-									<div class="mt-1.5 h-0.5 w-24 bg-ink/10" aria-hidden="true">
+									<div class="bg-ink/10 mt-1.5 h-0.5 w-24" aria-hidden="true">
 										<div
-											class="h-0.5 bg-ink/55"
+											class="bg-ink/55 h-0.5"
 											style={`width: ${Math.min(100, row.progressionPercent)}%`}
 										/>
 									</div>
 								</div>
 							</td>
-							<td class="py-3.5 pr-3 text-ink-soft">
-								{formatLearnerDate(row.lastActivityAt)}
-							</td>
-							<td class="py-3.5 text-ink-soft">
-								{formatLearnerDate(row.lastLoginAt)}
-							</td>
+							<td class="text-ink-soft py-3.5 pr-3">{formatLearnerDate(row.lastActivityAt)}</td>
+							<td class="text-ink-soft py-3.5">{formatLearnerDate(row.lastLoginAt)}</td>
 						</tr>
 					);
 				})

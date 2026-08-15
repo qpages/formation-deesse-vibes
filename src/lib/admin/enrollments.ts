@@ -63,11 +63,7 @@ export type AdminEnrollmentDetail = AdminEnrollmentRow & {
 
 /** Tokenized insensitive search on user email / firstName / lastName. */
 export function enrollmentSearchWhere(q: string): Prisma.EnrollmentWhereInput | undefined {
-	const tokens = q
-		.trim()
-		.split(/\s+/)
-		.filter(Boolean)
-		.slice(0, 5);
+	const tokens = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
 
 	if (tokens.length === 0) return undefined;
 
@@ -157,9 +153,7 @@ export async function listEnrollmentsForExport() {
 	});
 }
 
-export async function listAdminEnrollments(
-	input: AdminListFilters,
-): Promise<AdminEnrollmentList> {
+export async function listAdminEnrollments(input: AdminListFilters): Promise<AdminEnrollmentList> {
 	const q = input.q.trim();
 	const collection = input.collection ?? '';
 	const contract = input.contract ?? '';
@@ -187,9 +181,7 @@ export async function listAdminEnrollments(
 		take: pagination.take,
 	});
 
-	const paymentsByEnrollment = await listPaymentsForEnrollments(
-		enrollments.map((e) => e.id),
-	);
+	const paymentsByEnrollment = await listPaymentsForEnrollments(enrollments.map((e) => e.id));
 
 	return {
 		...pagination,
@@ -203,9 +195,7 @@ export async function listAdminEnrollments(
 	};
 }
 
-export async function getAdminEnrollmentDetail(
-	id: string,
-): Promise<AdminEnrollmentDetail | null> {
+export async function getAdminEnrollmentDetail(id: string): Promise<AdminEnrollmentDetail | null> {
 	const prisma = getPrisma();
 	const enrollment = await prisma.enrollment.findUnique({
 		where: { id },

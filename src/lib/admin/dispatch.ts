@@ -88,14 +88,11 @@ const handlers = {
 		if (!result.ok) {
 			const messages: Record<string, string> = {
 				enrollment_not_found: 'Inscription introuvable.',
-				not_eligible:
-					'Pas éligible — NDA signé requis, et accès non révoqué / non remboursé.',
+				not_eligible: 'Pas éligible — NDA signé requis, et accès non révoqué / non remboursé.',
 				blocked: 'Formation bloquée côté Teachizy — débloquez d’abord sur Teachizy.',
 				account_disabled: 'Compte Teachizy désactivé.',
 				not_configured: 'Teachizy n’est pas configuré (TEACHIZY_API_KEY).',
-				api_error: result.detail
-					? `Erreur Teachizy : ${result.detail}`
-					: 'Erreur API Teachizy.',
+				api_error: result.detail ? `Erreur Teachizy : ${result.detail}` : 'Erreur API Teachizy.',
 			};
 			return {
 				ok: false,
@@ -183,10 +180,7 @@ const handlers = {
 				status: 400,
 			};
 		}
-		const url = await getSignatureLink(
-			enrollment.yousignRequestId,
-			enrollment.yousignSignerId,
-		);
+		const url = await getSignatureLink(enrollment.yousignRequestId, enrollment.yousignSignerId);
 		if (!url) {
 			return {
 				ok: false,

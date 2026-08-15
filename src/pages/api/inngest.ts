@@ -24,7 +24,8 @@ import { inngest } from '../../lib/inngest/client';
 import { inngestFunctions } from '../../lib/inngest/functions';
 import { env } from '../../lib/env';
 
-const isDev = env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.MODE === 'development';
+const isDev =
+	env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.MODE === 'development';
 
 export const { GET, POST, PUT } = serve({
 	client: inngest,

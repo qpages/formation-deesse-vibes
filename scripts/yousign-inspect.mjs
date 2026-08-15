@@ -11,10 +11,7 @@
 import 'dotenv/config';
 
 const apiKey = process.env.YOUSIGN_API_KEY;
-const baseUrl = (process.env.YOUSIGN_API_BASE ?? 'https://api.yousign.app/v3').replace(
-	/\/$/,
-	'',
-);
+const baseUrl = (process.env.YOUSIGN_API_BASE ?? 'https://api.yousign.app/v3').replace(/\/$/, '');
 
 if (!apiKey) {
 	console.error('Missing YOUSIGN_API_KEY in .env');

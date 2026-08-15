@@ -150,8 +150,7 @@ export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaym
 		(summary.totalAmountCents ?? summary.collectedAmountCents) - summary.collectedAmountCents,
 	);
 	const remainingSlots = Math.max(0, total - summary.installmentsPaid);
-	const estimatedCents =
-		remainingSlots > 0 ? Math.round(remainingCents / remainingSlots) : 0;
+	const estimatedCents = remainingSlots > 0 ? Math.round(remainingCents / remainingSlots) : 0;
 
 	const rows: AdminPaymentRow[] = [];
 	let assignedNextDue = false;
@@ -165,9 +164,7 @@ export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaym
 		}
 
 		const dueAt =
-			!assignedNextDue && summary.nextInstallmentDueAt
-				? summary.nextInstallmentDueAt
-				: null;
+			!assignedNextDue && summary.nextInstallmentDueAt ? summary.nextInstallmentDueAt : null;
 		if (dueAt) assignedNextDue = true;
 
 		rows.push({

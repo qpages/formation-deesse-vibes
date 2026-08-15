@@ -15,10 +15,7 @@ const SKIP_PREFIXES = ['VERCEL_'];
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const envFileFlag = args.indexOf('--env-file');
-const envFile =
-	envFileFlag >= 0 && args[envFileFlag + 1]
-		? args[envFileFlag + 1]
-		: '.env';
+const envFile = envFileFlag >= 0 && args[envFileFlag + 1] ? args[envFileFlag + 1] : '.env';
 
 function fail(message, extra) {
 	console.error(`✗ ${message}`);
@@ -57,10 +54,7 @@ function shouldSkipKey(key) {
 function listProductionKeys() {
 	const result = runVercel(['env', 'ls', TARGET, '--json']);
 	if (result.status !== 0) {
-		fail(
-			'vercel env ls a échoué (projet lié ? `vercel link`)',
-			result.stderr || result.stdout,
-		);
+		fail('vercel env ls a échoué (projet lié ? `vercel link`)', result.stderr || result.stdout);
 	}
 
 	const raw = (result.stdout || '').trim();
@@ -68,7 +62,7 @@ function listProductionKeys() {
 
 	try {
 		const parsed = JSON.parse(raw);
-		const rows = Array.isArray(parsed) ? parsed : parsed.envs ?? parsed.variables ?? [];
+		const rows = Array.isArray(parsed) ? parsed : (parsed.envs ?? parsed.variables ?? []);
 		const keys = new Set();
 		for (const row of rows) {
 			const key = row.key ?? row.name ?? row.id;

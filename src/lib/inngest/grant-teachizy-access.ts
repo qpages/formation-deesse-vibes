@@ -1,12 +1,6 @@
 import { applyAccessPolicy } from '../services/access';
-import {
-	findEnrollmentByIdOrThrow,
-	updateEnrollmentYousignMirror,
-} from '../services/enrollment';
-import {
-	inviteOrConfirmTeachizy,
-	markEnrollmentTeachizyActive,
-} from '../services/teachizy-access';
+import { findEnrollmentByIdOrThrow, updateEnrollmentYousignMirror } from '../services/enrollment';
+import { inviteOrConfirmTeachizy, markEnrollmentTeachizyActive } from '../services/teachizy-access';
 import {
 	alertFinalFailure,
 	formatErrorDetail,
@@ -24,10 +18,7 @@ export const grantTeachizyAccess = inngest.createFunction(
 	{
 		id: 'grant-teachizy-access',
 		retries: 2,
-		triggers: [
-			{ event: 'yousign/signature.done' },
-			{ event: 'enrollment/access.grant' },
-		],
+		triggers: [{ event: 'yousign/signature.done' }, { event: 'enrollment/access.grant' }],
 		onFailure: async ({ event, error }) => {
 			const original = event.data as { event?: { data?: { enrollmentId?: string } } };
 			await alertFinalFailure({
@@ -87,18 +78,13 @@ export const grantTeachizyAccess = inngest.createFunction(
 				await step.run('mark-active', async () => {
 					// step.run sérialise les Date → string : re-hydrater avant Prisma.
 					await markEnrollmentTeachizyActive(fresh.id, {
-						accessGrantedAt: fresh.accessGrantedAt
-							? new Date(fresh.accessGrantedAt)
-							: null,
-						invitedAt: fresh.teachizyInvitedAt
-							? new Date(fresh.teachizyInvitedAt)
-							: null,
+						accessGrantedAt: fresh.accessGrantedAt ? new Date(fresh.accessGrantedAt) : null,
+						invitedAt: fresh.teachizyInvitedAt ? new Date(fresh.teachizyInvitedAt) : null,
 					});
 				});
 
 				await step.run('notify-access-active', async () => {
-					const via =
-						'confirmed' in inviteResult ? ' (déjà présent Teachizy)' : '';
+					const via = 'confirmed' in inviteResult ? ' (déjà présent Teachizy)' : '';
 					await notifyOps({
 						kind: 'access.active',
 						severity: 'info',

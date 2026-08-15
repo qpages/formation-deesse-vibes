@@ -1,9 +1,6 @@
 ---
 import StatusBadge from '../../ui/StatusBadge.astro';
-import {
-	expandAdminInstallments,
-	type AdminPaymentSummary,
-} from '../../../lib/admin/payments';
+import { expandAdminInstallments, type AdminPaymentSummary } from '../../../lib/admin/payments';
 
 interface Props {
 	summary: AdminPaymentSummary;
@@ -28,9 +25,7 @@ const nextDue = summary.nextInstallmentDueAt
 	? new Date(summary.nextInstallmentDueAt).toLocaleDateString('fr-FR')
 	: null;
 const showNextDue =
-	Boolean(nextDue) &&
-	summary.trackingState !== 'termine' &&
-	summary.trackingState !== 'rembourse';
+	Boolean(nextDue) && summary.trackingState !== 'termine' && summary.trackingState !== 'rembourse';
 
 const statusTone = {
 	paid: 'success',
@@ -58,15 +53,11 @@ const linkClass =
 	'text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
 ---
 
-<section
-	class="mb-8 scroll-mt-20"
-	id="paiements"
-	aria-labelledby="paiements-heading"
->
+<section class="mb-8 scroll-mt-20" id="paiements" aria-labelledby="paiements-heading">
 	<div class="mb-3 flex flex-wrap items-center gap-2">
 		{
 			heading ? (
-				<h2 id="paiements-heading" class="text-lg font-medium text-ink">
+				<h2 id="paiements-heading" class="text-ink text-lg font-medium">
 					{heading}
 				</h2>
 			) : (
@@ -78,12 +69,12 @@ const linkClass =
 		<StatusBadge tone={summary.trackingTone}>{summary.trackingLabel}</StatusBadge>
 	</div>
 
-	<p class="text-sm text-ink tabular-nums">
+	<p class="text-ink text-sm tabular-nums">
 		<span class="text-ink/45">{summary.planLabel}</span>
-		<span class="mx-1.5 text-ink/25">·</span>
+		<span class="text-ink/25 mx-1.5">·</span>
 		<span class="font-medium">{collected}</span>
 		{totalLabel ? <span class="text-ink/35"> / {totalLabel}</span> : null}
-		<span class="mx-1.5 text-ink/25">·</span>
+		<span class="text-ink/25 mx-1.5">·</span>
 		<span class="text-ink-soft">{installmentSummary}</span>
 		{showNextDue ? <span class="text-ink-soft"> · prochain {nextDue}</span> : null}
 	</p>
@@ -91,7 +82,7 @@ const linkClass =
 	{
 		installments.length === 0 ? (
 			<div class="mt-3 flex flex-wrap items-center gap-x-4">
-				<p class="text-sm text-ink-soft">
+				<p class="text-ink-soft text-sm">
 					Aucune échéance. Sync Stripe pour charger le calendrier.
 				</p>
 				{summary.stripeSubscriptionUrl ? (
@@ -149,7 +140,7 @@ const linkClass =
 						Schedule Stripe ↗
 					</a>
 				) : null}
-				<ul class="mt-2 hidden w-full basis-full divide-y divide-ink/10 border-t border-ink/10 peer-open:block">
+				<ul class="divide-ink/10 border-ink/10 mt-2 hidden w-full basis-full divide-y border-t peer-open:block">
 					{installments.map((p) => {
 						const paid = formatDate(p.paidAt, true);
 						const due = formatDate(p.dueAt);
@@ -159,20 +150,18 @@ const linkClass =
 						const isEstimated = p.id.startsWith('estimated-');
 						return (
 							<li class="flex items-start gap-3 py-3">
-								<span class="mt-0.5 w-5 shrink-0 text-xs font-medium text-ink/45 tabular-nums">
+								<span class="text-ink/45 mt-0.5 w-5 shrink-0 text-xs font-medium tabular-nums">
 									{p.installmentNumber}
 								</span>
 								<div class="min-w-0 flex-1">
 									<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-										<span class="font-medium text-ink tabular-nums">{p.amountLabel}</span>
+										<span class="text-ink font-medium tabular-nums">{p.amountLabel}</span>
 										<StatusBadge tone={tone}>{p.statusLabel}</StatusBadge>
-										{isEstimated ? (
-											<span class="text-xs text-ink/40">estimée</span>
-										) : null}
+										{isEstimated ? <span class="text-ink/40 text-xs">estimée</span> : null}
 									</div>
-									<p class="mt-1 text-sm text-ink-soft">{meta}</p>
+									<p class="text-ink-soft mt-1 text-sm">{meta}</p>
 									{p.failureReason ? (
-										<p class="mt-1 text-sm text-blush-deep">{p.failureReason}</p>
+										<p class="text-blush-deep mt-1 text-sm">{p.failureReason}</p>
 									) : null}
 									{invoiceHref ? (
 										<p class="mt-1">
@@ -192,7 +181,7 @@ const linkClass =
 										href={p.stripeUrl}
 										target="_blank"
 										rel="noopener noreferrer"
-										class="mt-0.5 inline-flex min-h-9 shrink-0 items-center text-xs text-ink/45 underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+										class="text-ink/45 hover:text-ink focus-visible:outline-blush mt-0.5 inline-flex min-h-9 shrink-0 items-center text-xs underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
 										aria-label={`Ouvrir l’échéance ${p.installmentNumber} dans Stripe`}
 									>
 										Stripe

@@ -24,14 +24,9 @@ const zoneLabelClass = 'text-xs font-medium uppercase tracking-[0.12em] text-ink
 
 {
 	metier.length + actions.length === 0 ? (
-		<span class="text-xs text-ink/35">—</span>
+		<span class="text-ink/35 text-xs">—</span>
 	) : (
-		<div
-			class="space-y-2"
-			data-action-zone
-			data-enrollment={row.id}
-			data-name={row.displayName}
-		>
+		<div class="space-y-2" data-action-zone data-enrollment={row.id} data-name={row.displayName}>
 			{metier.length > 0 ? (
 				<div>
 					{!compact ? <p class:list={['mb-2', zoneLabelClass]}>Métier</p> : null}

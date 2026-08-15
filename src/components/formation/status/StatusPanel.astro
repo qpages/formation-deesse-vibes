@@ -31,8 +31,7 @@ const poll = shouldPollEnrollment({
 	hasCheckoutSession: Boolean(enrollment.stripeCheckoutSessionId),
 	hasNdaSignUrl: showSignCard,
 });
-const closed =
-	enrollment.accessStatus === 'revoked' || enrollment.collectionStatus === 'refunded';
+const closed = enrollment.accessStatus === 'revoked' || enrollment.collectionStatus === 'refunded';
 const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractStatus}|${enrollment.accessStatus}`;
 ---
 
@@ -44,11 +43,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	data-poll-interval={ENROLLMENT_POLL_INTERVAL_MS}
 	data-poll-max={ENROLLMENT_POLL_MAX_MS}
 >
-	{
-		showSignCard && (
-			<p class="text-ink-soft">Le lien de signature est prêt.</p>
-		)
-	}
+	{showSignCard && <p class="text-ink-soft">Le lien de signature est prêt.</p>}
 
 	{
 		enrollment.collectionStatus === 'pending' && enrollment.stripeCheckoutSessionId && (
@@ -61,16 +56,16 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		isPaidEnough(enrollment.collectionStatus) &&
 			enrollment.contractStatus === 'pending' &&
 			!showSignCard && (
-			<p class="text-ink-soft">
-				Votre paiement est bien confirmé. Le lien de signature apparaît ici dès qu’il est prêt.
-			</p>
-		)
+				<p class="text-ink-soft">
+					Votre paiement est bien confirmé. Le lien de signature apparaît ici dès qu’il est prêt.
+				</p>
+			)
 	}
 	{
 		enrollment.contractStatus === 'sent' && !showSignCard && (
 			<p class="text-ink-soft">
-				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page
-				ou contactez un administrateur.
+				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page ou
+				contactez un administrateur.
 			</p>
 		)
 	}
@@ -79,13 +74,9 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
 				{message && (
 					<div class="max-w-prose space-y-1.5">
-						<p class="text-lg font-normal leading-snug text-ink-soft sm:text-xl">
-							{message[0]}
-						</p>
+						<p class="text-ink-soft text-lg leading-snug font-normal sm:text-xl">{message[0]}</p>
 						{message[1] && (
-							<p class="text-sm leading-relaxed text-ink-soft sm:text-[0.9375rem]">
-								{message[1]}
-							</p>
+							<p class="text-ink-soft text-sm leading-relaxed sm:text-[0.9375rem]">{message[1]}</p>
 						)}
 					</div>
 				)}
@@ -104,7 +95,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 			message && (
 				<div class="max-w-prose space-y-1.5">
 					{message.map((line) => (
-						<p class="text-sm text-ink-soft">{line}</p>
+						<p class="text-ink-soft text-sm">{line}</p>
 					))}
 				</div>
 			)

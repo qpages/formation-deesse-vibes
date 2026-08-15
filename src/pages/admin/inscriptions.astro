@@ -42,13 +42,13 @@ const summary =
 <AdminLayout title="Inscriptions" email={admin}>
 	<div class="mb-6 flex flex-wrap items-end justify-between gap-4">
 		<div>
-			<h1 class="font-display text-4xl text-ink">Inscriptions</h1>
-			<p class="mt-2 text-sm text-ink-soft">{summary}</p>
+			<h1 class="font-display text-ink text-4xl">Inscriptions</h1>
+			<p class="text-ink-soft mt-2 text-sm">{summary}</p>
 		</div>
 		<Button href="/api/admin/export" variant="secondary" size="sm">Export CSV</Button>
 	</div>
 
-	<div class="mb-6 border border-ink/10 bg-white/50 p-4">
+	<div class="border-ink/10 mb-6 border bg-white/50 p-4">
 		<FilterBar
 			q={list.q}
 			collection={list.collection}
@@ -59,7 +59,7 @@ const summary =
 
 	{
 		list.rows.length === 0 ? (
-			<p class="border border-dashed border-ink/15 px-4 py-10 text-center text-sm text-ink-soft">
+			<p class="border-ink/15 text-ink-soft border border-dashed px-4 py-10 text-center text-sm">
 				{list.q || chips.length
 					? 'Aucune inscription ne correspond à ces critères.'
 					: 'Les inscriptions apparaîtront ici.'}
@@ -92,11 +92,7 @@ const summary =
 	</Dialog>
 </AdminLayout>
 
-<script
-	id="admin-action-meta"
-	type="application/json"
-	set:html={JSON.stringify(actionMeta)}
-/>
+<script id="admin-action-meta" type="application/json" set:html={JSON.stringify(actionMeta)} />
 <script>
 	import { bindAdminActions } from '../../components/admin/admin-client';
 	import type { AdminActionMetaClient } from '../../lib/admin/actions';

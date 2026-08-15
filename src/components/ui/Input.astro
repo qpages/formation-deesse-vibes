@@ -2,7 +2,7 @@
 import { cn } from '../../lib/cn';
 
 interface Props {
-	type?: string;
+	type?: 'text' | 'email' | 'password' | 'tel' | 'url' | 'search' | 'hidden';
 	name: string;
 	id?: string;
 	required?: boolean;

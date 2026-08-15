@@ -7,16 +7,16 @@ import react from '@astrojs/react';
 
 // https://astro.build/config
 export default defineConfig({
-  output: 'server',
-  adapter: vercel(),
+	output: 'server',
+	adapter: vercel(),
 
-  server: {
-      allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.io'],
+	server: {
+		allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.io'],
 	},
 
-  vite: {
-      plugins: [tailwindcss()],
+	vite: {
+		plugins: [tailwindcss()],
 	},
 
-  integrations: [react()],
+	integrations: [react()],
 });

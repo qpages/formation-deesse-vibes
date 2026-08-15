@@ -1,8 +1,4 @@
-import type {
-	AccessStatus,
-	CollectionStatus,
-	ContractStatus,
-} from '../../generated/prisma/client';
+import type { AccessStatus, CollectionStatus, ContractStatus } from '../../generated/prisma/client';
 
 export type StepKey = 'paiement' | 'nda' | 'acces';
 export type StepState = 'a_faire' | 'en_cours' | 'termine' | 'action_requise';
@@ -22,9 +18,4 @@ export type PrimaryAction =
 	| { kind: 'open_platform'; label: string; href: string }
 	| { kind: 'none'; label: string };
 
-export type PaymentTrackingState =
-	| 'en_attente'
-	| 'a_jour'
-	| 'impaye'
-	| 'termine'
-	| 'rembourse';
+export type PaymentTrackingState = 'en_attente' | 'a_jour' | 'impaye' | 'termine' | 'rembourse';

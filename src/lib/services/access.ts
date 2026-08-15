@@ -46,10 +46,7 @@ export function evaluateAccess(input: {
 	return { shouldHaveAccess: true, reason: 'ELIGIBLE' };
 }
 
-function targetAccessStatus(
-	decision: AccessDecision,
-	current: AccessStatus,
-): AccessStatus | null {
+function targetAccessStatus(decision: AccessDecision, current: AccessStatus): AccessStatus | null {
 	if (!decision.shouldHaveAccess) {
 		if (decision.reason === 'ORDER_CANCELED' || decision.reason === 'ORDER_REFUNDED') {
 			return current === 'revoked' ? null : 'revoked';

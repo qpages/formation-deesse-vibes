@@ -31,8 +31,7 @@ export type SyncTeachizyResult =
 	  };
 
 export type InviteOrConfirmResult =
-	| { invited: true }
-	| { confirmed: true; source: 'already_present' };
+	{ invited: true } | { confirmed: true; source: 'already_present' };
 
 function parseEnrolledAt(value: string | null | undefined): Date | null {
 	if (!value) return null;
@@ -103,11 +102,7 @@ export async function inviteOrConfirmTeachizy(input: {
 		return { invited: true };
 	} catch (error) {
 		const presence = await inspectTeachizyPresence(input.email);
-		if (
-			presence.present &&
-			!presence.blocked &&
-			!presence.disabled
-		) {
+		if (presence.present && !presence.blocked && !presence.disabled) {
 			console.warn('[Teachizy] invite failed but learner already on training — confirming', {
 				enrollmentId: input.enrollmentId,
 				email: input.email,

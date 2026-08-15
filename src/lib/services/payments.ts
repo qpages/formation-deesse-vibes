@@ -161,9 +161,7 @@ export function assertCheckoutAmountAcceptable(
 }
 
 export function isCheckoutPaid(session: Stripe.Checkout.Session) {
-	return (
-		session.payment_status === 'paid' || session.payment_status === 'no_payment_required'
-	);
+	return session.payment_status === 'paid' || session.payment_status === 'no_payment_required';
 }
 
 /** Expand Stripe string | { id } unions. */
@@ -212,23 +210,22 @@ function mapInvoiceStatus(status: Stripe.Invoice.Status | null): PaymentStatus {
 	}
 }
 
-/** Identity map — SubscriptionStatus = Stripe Subscription.status 1:1. */
+const SUBSCRIPTION_STATUSES = [
+	'incomplete',
+	'incomplete_expired',
+	'trialing',
+	'active',
+	'past_due',
+	'canceled',
+	'unpaid',
+	'paused',
+] as const satisfies readonly SubscriptionStatus[];
+
 function mapSubscriptionStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
-	switch (status) {
-		case 'incomplete':
-		case 'incomplete_expired':
-		case 'trialing':
-		case 'active':
-		case 'past_due':
-		case 'canceled':
-		case 'unpaid':
-		case 'paused':
-			return status;
-		default: {
-			const _exhaustive: never = status;
-			throw new Error(`Unknown Stripe subscription status: ${String(_exhaustive)}`);
-		}
+	if ((SUBSCRIPTION_STATUSES as readonly string[]).includes(status)) {
+		return status as SubscriptionStatus;
 	}
+	throw new Error(`Unknown Stripe subscription status: ${status}`);
 }
 
 function resolvePlanFromMetadata(metadata: Stripe.Metadata | null | undefined) {
@@ -452,8 +449,7 @@ async function syncOneTimePaymentFromCheckout(
 	enrollment: EnrollmentWithUser,
 	session: Stripe.Checkout.Session,
 ) {
-	const invoiceId =
-		typeof session.invoice === 'string' ? session.invoice : session.invoice?.id;
+	const invoiceId = typeof session.invoice === 'string' ? session.invoice : session.invoice?.id;
 
 	if (invoiceId) {
 		const invoice = await getStripe().invoices.retrieve(invoiceId);
@@ -618,8 +614,7 @@ export async function confirmPaidCheckout(
 	session: Stripe.Checkout.Session,
 	opts: { softEnqueue?: boolean } = {},
 ): Promise<ConfirmCheckoutResult> {
-	const enrollmentId =
-		session.metadata?.enrollmentId ?? session.client_reference_id ?? undefined;
+	const enrollmentId = session.metadata?.enrollmentId ?? session.client_reference_id ?? undefined;
 	if (!enrollmentId) {
 		throw new Error('Checkout sans enrollmentId');
 	}
@@ -659,8 +654,7 @@ export async function confirmPaidCheckout(
 
 	const paymentIntentId = paymentIntentIdFromSession(session);
 	const subscriptionId = subscriptionIdFromSession(session);
-	const customerId =
-		typeof session.customer === 'string' ? session.customer : session.customer?.id;
+	const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
 
 	if (customerId) {
 		await prisma.user.update({
@@ -744,9 +738,7 @@ export async function syncSubscriptionState(subscription: Stripe.Subscription) {
 	}
 
 	const scheduleId =
-		typeof subscription.schedule === 'string'
-			? subscription.schedule
-			: subscription.schedule?.id;
+		typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id;
 
 	await prisma.enrollment.update({
 		where: { id: enrollment.id },
@@ -763,9 +755,7 @@ export async function syncSubscriptionState(subscription: Stripe.Subscription) {
  * Schedule Stripe terminé → sync statut abo (souvent canceled) + clear prochaine échéance.
  * “Soldé” métier = collectionStatus / Payments, pas subscriptionStatus.
  */
-export async function markSubscriptionScheduleCompleted(
-	schedule: Stripe.SubscriptionSchedule,
-) {
+export async function markSubscriptionScheduleCompleted(schedule: Stripe.SubscriptionSchedule) {
 	const subscriptionId = stripeId(schedule.subscription);
 
 	if (!subscriptionId) {
@@ -899,8 +889,7 @@ export type PaidInvoiceLink = {
 /** Recharge les URLs Stripe (PDF signé + page hébergée) si une des deux manque. */
 export async function hydrateInvoiceUrls(payments: Payment[]): Promise<Payment[]> {
 	const missing = payments.filter(
-		(payment) =>
-			payment.stripeInvoiceId && (!payment.invoicePdfUrl || !payment.hostedInvoiceUrl),
+		(payment) => payment.stripeInvoiceId && (!payment.invoicePdfUrl || !payment.hostedInvoiceUrl),
 	);
 	if (missing.length === 0) return payments;
 

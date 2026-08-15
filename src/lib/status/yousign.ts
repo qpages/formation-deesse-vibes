@@ -13,9 +13,7 @@ export const YOUSIGN_FAILURE: ReadonlySet<YousignRequestStatus> = new Set([
 ]);
 
 /** Mappe un event_name Yousign vers un statut de demande. */
-export function yousignStatusFromEvent(
-	eventName: string,
-): YousignRequestStatus | null {
+export function yousignStatusFromEvent(eventName: string): YousignRequestStatus | null {
 	switch (eventName) {
 		case 'signature_request.done':
 			return 'done';
@@ -38,9 +36,7 @@ export function yousignStatusFromEvent(
 }
 
 /** Mappe le `status` API d’une Signature Request vers l’enum Prisma. */
-export function mapYousignApiStatus(
-	apiStatus: string,
-): YousignRequestStatus | null {
+export function mapYousignApiStatus(apiStatus: string): YousignRequestStatus | null {
 	switch (apiStatus.toLowerCase()) {
 		case 'draft':
 		case 'approval':
@@ -64,9 +60,7 @@ export function mapYousignApiStatus(
 }
 
 /** Mappe le `status` API d’un Signer vers l’enum Prisma. */
-export function mapYousignSignerApiStatus(
-	apiStatus: string,
-): YousignSignerStatus | null {
+export function mapYousignSignerApiStatus(apiStatus: string): YousignSignerStatus | null {
 	switch (apiStatus.toLowerCase()) {
 		case 'initiated':
 			return 'initiated';

@@ -8,10 +8,7 @@ interface TeachizyInviteInput {
 	lastName: string;
 }
 
-const customFieldsSchema = z.union([
-	z.array(z.unknown()),
-	z.record(z.string(), z.unknown()),
-]);
+const customFieldsSchema = z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())]);
 
 const teachizyTrainingSchema = z.object({
 	training: z.object({
@@ -215,9 +212,7 @@ export async function exportTeachizyCustomers(
 	return { data, meta: parsed.data.meta };
 }
 
-export async function getTeachizyCustomerByEmail(
-	email: string,
-): Promise<TeachizyCustomer | null> {
+export async function getTeachizyCustomerByEmail(email: string): Promise<TeachizyCustomer | null> {
 	const params = new URLSearchParams({ email });
 	const response = await teachizyFetch(`/externals/automations/customers?${params.toString()}`);
 

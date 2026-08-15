@@ -45,97 +45,91 @@ const trackingFlash = showFunnel ? null : flash;
 	showFunnel ? (
 		<div id="access-funnel">
 			<div
-				class="inline-flex rounded-sm border border-ink/15 p-1"
+				class="border-ink/15 inline-flex rounded-sm border p-1"
 				role="tablist"
 				aria-label="Choisir votre parcours"
 			>
-					<button
-						type="button"
-						role="tab"
-						id="tab-nouveau"
-						aria-controls="panel-nouveau"
-						aria-selected={activeTab === 'nouveau' ? 'true' : 'false'}
-						data-access-tab="nouveau"
-						class:list={[
-							'access-tab h-10 px-4 text-sm font-medium transition',
-							activeTab === 'nouveau'
-								? 'bg-ink text-mist'
-								: 'text-ink-soft',
-						]}
-					>
-						Nouveau
-					</button>
-					<button
-						type="button"
-						role="tab"
-						id="tab-retrouver"
-						aria-controls="panel-retrouver"
-						aria-selected={activeTab === 'retrouver' ? 'true' : 'false'}
-						data-access-tab="retrouver"
-						class:list={[
-							'access-tab h-10 px-4 text-sm font-medium transition',
-							activeTab === 'retrouver'
-								? 'bg-ink text-mist'
-								: 'text-ink-soft',
-						]}
-					>
-						Déjà inscrit·e
-					</button>
-				</div>
-
-				<div
-					id="panel-nouveau"
-					role="tabpanel"
-					aria-labelledby="tab-nouveau"
-					class:list={['mt-6', activeTab !== 'nouveau' && 'hidden']}
-					data-access-panel="nouveau"
+				<button
+					type="button"
+					role="tab"
+					id="tab-nouveau"
+					aria-controls="panel-nouveau"
+					aria-selected={activeTab === 'nouveau' ? 'true' : 'false'}
+					data-access-tab="nouveau"
+					class:list={[
+						'access-tab h-10 px-4 text-sm font-medium transition',
+						activeTab === 'nouveau' ? 'bg-ink text-mist' : 'text-ink-soft',
+					]}
 				>
-					<p class="mb-5 text-sm text-ink-soft">
-						Renseignez vos informations, puis réglez en toute sécurité via la plateforme de paiement Stripe.
-					</p>
-					<CheckoutForm />
-				</div>
-
-				<div
-					id="panel-retrouver"
-					role="tabpanel"
-					aria-labelledby="tab-retrouver"
-					class:list={['mt-6', activeTab !== 'retrouver' && 'hidden']}
-					data-access-panel="retrouver"
+					Nouveau
+				</button>
+				<button
+					type="button"
+					role="tab"
+					id="tab-retrouver"
+					aria-controls="panel-retrouver"
+					aria-selected={activeTab === 'retrouver' ? 'true' : 'false'}
+					data-access-tab="retrouver"
+					class:list={[
+						'access-tab h-10 px-4 text-sm font-medium transition',
+						activeTab === 'retrouver' ? 'bg-ink text-mist' : 'text-ink-soft',
+					]}
 				>
-					<p class="mb-1 text-sm text-ink-soft">
-						Saisissez l’e-mail utilisé lors du paiement pour retrouver votre inscription.
-					</p>
-					<MagicLinkForm />
-				</div>
+					Déjà inscrit·e
+				</button>
+			</div>
+
+			<div
+				id="panel-nouveau"
+				role="tabpanel"
+				aria-labelledby="tab-nouveau"
+				class:list={['mt-6', activeTab !== 'nouveau' && 'hidden']}
+				data-access-panel="nouveau"
+			>
+				<p class="text-ink-soft mb-5 text-sm">
+					Renseignez vos informations, puis réglez en toute sécurité via la plateforme de paiement
+					Stripe.
+				</p>
+				<CheckoutForm />
+			</div>
+
+			<div
+				id="panel-retrouver"
+				role="tabpanel"
+				aria-labelledby="tab-retrouver"
+				class:list={['mt-6', activeTab !== 'retrouver' && 'hidden']}
+				data-access-panel="retrouver"
+			>
+				<p class="text-ink-soft mb-1 text-sm">
+					Saisissez l’e-mail utilisé lors du paiement pour retrouver votre inscription.
+				</p>
+				<MagicLinkForm />
+			</div>
 		</div>
 	) : (
 		<div id="access-tracking" class="max-w-3xl">
 			{enrollment && (
 				<div class="space-y-8">
 					<div>
-						<StatusPanel
-							enrollment={enrollment}
-							ndaSignUrl={ndaSignUrl}
-						/>
+						<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} />
 					</div>
 
 					<div>
-						<p class="mb-3 text-[10px] uppercase tracking-[0.12em] text-ink/40">Compte</p>
+						<p class="text-ink/40 mb-3 text-[10px] tracking-[0.12em] uppercase">Compte</p>
 						<div class="space-y-4">
-							<p class="text-sm text-ink-soft">
+							<p class="text-ink-soft text-sm">
 								Connecté·e en tant que{' '}
-								<span class="font-medium text-ink">
+								<span class="text-ink font-medium">
 									{enrollment.user.firstName} {enrollment.user.lastName}
 								</span>
 								<span class="text-ink/40"> · </span>
 								{enrollment.user.email}
 							</p>
-							<p class="text-sm text-ink-soft">
+							<p class="text-ink-soft text-sm">
 								<button
 									type="button"
 									id="clear-session"
-									class="underline-offset-4 hover:text-ink hover:underline"
+									class="hover:text-ink underline-offset-4 hover:underline"
 								>
 									Se déconnecter
 								</button>
@@ -145,7 +139,7 @@ const trackingFlash = showFunnel ? null : flash;
 								</span>
 								<a
 									href={adminContactHref}
-									class="underline-offset-4 hover:text-ink hover:underline"
+									class="hover:text-ink underline-offset-4 hover:underline"
 									target={adminContactExternal ? '_blank' : undefined}
 									rel={adminContactExternal ? 'noopener noreferrer' : undefined}
 								>
@@ -157,18 +151,18 @@ const trackingFlash = showFunnel ? null : flash;
 
 					{invoiceLinks.length > 0 && (
 						<div>
-							<p class="mb-3 text-[10px] uppercase tracking-[0.12em] text-ink/40">Factures</p>
+							<p class="text-ink/40 mb-3 text-[10px] tracking-[0.12em] uppercase">Factures</p>
 							<ul class="space-y-3">
 								{invoiceLinks.map((invoice) => (
 									<li class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-										<p class="text-sm text-ink">{invoice.label}</p>
+										<p class="text-ink text-sm">{invoice.label}</p>
 										<div class="flex shrink-0 items-center gap-x-3 text-sm">
 											{invoice.viewUrl ? (
 												<a
 													href={invoice.viewUrl}
 													target="_blank"
 													rel="noopener noreferrer"
-													class="text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+													class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
 												>
 													Voir
 												</a>
@@ -178,7 +172,7 @@ const trackingFlash = showFunnel ? null : flash;
 													href={invoice.downloadUrl}
 													target="_blank"
 													rel="noopener noreferrer"
-													class="text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+													class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
 												>
 													Télécharger
 												</a>

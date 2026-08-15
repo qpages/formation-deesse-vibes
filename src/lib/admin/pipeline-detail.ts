@@ -132,9 +132,7 @@ type SignatureDiagnosticInput = Pick<
  * l'état constaté et l'action qui ira chercher le vrai motif côté Yousign.
  * `null` = rien à signaler (signé, ou signature pas encore due car impayé).
  */
-export function signatureDiagnostic(
-	detail: SignatureDiagnosticInput,
-): SignatureDiagnostic | null {
+export function signatureDiagnostic(detail: SignatureDiagnosticInput): SignatureDiagnostic | null {
 	if (detail.contractStatus === 'signed') return null;
 
 	// 1. Erreur réelle remontée par un job / webhook / sync Yousign → affichée verbatim.
@@ -162,8 +160,7 @@ export function signatureDiagnostic(
 	if (!detail.yousignSignerId && detail.contractStatus === 'pending') {
 		return {
 			level: 'warn',
-			title:
-				'Demande Yousign présente mais sans signataire, et aucune erreur enregistrée.',
+			title: 'Demande Yousign présente mais sans signataire, et aucune erreur enregistrée.',
 			action:
 				'« Sync statut Yousign » interroge Yousign en direct et affiche le statut/motif réel ici.',
 		};
@@ -237,9 +234,7 @@ export function buildPipelineStageCards(
 	const bottleneck = resolvePipelineBottleneck(detail);
 	const collected = formatMoney(paymentSummary.collectedAmountCents);
 	const total =
-		paymentSummary.totalAmountCents != null
-			? formatMoney(paymentSummary.totalAmountCents)
-			: null;
+		paymentSummary.totalAmountCents != null ? formatMoney(paymentSummary.totalAmountCents) : null;
 	const moneyHint = total ? `${collected} / ${total}` : collected;
 
 	let paiementHint = moneyHint;

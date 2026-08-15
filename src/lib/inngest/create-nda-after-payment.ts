@@ -12,11 +12,7 @@ import {
 	notifyOps,
 	withJobLifecycleAlerts,
 } from '../services/slack';
-import {
-	activateNdaRequest,
-	createNdaDraft,
-	isNdaFullyProvisioned,
-} from '../yousign';
+import { activateNdaRequest, createNdaDraft, isNdaFullyProvisioned } from '../yousign';
 import { inngest } from './client';
 
 /** Command: créer / activer NDA après paiement (aussi admin recreate/retrigger). */
@@ -24,10 +20,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 	{
 		id: 'create-nda-after-payment',
 		retries: 2,
-		triggers: [
-			{ event: 'stripe/payment.confirmed' },
-			{ event: 'admin/recreate-nda' },
-		],
+		triggers: [{ event: 'stripe/payment.confirmed' }, { event: 'admin/recreate-nda' }],
 		onFailure: async ({ event, error }) => {
 			const original = event.data as { event?: { data?: { enrollmentId?: string } } };
 			const enrollmentId = original.event?.data?.enrollmentId;

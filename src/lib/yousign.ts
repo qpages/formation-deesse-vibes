@@ -91,10 +91,9 @@ export async function activateNdaRequest(requestId: string): Promise<ActivatedNd
 
 	const activated =
 		current.status === 'draft'
-			? await yousignFetch<YousignSignatureRequest>(
-					`/signature_requests/${requestId}/activate`,
-					{ method: 'POST' },
-				)
+			? await yousignFetch<YousignSignatureRequest>(`/signature_requests/${requestId}/activate`, {
+					method: 'POST',
+				})
 			: current;
 
 	const signer = activated.signers?.[0];
@@ -127,9 +126,7 @@ export type YousignSigner = {
 
 /** Détail Signer — `signature_link` fiable uniquement ici, pas sur la Signature Request. */
 export async function getSigner(requestId: string, signerId: string) {
-	return yousignFetch<YousignSigner>(
-		`/signature_requests/${requestId}/signers/${signerId}`,
-	);
+	return yousignFetch<YousignSigner>(`/signature_requests/${requestId}/signers/${signerId}`);
 }
 
 export async function getSignatureLink(requestId: string, signerId: string) {

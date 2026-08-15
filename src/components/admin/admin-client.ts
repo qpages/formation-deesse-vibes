@@ -13,13 +13,11 @@ const DETAIL_SWAP_IDS = [
 	'historique-wrap',
 ] as const;
 
-declare global {
-	interface Window {
-		toast?: (message: string, variant?: string) => void;
-	}
-}
+let adminActionsBound = false;
 
 export function bindAdminActions(actionMeta: AdminActionMetaClient) {
+	if (adminActionsBound) return;
+	adminActionsBound = true;
 	const dialog = document.getElementById('admin-action-dialog') as HTMLDialogElement | null;
 	const eyebrowEl = dialog?.querySelector('[data-dialog-eyebrow]');
 	const titleEl = dialog?.querySelector('[data-dialog-title]');
@@ -30,13 +28,12 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 
 	let busy = false;
 	let pendingConfirmLabel = 'Confirmer';
-	let bound = false;
 
 	dialog?.addEventListener('cancel', (event) => {
 		if (busy) event.preventDefault();
 	});
 
-	function toast(message: string, variant = 'info') {
+	function toast(message: string, variant: ToastVariant = 'info') {
 		window.toast?.(message, variant);
 	}
 
@@ -192,8 +189,7 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 					return true;
 				}
 
-				const variant =
-					json.toast === 'info' || json.toast === 'error' ? json.toast : 'success';
+				const variant = json.toast === 'info' || json.toast === 'error' ? json.toast : 'success';
 				toast(json.message || 'Action effectuée.', variant);
 				await refreshDetailPanels();
 				return true;
@@ -208,8 +204,7 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 		}
 	}
 
-	if (bound) return;
-	bound = true;
+	let actionInFlight = false;
 
 	document.addEventListener('click', async (event) => {
 		const target = event.target;
@@ -233,11 +228,17 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 		if (!btn) return;
 
 		event.stopPropagation();
+		if (actionInFlight) return;
 		const action = btn.getAttribute('data-action');
 		const wrap = btn.closest('[data-action-zone]') ?? btn.closest('[data-enrollment]');
 		const enrollmentId = wrap?.getAttribute('data-enrollment');
 		const name = wrap?.getAttribute('data-name') ?? '';
 		if (!action || !enrollmentId) return;
-		await runAdminAction(enrollmentId, action, name);
+		actionInFlight = true;
+		try {
+			await runAdminAction(enrollmentId, action, name);
+		} finally {
+			actionInFlight = false;
+		}
 	});
 }

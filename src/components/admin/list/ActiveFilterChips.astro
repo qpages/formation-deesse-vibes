@@ -1,7 +1,11 @@
 ---
 import { activeFilterChips } from '../../../lib/admin/filter-labels';
 import { adminListHref } from '../../../lib/admin/enrollments';
-import type { AccessStatus, CollectionStatus, ContractStatus } from '../../../generated/prisma/client';
+import type {
+	AccessStatus,
+	CollectionStatus,
+	ContractStatus,
+} from '../../../generated/prisma/client';
 
 interface Props {
 	q: string;
@@ -25,11 +29,11 @@ const clearAllHref = adminListHref({ q });
 {
 	chips.length > 0 ? (
 		<div class="flex flex-wrap items-center gap-2" aria-label="Filtres actifs">
-			<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Actifs</span>
+			<span class="text-ink/45 text-[10px] tracking-[0.12em] uppercase">Actifs</span>
 			{chips.map((chip) => (
 				<a
 					href={chip.href}
-					class="inline-flex items-center gap-1.5 border border-ink/15 bg-white/80 px-2.5 py-1 text-[11px] text-ink-soft transition-colors hover:border-ink/30 hover:text-ink"
+					class="border-ink/15 text-ink-soft hover:border-ink/30 hover:text-ink inline-flex items-center gap-1.5 border bg-white/80 px-2.5 py-1 text-[11px] transition-colors"
 					title="Retirer ce filtre"
 				>
 					{chip.label}
@@ -41,7 +45,7 @@ const clearAllHref = adminListHref({ q });
 			{chips.length > 1 ? (
 				<a
 					href={clearAllHref}
-					class="text-[11px] text-ink-soft underline underline-offset-2 hover:text-ink"
+					class="text-ink-soft hover:text-ink text-[11px] underline underline-offset-2"
 				>
 					Tout effacer
 				</a>

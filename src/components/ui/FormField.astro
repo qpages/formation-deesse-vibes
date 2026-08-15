@@ -12,7 +12,7 @@ const { label, name, hint, class: className } = Astro.props;
 ---
 
 <label class={cn('block space-y-2', className)} for={name}>
-	<span class="text-sm font-medium text-ink">{label}</span>
+	<span class="text-ink text-sm font-medium">{label}</span>
 	<slot />
-	{hint && <span class="block text-xs text-ink-soft/80">{hint}</span>}
+	{hint && <span class="text-ink-soft/80 block text-xs">{hint}</span>}
 </label>

@@ -5,10 +5,7 @@ import LearnerFilterBar from '../../components/admin/list/LearnerFilterBar.astro
 import LearnerList from '../../components/admin/list/LearnerList.astro';
 import Pager from '../../components/admin/list/Pager.astro';
 import { requireAdminPage } from '../../lib/admin/auth';
-import {
-	adminLearnersHref,
-	listAdminTeachizyLearners,
-} from '../../lib/admin/teachizy-learners';
+import { adminLearnersHref, listAdminTeachizyLearners } from '../../lib/admin/teachizy-learners';
 import { parseAdminLearnersQuery } from '../../lib/validation';
 
 export const prerender = false;
@@ -30,15 +27,11 @@ const summary = list.error
 
 <AdminLayout title="Apprenants" email={admin}>
 	<div class="mb-6">
-		<h1 class="font-display text-4xl text-ink">Apprenants</h1>
-		{
-			summary && (
-				<p class="mt-2 text-sm text-ink-soft">{summary}</p>
-			)
-		}
+		<h1 class="font-display text-ink text-4xl">Apprenants</h1>
+		{summary && <p class="text-ink-soft mt-2 text-sm">{summary}</p>}
 	</div>
 
-	<div class="mb-6 border border-ink/10 bg-white/50 p-4">
+	<div class="border-ink/10 mb-6 border bg-white/50 p-4">
 		<LearnerFilterBar q={list.q} status={list.status} />
 	</div>
 
@@ -46,7 +39,7 @@ const summary = list.error
 		list.error ? (
 			<Alert variant="error">{list.error}</Alert>
 		) : list.rows.length === 0 ? (
-			<p class="border border-dashed border-ink/15 px-4 py-10 text-center text-sm text-ink-soft">
+			<p class="border-ink/15 text-ink-soft border border-dashed px-4 py-10 text-center text-sm">
 				{list.q || list.status
 					? 'Aucun apprenant Teachizy ne correspond à ces critères.'
 					: 'Les apprenants Teachizy apparaîtront ici.'}

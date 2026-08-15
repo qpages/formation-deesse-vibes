@@ -41,9 +41,7 @@ export function isHandledStripeEventType(eventType: string) {
 /**
  * Corrélation enrollment : metadata enrollmentId d’abord, jamais email seul.
  */
-export async function resolveEnrollmentFromStripeObject(
-	object: unknown,
-): Promise<string | null> {
+export async function resolveEnrollmentFromStripeObject(object: unknown): Promise<string | null> {
 	const obj = object as Record<string, unknown>;
 	const meta = obj.metadata as Stripe.Metadata | null | undefined;
 	if (meta?.enrollmentId) {
@@ -89,11 +87,7 @@ export async function resolveEnrollmentFromStripeObject(
 function stripeRefId(ref: unknown): string | undefined {
 	if (!ref) return undefined;
 	if (typeof ref === 'string') return ref;
-	if (
-		typeof ref === 'object' &&
-		'id' in ref &&
-		typeof (ref as { id: unknown }).id === 'string'
-	) {
+	if (typeof ref === 'object' && 'id' in ref && typeof (ref as { id: unknown }).id === 'string') {
 		return (ref as { id: string }).id;
 	}
 	return undefined;
@@ -161,10 +155,7 @@ export async function handleStripeProviderEvent(input: {
 		return { enrollmentId: result.enrollmentId };
 	}
 
-	if (
-		eventType === 'invoice.payment_failed' ||
-		eventType === 'invoice.payment_action_required'
-	) {
+	if (eventType === 'invoice.payment_failed' || eventType === 'invoice.payment_action_required') {
 		const invoice = object as Stripe.Invoice;
 		const result = await syncStripeInvoice(invoice, {
 			forceStatus: eventType === 'invoice.payment_failed' ? 'failed' : 'open',

@@ -33,9 +33,9 @@ const defaultPlanId: PlanId = 'unique';
 ---
 
 <fieldset class="payment-plans space-y-2 border-0 p-0">
-	<legend class="float-none p-0 text-sm font-medium text-ink">Règlement</legend>
+	<legend class="text-ink float-none p-0 text-sm font-medium">Règlement</legend>
 
-	<div class="divide-y divide-ink/10" role="presentation">
+	<div class="divide-ink/10 divide-y" role="presentation">
 		{
 			plans.map((plan) => (
 				<label class="payment-plan flex cursor-pointer items-start gap-4 py-4 first:pt-0 last:pb-0">
@@ -48,18 +48,16 @@ const defaultPlanId: PlanId = 'unique';
 						class="payment-plan__input peer sr-only"
 					/>
 					<span
-						class="payment-plan__radio mt-1 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-ink/20 transition duration-200 peer-checked:border-ink peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blush"
+						class="payment-plan__radio border-ink/20 peer-checked:border-ink peer-focus-visible:outline-blush mt-1 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition duration-200 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2"
 						aria-hidden="true"
 					>
-						<span class="payment-plan__dot h-2 w-2 rounded-full bg-ink opacity-0 transition duration-200" />
+						<span class="payment-plan__dot bg-ink h-2 w-2 rounded-full opacity-0 transition duration-200" />
 					</span>
 					<span class="payment-plan__copy min-w-0 flex-1">
-						<span class="block text-[15px] font-medium leading-snug tracking-[-0.01em] text-ink">
+						<span class="text-ink block text-[15px] leading-snug font-medium tracking-[-0.01em]">
 							{plan.title}
 						</span>
-						{plan.total && (
-							<span class="mt-1 block text-sm text-ink-soft/75">{plan.total}</span>
-						)}
+						{plan.total && <span class="text-ink-soft/75 mt-1 block text-sm">{plan.total}</span>}
 					</span>
 				</label>
 			))

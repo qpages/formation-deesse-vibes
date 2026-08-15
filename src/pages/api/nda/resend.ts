@@ -8,10 +8,7 @@ import {
 } from '../../../lib/auth/session';
 import { inngest } from '../../../lib/inngest/client';
 import { json } from '../../../lib/http';
-import {
-	canResendNda,
-	findEnrollmentById,
-} from '../../../lib/services/enrollment';
+import { canResendNda, findEnrollmentById } from '../../../lib/services/enrollment';
 import { notifyOps } from '../../../lib/services/slack';
 
 export const POST: APIRoute = async ({ request }) => {

@@ -5,8 +5,7 @@ const TRACKING_COOKIE = 'dv_enrollment';
 const ADMIN_COOKIE = 'dv_admin';
 
 function secretKey(kind: 'session' | 'magic') {
-	const value =
-		kind === 'session' ? requireEnv('SESSION_SECRET') : requireEnv('MAGIC_LINK_SECRET');
+	const value = kind === 'session' ? requireEnv('SESSION_SECRET') : requireEnv('MAGIC_LINK_SECRET');
 	return new TextEncoder().encode(value);
 }
 

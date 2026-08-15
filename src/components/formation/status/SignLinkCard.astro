@@ -11,19 +11,19 @@ const { signUrl } = Astro.props;
 <div class="space-y-2">
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
 		<div
-			class="flex min-w-0 flex-1 items-stretch overflow-hidden rounded-sm border border-ink/12 transition focus-within:border-gold/50"
+			class="border-ink/12 focus-within:border-gold/50 flex min-w-0 flex-1 items-stretch overflow-hidden rounded-sm border transition"
 		>
 			<input
 				id="nda-sign-url"
 				type="text"
 				readonly
 				value={signUrl}
-				class="min-w-0 flex-1 bg-transparent px-3.5 py-3 font-sans text-sm text-ink-soft outline-none selection:bg-blush/25"
+				class="text-ink-soft selection:bg-blush/25 min-w-0 flex-1 bg-transparent px-3.5 py-3 font-sans text-sm outline-none"
 			/>
 			<button
 				id="copy-sign-url"
 				type="button"
-				class="shrink-0 border-l border-ink/10 px-4 text-xs font-medium uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-mist"
+				class="border-ink/10 text-ink hover:bg-ink hover:text-mist shrink-0 border-l px-4 text-xs font-medium tracking-[0.12em] uppercase transition"
 				data-copied="false"
 			>
 				<span data-copy-label>Copier</span>

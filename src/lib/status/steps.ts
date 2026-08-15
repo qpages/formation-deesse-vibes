@@ -6,13 +6,7 @@ import {
 	CONTRACT_STATUS_LABELS,
 	YOUSIGN_STATUS_LABELS,
 } from './labels';
-import type {
-	BadgeTone,
-	OrthogonalStatuses,
-	PrimaryAction,
-	StepKey,
-	StepState,
-} from './types';
+import type { BadgeTone, OrthogonalStatuses, PrimaryAction, StepKey, StepState } from './types';
 import { YOUSIGN_FAILURE } from './yousign';
 
 export const TEACHIZY_ACADEMY_URL = 'https://jsmatriceacademy.teachizy.fr';
@@ -38,7 +32,7 @@ export function stepStates(input: OrthogonalStatuses): Record<StepKey, StepState
 		return { paiement: 'termine', nda: 'a_faire', acces: 'a_faire' };
 	}
 
-	let paiement: StepState = 'a_faire';
+	let paiement: StepState;
 	if (input.collectionStatus === 'pending') {
 		paiement = 'en_cours';
 	} else if (input.collectionStatus === 'past_due') {
@@ -80,20 +74,19 @@ export function stepLabel(state: StepState): string {
 }
 
 /** Colonnes admin : Paiement / Signature / Accès depuis les 3 enums. */
-export function adminPipelineBadges(input: OrthogonalStatuses & {
-	yousignStatus?: YousignRequestStatus | null;
-	yousignLastError?: string | null;
-}): {
+export function adminPipelineBadges(
+	input: OrthogonalStatuses & {
+		yousignStatus?: YousignRequestStatus | null;
+		yousignLastError?: string | null;
+	},
+): {
 	paiement: { label: string; tone: BadgeTone };
 	signature: { label: string; tone: BadgeTone };
 	acces: { label: string; tone: BadgeTone };
 } {
 	const steps = stepStates(input);
 
-	if (
-		input.collectionStatus === 'refunded' ||
-		input.accessStatus === 'revoked'
-	) {
+	if (input.collectionStatus === 'refunded' || input.accessStatus === 'revoked') {
 		return {
 			paiement: {
 				label: COLLECTION_STATUS_LABELS[input.collectionStatus],
@@ -139,10 +132,12 @@ export function adminPipelineBadges(input: OrthogonalStatuses & {
 	};
 }
 
-export function shouldPollEnrollment(input: OrthogonalStatuses & {
-	hasCheckoutSession?: boolean;
-	hasNdaSignUrl?: boolean;
-}): boolean {
+export function shouldPollEnrollment(
+	input: OrthogonalStatuses & {
+		hasCheckoutSession?: boolean;
+		hasNdaSignUrl?: boolean;
+	},
+): boolean {
 	if (input.collectionStatus === 'pending' && input.hasCheckoutSession) return true;
 	if (
 		isPaidEnough(input.collectionStatus) &&
@@ -181,7 +176,9 @@ export function statusMessage(input: OrthogonalStatuses): string[] | null {
 		];
 	}
 	if (input.accessStatus === 'suspended') {
-		return ['Votre accès est temporairement suspendu suite à un impayé. Régularisez pour le rétablir.'];
+		return [
+			'Votre accès est temporairement suspendu suite à un impayé. Régularisez pour le rétablir.',
+		];
 	}
 	if (input.accessStatus === 'revoked' || input.collectionStatus === 'refunded') {
 		return null;

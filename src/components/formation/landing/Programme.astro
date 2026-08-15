@@ -49,7 +49,7 @@ const modules = [
 
 <div class="space-y-8">
 	<figure class="mx-auto w-full max-w-xs">
-		<div class="overflow-hidden rounded-sm border border-ink/10 bg-surface shadow-soft">
+		<div class="border-ink/10 bg-surface shadow-soft overflow-hidden rounded-sm border">
 			<img
 				src="/images/matrice-evolution.png"
 				alt="Visuel Matrice Évolution — Jessica Stamck"
@@ -60,7 +60,7 @@ const modules = [
 				decoding="async"
 			/>
 		</div>
-		<figcaption class="mt-2 text-center text-xs italic text-ink-soft">
+		<figcaption class="text-ink-soft mt-2 text-center text-xs italic">
 			Matrice Évolution · Jessica Stamck
 		</figcaption>
 	</figure>
@@ -73,19 +73,17 @@ const modules = [
 			modules.map((item, index) => (
 				<li class="grid grid-cols-[2.25rem_1fr] gap-3">
 					<span
-						class="pt-0.5 font-display text-base tabular-nums text-gold sm:text-lg"
+						class="font-display text-gold pt-0.5 text-base tabular-nums sm:text-lg"
 						aria-hidden="true"
 					>
 						{String(index + 1).padStart(2, '0')}
 					</span>
 					<div>
-						<h3 class="font-display text-base leading-snug text-ink sm:text-lg">
+						<h3 class="font-display text-ink text-base leading-snug sm:text-lg">
 							<span class="sr-only">Module {index + 1} — </span>
 							{item.title}
 						</h3>
-						<p class="mt-0.5 text-xs leading-snug text-ink-soft sm:text-sm">
-							{item.blurb}
-						</p>
+						<p class="text-ink-soft mt-0.5 text-xs leading-snug sm:text-sm">{item.blurb}</p>
 					</div>
 				</li>
 			))

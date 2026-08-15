@@ -14,10 +14,7 @@ import { getAdminEnrollmentDetail } from '../../../lib/admin/enrollments';
 import { getAdminTeachizyLearner } from '../../../lib/admin/teachizy-learners';
 import { adminActionMetaForClient, partitionVisibleActions } from '../../../lib/admin/actions';
 import { getAdminPaymentSummary } from '../../../lib/admin/payments';
-import {
-	buildPipelineStageCards,
-	enrollmentHeadline,
-} from '../../../lib/admin/pipeline-detail';
+import { buildPipelineStageCards, enrollmentHeadline } from '../../../lib/admin/pipeline-detail';
 
 export const prerender = false;
 
@@ -30,8 +27,7 @@ if (!id) return Astro.redirect('/admin/inscriptions');
 const detail = await getAdminEnrollmentDetail(id);
 if (!detail) return Astro.redirect('/admin/inscriptions');
 
-const paymentSummary =
-	(await getAdminPaymentSummary(id)) ?? detail.paymentSummary;
+const paymentSummary = (await getAdminPaymentSummary(id)) ?? detail.paymentSummary;
 const actionMeta = adminActionMetaForClient();
 const actionPartition = partitionVisibleActions(detail);
 const pipelineStages = buildPipelineStageCards(detail, paymentSummary);
@@ -89,11 +85,7 @@ const teachizy = await getAdminTeachizyLearner(detail.email, detail.id);
 	</Dialog>
 </AdminLayout>
 
-<script
-	id="admin-action-meta"
-	type="application/json"
-	set:html={JSON.stringify(actionMeta)}
-/>
+<script id="admin-action-meta" type="application/json" set:html={JSON.stringify(actionMeta)} />
 <script>
 	import { bindAdminActions } from '../../../components/admin/admin-client';
 	import type { AdminActionMetaClient } from '../../../lib/admin/actions';

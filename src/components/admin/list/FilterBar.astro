@@ -45,14 +45,14 @@ const selectClass =
 				autocomplete="off"
 				class="h-11 sm:max-w-md"
 			/>
-			<Button type="submit" variant="secondary" size="sm" class="h-11 px-5 shrink-0">
+			<Button type="submit" variant="secondary" size="sm" class="h-11 shrink-0 px-5">
 				Rechercher
 			</Button>
 		</div>
 
 		<div class="flex flex-wrap items-end gap-3">
 			<label class="flex min-w-32 flex-1 flex-col gap-1">
-				<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Paiement</span>
+				<span class="text-ink/45 text-[10px] tracking-[0.12em] uppercase">Paiement</span>
 				<select
 					name="collection"
 					class={selectClass}
@@ -71,7 +71,7 @@ const selectClass =
 			</label>
 
 			<label class="flex min-w-32 flex-1 flex-col gap-1">
-				<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Signature</span>
+				<span class="text-ink/45 text-[10px] tracking-[0.12em] uppercase">Signature</span>
 				<select
 					name="contract"
 					class={selectClass}
@@ -90,7 +90,7 @@ const selectClass =
 			</label>
 
 			<label class="flex min-w-32 flex-1 flex-col gap-1">
-				<span class="text-[10px] uppercase tracking-[0.12em] text-ink/45">Accès</span>
+				<span class="text-ink/45 text-[10px] tracking-[0.12em] uppercase">Accès</span>
 				<select name="access" class={selectClass} aria-label="Filtrer par accès" data-filter-auto>
 					<option value="">Tous</option>
 					{

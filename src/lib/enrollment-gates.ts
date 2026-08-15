@@ -23,9 +23,7 @@ export function isAwaitingNda(input: {
 	);
 }
 
-export function hasOpenOrFailedPayments(
-	payments: { status: PaymentStatus }[],
-): boolean {
+export function hasOpenOrFailedPayments(payments: { status: PaymentStatus }[]): boolean {
 	return payments.some((p) => p.status === 'open' || p.status === 'failed');
 }
 

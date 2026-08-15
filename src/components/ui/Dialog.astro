@@ -19,18 +19,19 @@ const { id, title = '', size = 'sm', class: className } = Astro.props;
 >
 	<div class="admin-dialog__panel grain relative overflow-hidden">
 		<div
-			class="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-gold/50 to-transparent"
+			class="via-gold/50 pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent to-transparent"
 			aria-hidden="true"
 		>
 		</div>
 
 		<header class="pr-8">
-			<p
-				data-dialog-eyebrow
-				class="text-[10px] font-medium uppercase tracking-[0.22em] text-gold"
-			>
+			<p data-dialog-eyebrow class="text-gold text-[10px] font-medium tracking-[0.22em] uppercase">
 			</p>
-			<h2 id={`${id}-title`} data-dialog-title class="mt-2 font-display text-[1.85rem] leading-tight text-ink">
+			<h2
+				id={`${id}-title`}
+				data-dialog-title
+				class="font-display text-ink mt-2 text-[1.85rem] leading-tight"
+			>
 				{title}
 			</h2>
 		</header>
@@ -38,7 +39,7 @@ const { id, title = '', size = 'sm', class: className } = Astro.props;
 		<button
 			type="button"
 			data-dialog-close
-			class="absolute right-4 top-4 flex size-8 items-center justify-center text-ink/40 transition-colors hover:text-ink"
+			class="text-ink/40 hover:text-ink absolute top-4 right-4 flex size-8 items-center justify-center transition-colors"
 			aria-label="Fermer"
 		>
 			<svg class="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -49,7 +50,7 @@ const { id, title = '', size = 'sm', class: className } = Astro.props;
 		<p
 			id={`${id}-desc`}
 			data-dialog-description
-			class="mt-3 text-sm leading-relaxed text-ink-soft empty:hidden"
+			class="text-ink-soft mt-3 text-sm leading-relaxed empty:hidden"
 		>
 		</p>
 
@@ -79,8 +80,11 @@ const { id, title = '', size = 'sm', class: className } = Astro.props;
 	}
 
 	.admin-dialog::backdrop {
-		background:
-			radial-gradient(ellipse 70% 50% at 50% 40%, rgb(26 20 16 / 0.35), rgb(26 20 16 / 0.55));
+		background: radial-gradient(
+			ellipse 70% 50% at 50% 40%,
+			rgb(26 20 16 / 0.35),
+			rgb(26 20 16 / 0.55)
+		);
 		backdrop-filter: blur(4px);
 	}
 

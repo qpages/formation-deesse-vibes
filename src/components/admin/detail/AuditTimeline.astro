@@ -14,35 +14,31 @@ const { items, collapsed = false } = Astro.props;
 const countLabel = items.length === 0 ? 'vide' : `${items.length}`;
 ---
 
-<section
-	class="scroll-mt-20"
-	id="historique"
-	aria-labelledby="historique-heading"
->
+<section class="scroll-mt-20" id="historique" aria-labelledby="historique-heading">
 	{
 		collapsed ? (
 			<details class="group">
-				<summary class="flex cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush [&::-webkit-details-marker]:hidden">
-					<h2 id="historique-heading" class="text-lg font-medium text-ink">
+				<summary class="focus-visible:outline-blush flex cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 [&::-webkit-details-marker]:hidden">
+					<h2 id="historique-heading" class="text-ink text-lg font-medium">
 						Historique
-						<span class="ml-1.5 text-sm font-normal text-ink/40">{countLabel}</span>
+						<span class="text-ink/40 ml-1.5 text-sm font-normal">{countLabel}</span>
 					</h2>
-					<span class="text-sm text-ink/40 group-open:hidden">afficher</span>
-					<span class="hidden text-sm text-ink/40 group-open:inline">masquer</span>
+					<span class="text-ink/40 text-sm group-open:hidden">afficher</span>
+					<span class="text-ink/40 hidden text-sm group-open:inline">masquer</span>
 				</summary>
 				<div class="mt-3">
 					{items.length === 0 ? (
-						<p class="py-2 text-sm text-ink-soft">Aucune action admin.</p>
+						<p class="text-ink-soft py-2 text-sm">Aucune action admin.</p>
 					) : (
-						<ol class="divide-y divide-ink/10">
+						<ol class="divide-ink/10 divide-y">
 							{items.map((item) => (
 								<li class="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
 									<div class="min-w-0">
-										<p class="text-sm font-medium text-ink">{item.actionLabel}</p>
-										<p class="text-xs text-ink-soft">{item.adminEmail}</p>
+										<p class="text-ink text-sm font-medium">{item.actionLabel}</p>
+										<p class="text-ink-soft text-xs">{item.adminEmail}</p>
 									</div>
 									<time
-										class="shrink-0 text-xs text-ink/45 tabular-nums"
+										class="text-ink/45 shrink-0 text-xs tabular-nums"
 										datetime={item.createdAt.toISOString()}
 									>
 										{item.createdAt.toLocaleString('fr-FR', {
@@ -58,21 +54,21 @@ const countLabel = items.length === 0 ? 'vide' : `${items.length}`;
 			</details>
 		) : (
 			<>
-				<h2 id="historique-heading" class="text-lg font-medium text-ink">
+				<h2 id="historique-heading" class="text-ink text-lg font-medium">
 					Historique
 				</h2>
 				{items.length === 0 ? (
-					<p class="mt-3 py-2 text-sm text-ink-soft">Aucune action admin.</p>
+					<p class="text-ink-soft mt-3 py-2 text-sm">Aucune action admin.</p>
 				) : (
-					<ol class="mt-3 divide-y divide-ink/10">
+					<ol class="divide-ink/10 mt-3 divide-y">
 						{items.map((item) => (
 							<li class="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
 								<div class="min-w-0">
-									<p class="text-sm font-medium text-ink">{item.actionLabel}</p>
-									<p class="text-xs text-ink-soft">{item.adminEmail}</p>
+									<p class="text-ink text-sm font-medium">{item.actionLabel}</p>
+									<p class="text-ink-soft text-xs">{item.adminEmail}</p>
 								</div>
 								<time
-									class="shrink-0 text-xs text-ink/45 tabular-nums"
+									class="text-ink/45 shrink-0 text-xs tabular-nums"
 									datetime={item.createdAt.toISOString()}
 								>
 									{item.createdAt.toLocaleString('fr-FR', {

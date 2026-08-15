@@ -1,9 +1,5 @@
 import type { AccessStatus, CollectionStatus, ContractStatus } from '../../generated/prisma/client';
-import {
-	ACCESS_STATUS_LABELS,
-	COLLECTION_STATUS_LABELS,
-	CONTRACT_STATUS_LABELS,
-} from '../status';
+import { ACCESS_STATUS_LABELS, COLLECTION_STATUS_LABELS, CONTRACT_STATUS_LABELS } from '../status';
 import { adminListHref } from './enrollments';
 
 export type ActiveFilterChip = { label: string; href: string };

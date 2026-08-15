@@ -8,8 +8,7 @@ export type MagicLinkOutcome =
 	| { action: 'silent_home'; redirectTo: '/' }
 	| { action: 'fail'; redirectTo: '/?link=invalid' };
 
-export const MAGIC_LINK_CONNECTED_FLASH =
-	'Lien magique validé. Voici l’état de votre inscription.';
+export const MAGIC_LINK_CONNECTED_FLASH = 'Lien magique validé. Voici l’état de votre inscription.';
 export const MAGIC_LINK_INVALID_FLASH =
 	'Ce lien est invalide ou a expiré. Demandez-en un nouveau ci-dessous.';
 

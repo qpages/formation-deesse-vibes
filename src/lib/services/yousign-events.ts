@@ -56,10 +56,7 @@ export type SyncYousignStatusResult =
 	| {
 			ok: false;
 			reason:
-				| 'enrollment_not_found'
-				| 'no_yousign_request'
-				| 'unmapped_status'
-				| 'draft_not_activated';
+				'enrollment_not_found' | 'no_yousign_request' | 'unmapped_status' | 'draft_not_activated';
 			detail?: string;
 	  };
 
@@ -119,9 +116,7 @@ export function isHandledYousignEventType(eventType: string) {
  * Adapter = lecture SDK ; write ici (service).
  * Si la signature est done : même post-condition que le webhook (Teachizy).
  */
-export async function syncYousignStatus(
-	enrollmentId: string,
-): Promise<SyncYousignStatusResult> {
+export async function syncYousignStatus(enrollmentId: string): Promise<SyncYousignStatusResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) {
 		return { ok: false, reason: 'enrollment_not_found' };
@@ -143,16 +138,12 @@ export async function syncYousignStatus(
 
 	const yousignStatus = mapYousignApiStatus(remote.status);
 	if (!yousignStatus) {
-		await recordYousignError(
-			enrollment.id,
-			`statut API inconnu « ${remote.status} » (non mappé).`,
-		);
+		await recordYousignError(enrollment.id, `statut API inconnu « ${remote.status} » (non mappé).`);
 		return { ok: false, reason: 'unmapped_status', detail: remote.status };
 	}
 
 	const contractStatus = contractStatusFromYousignRequest(yousignStatus);
-	const becameSigned =
-		yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
+	const becameSigned = yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
 
 	const signerId = enrollment.yousignSignerId ?? remote.signers?.[0]?.id ?? null;
 	const signerMirror: {
@@ -310,11 +301,7 @@ export async function handleYousignProviderEvent(input: {
 			await notifyOps({
 				kind: 'nda.signed',
 				severity: 'info',
-				title: formatNdaSignedTitle(
-					enrollment.user.firstName,
-					enrollment.user.lastName,
-					at,
-				),
+				title: formatNdaSignedTitle(enrollment.user.firstName, enrollment.user.lastName, at),
 				enrollmentId: enrollment.id,
 				email: enrollment.user.email,
 			});
@@ -348,9 +335,7 @@ export async function handleYousignProviderEvent(input: {
 				.join(' | ');
 			await updateEnrollmentYousignMirror(enrollment.id, {
 				yousignStatus,
-				...(contractStatus && yousignStatus !== 'ongoing'
-					? { contractStatus }
-					: {}),
+				...(contractStatus && yousignStatus !== 'ongoing' ? { contractStatus } : {}),
 				yousignLastError: errorMessage,
 				yousignLastErrorAt: at,
 				...(eventName === 'signer.notification_delivery_failed'
@@ -359,12 +344,8 @@ export async function handleYousignProviderEvent(input: {
 							ndaDeliveryFailedAt: enrollment.ndaDeliveryFailedAt ?? at,
 						}
 					: {}),
-				...(eventName === 'signer.declined'
-					? { yousignSignerStatus: 'declined' as const }
-					: {}),
-				...(eventName === 'signer.error'
-					? { yousignSignerStatus: 'error' as const }
-					: {}),
+				...(eventName === 'signer.declined' ? { yousignSignerStatus: 'declined' as const } : {}),
+				...(eventName === 'signer.error' ? { yousignSignerStatus: 'error' as const } : {}),
 			});
 		}
 
@@ -377,9 +358,7 @@ export async function handleYousignProviderEvent(input: {
 
 		await notifyOps({
 			kind: 'nda.monitor',
-			severity: eventName.includes('error') || eventName.includes('deleted')
-				? 'critical'
-				: 'warn',
+			severity: eventName.includes('error') || eventName.includes('deleted') ? 'critical' : 'warn',
 			title: `Yousign ${eventName}`,
 			enrollmentId: enrollment?.id,
 			email: enrollment?.user.email,

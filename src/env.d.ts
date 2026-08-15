@@ -1,5 +1,11 @@
 /// <reference types="astro/client" />
 
+type ToastVariant = 'success' | 'error' | 'info';
+
+interface Window {
+	toast?: (message: string, variant?: ToastVariant) => void;
+}
+
 interface ImportMetaEnv {
 	readonly DEV_DATABASE_URL?: string;
 	readonly PRODUCTION_DATABASE_URL?: string;

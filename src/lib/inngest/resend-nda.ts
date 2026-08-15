@@ -4,11 +4,7 @@ import {
 	markNdaResent,
 	recordYousignError,
 } from '../services/enrollment';
-import {
-	alertFinalFailure,
-	formatErrorDetail,
-	withJobLifecycleAlerts,
-} from '../services/slack';
+import { alertFinalFailure, formatErrorDetail, withJobLifecycleAlerts } from '../services/slack';
 import { reactivateNda } from '../yousign';
 import { inngest } from './client';
 

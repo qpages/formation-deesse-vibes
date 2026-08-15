@@ -1,17 +1,11 @@
 import type { AstroGlobal } from 'astro';
-import {
-	ADMIN_COOKIE,
-	parseCookie,
-	verifyAdminSessionToken,
-} from '../auth/session';
+import { ADMIN_COOKIE, parseCookie, verifyAdminSessionToken } from '../auth/session';
 import { json } from '../http';
 
 export { json };
 
 /** API routes: returns admin email or a 401 Response. */
-export async function requireAdminApi(
-	request: Request,
-): Promise<string | Response> {
+export async function requireAdminApi(request: Request): Promise<string | Response> {
 	const email = await verifyAdminSessionToken(
 		parseCookie(request.headers.get('cookie'), ADMIN_COOKIE) ?? '',
 	);

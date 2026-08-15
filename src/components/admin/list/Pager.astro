@@ -21,10 +21,7 @@ const disabledClass =
 
 {
 	totalPages > 1 ? (
-		<nav
-			class={cn('flex items-center justify-between gap-3', className)}
-			aria-label="Pagination"
-		>
+		<nav class={cn('flex items-center justify-between gap-3', className)} aria-label="Pagination">
 			{hasPrev ? (
 				<a href={prevHref} class={linkClass}>
 					Précédent
@@ -34,7 +31,7 @@ const disabledClass =
 					Précédent
 				</span>
 			)}
-			<p class="text-sm text-ink-soft">
+			<p class="text-ink-soft text-sm">
 				Page <span class="text-ink">{page}</span> / {totalPages}
 			</p>
 			{hasNext ? (

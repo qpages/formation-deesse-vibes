@@ -8,10 +8,7 @@ export const reconcileEnrollments = inngest.createFunction(
 	{
 		id: 'reconcile-enrollments',
 		retries: 2,
-		triggers: [
-			{ cron: '0 4 * * *' },
-			{ event: 'ops/reconcile-enrollments' },
-		],
+		triggers: [{ cron: '0 4 * * *' }, { event: 'ops/reconcile-enrollments' }],
 	},
 	async ({ event, step }) => {
 		const enrollmentId =

@@ -7,8 +7,7 @@ const buttonVariants = cva(
 	{
 		variants: {
 			variant: {
-				primary:
-					'bg-ink text-mist hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]',
+				primary: 'bg-ink text-mist hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]',
 				secondary:
 					'bg-transparent text-ink border border-ink/20 hover:border-ink/40 hover:bg-surface/60',
 				ghost: 'bg-transparent text-ink-soft hover:text-ink underline-offset-4 hover:underline',
@@ -37,17 +36,28 @@ type Props = VariantProps<typeof buttonVariants> & {
 	rel?: string;
 };
 
-const { variant, size, class: className, href, type = 'button', disabled, id, target, rel } =
-	Astro.props;
+const {
+	variant,
+	size,
+	class: className,
+	href,
+	type = 'button',
+	disabled,
+	id,
+	target,
+	rel,
+} = Astro.props;
 const classes = cn(buttonVariants({ variant, size }), className);
 ---
 
-{href ? (
-	<a href={href} class={classes} id={id} target={target} rel={rel}>
-		<slot />
-	</a>
-) : (
-	<button type={type} class={classes} disabled={disabled} id={id}>
-		<slot />
-	</button>
-)}
+{
+	href ? (
+		<a href={href} class={classes} id={id} target={target} rel={rel}>
+			<slot />
+		</a>
+	) : (
+		<button type={type} class={classes} disabled={disabled} id={id}>
+			<slot />
+		</button>
+	)
+}

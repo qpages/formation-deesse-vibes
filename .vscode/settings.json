@@ -1,3 +1,8 @@
 {
-	"tailwindCSS.lint.suggestCanonicalClasses": "error"
+	"tailwindCSS.lint.suggestCanonicalClasses": "error",
+	"eslint.validate": ["javascript", "javascriptreact", "astro", "typescript", "typescriptreact"],
+	"prettier.documentSelectors": ["**/*.astro"],
+	"[astro]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	}
 }

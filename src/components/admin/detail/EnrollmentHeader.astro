@@ -22,7 +22,7 @@ const createdLabel = createdAt.toLocaleString('fr-FR', {
 <header id="enrollment-header" class="mb-5">
 	<a
 		href="/admin/inscriptions"
-		class="inline-flex min-h-9 items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+		class="text-ink-soft hover:text-ink focus-visible:outline-blush inline-flex min-h-9 items-center gap-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
 	>
 		<svg class="size-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
 			<path
@@ -37,26 +37,26 @@ const createdLabel = createdAt.toLocaleString('fr-FR', {
 
 	<div class="mt-3">
 		<div class="flex min-w-0 flex-wrap items-center gap-2">
-			<h1 class="font-display text-3xl leading-none text-ink sm:text-4xl">
+			<h1 class="font-display text-ink text-3xl leading-none sm:text-4xl">
 				{displayName}
 			</h1>
 			<StatusBadge tone={headline.tone}>{headline.label}</StatusBadge>
 		</div>
-		<div class="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-soft">
+		<div class="text-ink-soft mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
 			<a
 				href={`mailto:${email}`}
-				class="min-w-0 break-all underline-offset-2 hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+				class="hover:text-ink focus-visible:outline-blush min-w-0 break-all underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
 			>
 				{email}
 			</a>
 			<span class="text-ink/25" aria-hidden="true">·</span>
-			<span class="tabular-nums text-ink/45">Créé {createdLabel}</span>
+			<span class="text-ink/45 tabular-nums">Créé {createdLabel}</span>
 			<span class="text-ink/25" aria-hidden="true">·</span>
 			<button
 				type="button"
 				data-copy-text={enrollmentId}
 				data-copy-success="ID copié."
-				class="font-mono text-xs tracking-wide text-ink/45 underline-offset-2 hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush"
+				class="text-ink/45 hover:text-ink focus-visible:outline-blush font-mono text-xs tracking-wide underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
 				title={enrollmentId}
 			>
 				{shortId}

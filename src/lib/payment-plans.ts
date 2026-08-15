@@ -3,7 +3,12 @@ import type { PaymentPlanId as PrismaPaymentPlanId } from '../generated/prisma/c
 import { getEnv } from './env';
 
 /** Aligné sur l’enum Prisma `PaymentPlanId`. */
-export const PAYMENT_PLAN_IDS = ['unique', 'x2', 'x4', 'x6'] as const satisfies readonly PrismaPaymentPlanId[];
+export const PAYMENT_PLAN_IDS = [
+	'unique',
+	'x2',
+	'x4',
+	'x6',
+] as const satisfies readonly PrismaPaymentPlanId[];
 
 export const paymentPlanIdSchema = z.enum(PAYMENT_PLAN_IDS);
 export type PaymentPlanId = (typeof PAYMENT_PLAN_IDS)[number];
@@ -17,11 +22,7 @@ export interface PaymentPlan {
 	installments: number;
 	installmentAmountCents: number;
 	totalAmountCents: number;
-	envPriceKey:
-		| 'STRIPE_PRICE_UNIQUE'
-		| 'STRIPE_PRICE_X2'
-		| 'STRIPE_PRICE_X4'
-		| 'STRIPE_PRICE_X6';
+	envPriceKey: 'STRIPE_PRICE_UNIQUE' | 'STRIPE_PRICE_X2' | 'STRIPE_PRICE_X4' | 'STRIPE_PRICE_X6';
 }
 
 /** Source de vérité serveur — ne jamais faire confiance au montant côté client. */

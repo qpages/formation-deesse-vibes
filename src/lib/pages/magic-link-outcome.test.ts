@@ -11,15 +11,17 @@ describe('decideMagicLinkOutcome', () => {
 	});
 
 	it('token used + même enrollment cookie → accueil silencieux', () => {
-		expect(
-			decideMagicLinkOutcome({ status: 'used', enrollmentId: 'enr_1' }, 'enr_1'),
-		).toEqual({ action: 'silent_home', redirectTo: '/' });
+		expect(decideMagicLinkOutcome({ status: 'used', enrollmentId: 'enr_1' }, 'enr_1')).toEqual({
+			action: 'silent_home',
+			redirectTo: '/',
+		});
 	});
 
 	it('token used + autre cookie → échec', () => {
-		expect(
-			decideMagicLinkOutcome({ status: 'used', enrollmentId: 'enr_1' }, 'enr_other'),
-		).toEqual({ action: 'fail', redirectTo: '/?link=invalid' });
+		expect(decideMagicLinkOutcome({ status: 'used', enrollmentId: 'enr_1' }, 'enr_other')).toEqual({
+			action: 'fail',
+			redirectTo: '/?link=invalid',
+		});
 	});
 
 	it('token used sans cookie → échec', () => {

@@ -23,7 +23,7 @@ const toneDot: Record<PipelineStageCard['tone'], string> = {
 					<a
 						href={stage.href}
 						class:list={[
-							'group flex min-h-10 items-baseline gap-2.5 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush',
+							'group focus-visible:outline-blush flex min-h-10 items-baseline gap-2.5 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
 							stage.blocking ? 'text-ink' : 'text-ink-soft hover:text-ink',
 						]}
 					>
@@ -33,10 +33,10 @@ const toneDot: Record<PipelineStageCard['tone'], string> = {
 						/>
 						<span class="min-w-0">
 							<span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-								<span class="text-sm font-medium text-ink">{stage.title}</span>
+								<span class="text-ink text-sm font-medium">{stage.title}</span>
 								<span class="text-sm">{stage.label}</span>
 							</span>
-							<span class="mt-1 block truncate text-xs text-ink/45 group-hover:text-ink/60">
+							<span class="text-ink/45 group-hover:text-ink/60 mt-1 block truncate text-xs">
 								{stage.hint}
 							</span>
 						</span>

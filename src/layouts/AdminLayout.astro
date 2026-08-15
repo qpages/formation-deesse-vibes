@@ -23,12 +23,14 @@ function navLinkClass(active: boolean) {
 ---
 
 <BaseLayout title={title} noindex={true}>
-	<div class="flex min-h-screen flex-col bg-mist/30">
-		<header class="sticky top-0 z-20 border-b border-ink/10 bg-ink text-mist">
-			<Container class="flex flex-wrap items-center justify-between gap-x-4 gap-y-0 py-1 sm:h-14 sm:flex-nowrap sm:py-0">
+	<div class="bg-mist/30 flex min-h-screen flex-col">
+		<header class="border-ink/10 bg-ink text-mist sticky top-0 z-20 border-b">
+			<Container
+				class="flex flex-wrap items-center justify-between gap-x-4 gap-y-0 py-1 sm:h-14 sm:flex-nowrap sm:py-0"
+			>
 				<a
 					href="/"
-					class="inline-flex min-h-11 shrink-0 items-center font-display text-xl tracking-wide text-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-2xl"
+					class="font-display text-mist focus-visible:outline-gold inline-flex min-h-11 shrink-0 items-center text-xl tracking-wide focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:text-2xl"
 				>
 					Déesse Vibes
 				</a>
@@ -39,15 +41,12 @@ function navLinkClass(active: boolean) {
 							action="/api/admin/logout"
 							class="ml-auto flex shrink-0 items-center gap-3 sm:order-last sm:ml-0"
 						>
-							<span
-								class="hidden max-w-56 truncate text-xs text-mist/55 lg:inline"
-								title={email}
-							>
+							<span class="text-mist/55 hidden max-w-56 truncate text-xs lg:inline" title={email}>
 								{email}
 							</span>
 							<button
 								type="submit"
-								class="inline-flex min-h-11 items-center border border-mist/25 px-3 text-xs uppercase tracking-[0.14em] text-mist/85 transition-colors hover:border-mist/50 hover:text-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+								class="border-mist/25 text-mist/85 hover:border-mist/50 hover:text-mist focus-visible:outline-gold inline-flex min-h-11 items-center border px-3 text-xs tracking-[0.14em] uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
 								onclick="event.preventDefault(); fetch('/api/admin/logout',{method:'POST'}).then(()=>location.href='/admin/login')"
 							>
 								Déconnexion
@@ -58,7 +57,7 @@ function navLinkClass(active: boolean) {
 				{
 					email && (
 						<nav
-							class="-mx-2 flex w-[calc(100%+1rem)] min-w-0 items-center gap-0.5 overflow-x-auto text-xs uppercase tracking-[0.14em] sm:mx-0 sm:w-auto sm:flex-1"
+							class="-mx-2 flex w-[calc(100%+1rem)] min-w-0 items-center gap-0.5 overflow-x-auto text-xs tracking-[0.14em] uppercase sm:mx-0 sm:w-auto sm:flex-1"
 							aria-label="Admin"
 						>
 							<a
