@@ -2,7 +2,7 @@
 // npm install --save-dev prisma dotenv
 import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
-import { resolveDatabaseUrl } from './src/lib/database-url';
+import { resolvePrismaCliDatasourceUrl } from './src/lib/database-url';
 
 export default defineConfig({
 	schema: 'prisma/schema.prisma',
@@ -10,6 +10,12 @@ export default defineConfig({
 		path: 'prisma/migrations',
 	},
 	datasource: {
-		url: resolveDatabaseUrl(),
+		url: resolvePrismaCliDatasourceUrl({
+			NODE_ENV: process.env.NODE_ENV,
+			VERCEL: process.env.VERCEL,
+			VERCEL_ENV: process.env.VERCEL_ENV,
+			DEV_DATABASE_URL: process.env.DEV_DATABASE_URL,
+			PRODUCTION_DATABASE_URL: process.env.PRODUCTION_DATABASE_URL,
+		}),
 	},
 });

@@ -5,26 +5,20 @@
  */
 import { spawnSync } from 'node:child_process';
 
-/** Prisma 7 loads prisma.config.ts, which requires a URL even for `validate`. */
-const prismaEnv = {
-	...process.env,
-	DEV_DATABASE_URL: process.env.DEV_DATABASE_URL?.trim() || 'postgresql://ci:ci@127.0.0.1:5432/ci',
-};
-
 const steps = [
 	['prettier', ['pnpm', 'format:check']],
 	['eslint', ['pnpm', 'lint']],
-	['prisma validate', ['pnpm', 'db:validate'], prismaEnv],
+	['prisma validate', ['pnpm', 'db:validate']],
 	['astro check', ['pnpm', 'check']],
 	['vitest', ['pnpm', 'test']],
 ];
 
-for (const [name, [cmd, ...args], env] of steps) {
+for (const [name, [cmd, ...args]] of steps) {
 	console.log(`\n== ${name} ==`);
 	const result = spawnSync(cmd, args, {
 		stdio: 'inherit',
 		shell: process.platform === 'win32',
-		env: env ?? process.env,
+		env: process.env,
 	});
 	if (result.status !== 0) {
 		process.exit(result.status ?? 1);
