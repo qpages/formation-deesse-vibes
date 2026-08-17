@@ -25,6 +25,8 @@ export type AdminPaymentRow = {
 	dueAt: string | null;
 	paidAt: string | null;
 	stripeUrl: string | null;
+	stripeInvoiceId: string | null;
+	stripePaymentIntentId: string | null;
 	invoicePdfUrl: string | null;
 	hostedInvoiceUrl: string | null;
 };
@@ -52,6 +54,8 @@ export type AdminPaymentSummary = {
 	installmentsTotal: number | null;
 	stripeSubscriptionUrl: string | null;
 	stripeScheduleUrl: string | null;
+	stripeCheckoutSessionId: string | null;
+	stripeCheckoutUrl: string | null;
 	invoices: AdminInvoiceLink[];
 	payments: AdminPaymentRow[];
 };
@@ -80,6 +84,8 @@ export function buildAdminPaymentSummary(
 			invoiceId: payment.stripeInvoiceId,
 			paymentIntentId: payment.stripePaymentIntentId,
 		}),
+		stripeInvoiceId: payment.stripeInvoiceId,
+		stripePaymentIntentId: payment.stripePaymentIntentId,
 		invoicePdfUrl: payment.invoicePdfUrl,
 		hostedInvoiceUrl: payment.hostedInvoiceUrl,
 	}));
@@ -109,6 +115,10 @@ export function buildAdminPaymentSummary(
 			subscriptionId: enrollment.stripeSubscriptionId,
 		}),
 		stripeScheduleUrl: stripeDashboardUrl({ scheduleId: enrollment.stripeScheduleId }),
+		stripeCheckoutSessionId: enrollment.stripeCheckoutSessionId,
+		stripeCheckoutUrl: stripeDashboardUrl({
+			checkoutSessionId: enrollment.stripeCheckoutSessionId,
+		}),
 		invoices: paymentRows
 			.filter((payment) => payment.invoicePdfUrl || payment.hostedInvoiceUrl)
 			.map((payment) => ({
@@ -177,6 +187,8 @@ export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaym
 			dueAt,
 			paidAt: null,
 			stripeUrl: null,
+			stripeInvoiceId: null,
+			stripePaymentIntentId: null,
 			invoicePdfUrl: null,
 			hostedInvoiceUrl: null,
 		});

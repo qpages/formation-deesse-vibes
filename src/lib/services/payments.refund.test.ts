@@ -32,6 +32,8 @@ vi.mock('../stripe', () => ({
 	getStripe: vi.fn(),
 	listSubscriptionInvoices: vi.fn(),
 	retrieveCheckoutSession: vi.fn(),
+	retrieveInvoice: vi.fn(),
+	paymentIntentIdFromInvoice: vi.fn(),
 	retrieveSubscription: vi.fn(),
 }));
 

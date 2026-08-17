@@ -274,5 +274,97 @@ export async function listSubscriptionInvoices(subscriptionId: string) {
 }
 
 export async function retrieveInvoice(invoiceId: string) {
-	return getStripe().invoices.retrieve(invoiceId);
+	return getStripe().invoices.retrieve(invoiceId, { expand: ['payments'] });
+}
+
+function stripeRefId(ref: string | { id: string } | null | undefined): string | undefined {
+	if (!ref) return undefined;
+	return typeof ref === 'string' ? ref : ref.id;
+}
+
+type InvoiceWithPaymentIntent = Stripe.Invoice & {
+	payment_intent?: string | { id: string } | null;
+};
+
+type PaymentIntentWithInvoice = Stripe.PaymentIntent & {
+	invoice?: string | { id: string } | null;
+};
+
+/**
+ * PI d’une facture : champ legacy `payment_intent`, sinon `payments.data`
+ * (API Stripe récente, typique des invoices d’abonnement).
+ */
+export function paymentIntentIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
+	const legacy = stripeRefId((invoice as InvoiceWithPaymentIntent).payment_intent);
+	if (legacy) return legacy;
+
+	const payments = invoice.payments?.data ?? [];
+	const preferred =
+		payments.find((row) => row.is_default && row.status === 'paid') ??
+		payments.find((row) => row.status === 'paid') ??
+		payments.find((row) => row.is_default) ??
+		payments[0];
+	return stripeRefId(preferred?.payment?.payment_intent);
+}
+
+function invoiceIdFromPaymentIntent(paymentIntent: Stripe.PaymentIntent): string | undefined {
+	return stripeRefId((paymentIntent as PaymentIntentWithInvoice).invoice);
+}
+
+/** Facture liée à un PaymentIntent (champ PI, sinon liste customer). */
+export async function findInvoiceByPaymentIntent(
+	paymentIntentId: string,
+	customerId?: string | null,
+): Promise<Stripe.Invoice | null> {
+	if (e2eMockProviders()) return null;
+
+	const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
+	const invoiceId = invoiceIdFromPaymentIntent(paymentIntent);
+	if (invoiceId) return retrieveInvoice(invoiceId);
+
+	const customer = customerId ?? stripeRefId(paymentIntent.customer);
+	if (!customer) return null;
+
+	const listed = await getStripe().invoices.list({ customer, limit: 20 });
+	return (
+		listed.data.find((invoice) => paymentIntentIdFromInvoice(invoice) === paymentIntentId) ?? null
+	);
+}
+
+/**
+ * Checkout `mode: payment` : `session.invoice` est souvent vide sur
+ * `checkout.session.completed`. On re-fetch session, puis PI / customer.
+ */
+export async function findInvoiceForPaidCheckout(
+	session: Stripe.Checkout.Session,
+): Promise<Stripe.Invoice | null> {
+	if (e2eMockProviders()) return null;
+
+	const fromPayload = stripeRefId(session.invoice);
+	if (fromPayload) return retrieveInvoice(fromPayload);
+
+	try {
+		const fresh = await getStripe().checkout.sessions.retrieve(session.id);
+		const fromFresh = stripeRefId(fresh.invoice);
+		if (fromFresh) return retrieveInvoice(fromFresh);
+	} catch (error) {
+		console.warn('[stripe] retrieve session for invoice', session.id, error);
+	}
+
+	const paymentIntentId = stripeRefId(session.payment_intent);
+	const customerId = stripeRefId(session.customer);
+	if (paymentIntentId) {
+		return findInvoiceByPaymentIntent(paymentIntentId, customerId);
+	}
+
+	if (customerId && session.metadata?.enrollmentId) {
+		const listed = await getStripe().invoices.list({ customer: customerId, limit: 20 });
+		return (
+			listed.data.find(
+				(invoice) => invoice.metadata?.enrollmentId === session.metadata?.enrollmentId,
+			) ?? null
+		);
+	}
+
+	return null;
 }

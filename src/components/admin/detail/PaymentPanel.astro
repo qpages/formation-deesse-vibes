@@ -49,8 +49,45 @@ const openInstallments =
 	summary.trackingState === 'impaye' ||
 	installments.some((p) => p.status === 'failed' || p.status === 'uncollectible');
 
+const realPayments = summary.payments.filter((p) => !p.id.startsWith('estimated-'));
+const techRows: Array<{ label: string; value: string; href?: string | null }> = [];
+if (summary.stripeCheckoutSessionId) {
+	techRows.push({
+		label: 'Checkout',
+		value: summary.stripeCheckoutSessionId,
+		href: summary.stripeCheckoutUrl,
+	});
+}
+for (const p of realPayments) {
+	const prefix = realPayments.length > 1 ? `Échéance ${p.installmentNumber} · ` : '';
+	techRows.push({
+		label: `${prefix}Invoice ID`,
+		value: p.stripeInvoiceId ?? '—',
+	});
+	techRows.push({
+		label: `${prefix}PaymentIntent`,
+		value: p.stripePaymentIntentId ?? '—',
+		href: p.stripePaymentIntentId ? p.stripeUrl : null,
+	});
+	techRows.push({
+		label: `${prefix}Facture PDF`,
+		value: p.invoicePdfUrl ? 'Ouvrir' : '—',
+		href: p.invoicePdfUrl,
+	});
+	techRows.push({
+		label: `${prefix}Page facture`,
+		value: p.hostedInvoiceUrl ? 'Ouvrir' : '—',
+		href: p.hostedInvoiceUrl,
+	});
+}
+
 const linkClass =
 	'text-sm text-ink-soft underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush';
+const summaryClass = [
+	'cursor-pointer list-none py-1',
+	linkClass,
+	'[&::-webkit-details-marker]:hidden',
+];
 ---
 
 <section class="mb-8 scroll-mt-20" id="paiements" aria-labelledby="paiements-heading">
@@ -108,18 +145,28 @@ const linkClass =
 			</div>
 		) : (
 			<div class="mt-3 flex flex-wrap items-center gap-x-4">
-				<details class="peer group" open={openInstallments || undefined}>
-					<summary
-						class:list={[
-							'cursor-pointer list-none py-1',
-							linkClass,
-							'[&::-webkit-details-marker]:hidden',
-						]}
-					>
-						<span class="group-open:hidden">Voir les échéances</span>
-						<span class="hidden group-open:inline">Masquer les échéances</span>
+				<details class="peer/echeances group/echeances" open={openInstallments || undefined}>
+					<summary class:list={summaryClass}>
+						<span class="group-open/echeances:hidden">Voir les échéances</span>
+						<span class="hidden group-open/echeances:inline">Masquer les échéances</span>
 					</summary>
 				</details>
+				<details class="peer/detail group/detail">
+					<summary class:list={summaryClass}>
+						<span class="group-open/detail:hidden">Voir le détail</span>
+						<span class="hidden group-open/detail:inline">Masquer le détail</span>
+					</summary>
+				</details>
+				{summary.stripeCheckoutUrl ? (
+					<a
+						href={summary.stripeCheckoutUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class={linkClass}
+					>
+						Checkout Stripe ↗
+					</a>
+				) : null}
 				{summary.stripeSubscriptionUrl ? (
 					<a
 						href={summary.stripeSubscriptionUrl}
@@ -140,7 +187,7 @@ const linkClass =
 						Schedule Stripe ↗
 					</a>
 				) : null}
-				<ul class="divide-ink/10 border-ink/10 mt-2 hidden w-full basis-full divide-y border-t peer-open:block">
+				<ul class="divide-ink/10 border-ink/10 mt-2 hidden w-full basis-full divide-y border-t peer-open/echeances:block">
 					{installments.map((p) => {
 						const paid = formatDate(p.paidAt, true);
 						const due = formatDate(p.dueAt);
@@ -148,6 +195,7 @@ const linkClass =
 						const tone = statusTone[p.status] ?? 'neutral';
 						const invoiceHref = p.invoicePdfUrl ?? p.hostedInvoiceUrl;
 						const isEstimated = p.id.startsWith('estimated-');
+						const missingInvoice = !isEstimated && p.status === 'paid' && !p.stripeInvoiceId;
 						return (
 							<li class="flex items-start gap-3 py-3">
 								<span class="text-ink/45 mt-0.5 w-5 shrink-0 text-xs font-medium tabular-nums">
@@ -174,6 +222,8 @@ const linkClass =
 												{p.invoicePdfUrl ? 'Facture PDF' : 'Facture'}
 											</a>
 										</p>
+									) : missingInvoice ? (
+										<p class="text-ink/40 mt-1 text-sm">Facture Stripe non liée</p>
 									) : null}
 								</div>
 								{p.stripeUrl ? (
@@ -191,6 +241,22 @@ const linkClass =
 						);
 					})}
 				</ul>
+				<dl class="mt-3 hidden w-full basis-full gap-x-6 gap-y-2 peer-open/detail:grid sm:grid-cols-2">
+					{techRows.map((row) => (
+						<div class="flex min-w-0 gap-2 text-sm">
+							<dt class="text-ink/45 shrink-0">{row.label}</dt>
+							<dd class="text-ink min-w-0 break-all">
+								{row.href ? (
+									<a href={row.href} target="_blank" rel="noopener noreferrer" class={linkClass}>
+										{row.value}
+									</a>
+								) : (
+									row.value
+								)}
+							</dd>
+						</div>
+					))}
+				</dl>
 			</div>
 		)
 	}

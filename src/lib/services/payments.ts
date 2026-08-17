@@ -24,6 +24,7 @@ import {
 	findEnrollmentByIdOrThrow,
 	findEnrollmentByScheduleOrSubscription,
 	findEnrollmentBySubscriptionId,
+	findEnrollmentIdByPaymentIntentId,
 	type EnrollmentWithUser,
 } from './enrollment';
 import { notifyOps, type OpsKind, type OpsSeverity } from './slack';
@@ -31,8 +32,11 @@ import {
 	createCheckoutSession,
 	ensureSubscriptionSchedule,
 	expireCheckoutSession,
+	findInvoiceByPaymentIntent,
+	findInvoiceForPaidCheckout,
 	getStripe,
 	listSubscriptionInvoices,
+	paymentIntentIdFromInvoice,
 	retrieveCheckoutSession,
 	retrieveInvoice,
 	retrieveSubscription,
@@ -181,10 +185,6 @@ type InvoiceExtras = Stripe.Invoice & {
 	subscription_details?: { metadata?: Stripe.Metadata | null } | null;
 };
 
-function paymentIntentIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
-	return stripeId((invoice as InvoiceExtras).payment_intent);
-}
-
 function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
 	return stripeId((invoice as InvoiceExtras).subscription);
 }
@@ -244,6 +244,14 @@ async function resolveInstallmentNumber(
 		: null;
 	if (existing) return existing.installmentNumber;
 
+	const paymentIntentId = paymentIntentIdFromInvoice(invoice);
+	if (paymentIntentId) {
+		const byPi = await prisma.payment.findFirst({
+			where: { enrollmentId, stripePaymentIntentId: paymentIntentId },
+		});
+		if (byPi) return byPi.installmentNumber;
+	}
+
 	const subscriptionId = subscriptionIdFromInvoice(invoice);
 
 	if (subscriptionId) {
@@ -253,6 +261,12 @@ async function resolveInstallmentNumber(
 			.sort((a, b) => (a.created ?? 0) - (b.created ?? 0));
 		const index = sorted.findIndex((row) => row.id === invoice.id);
 		if (index >= 0) return index + 1;
+	} else {
+		const orphan = await prisma.payment.findFirst({
+			where: { enrollmentId, stripeInvoiceId: null },
+			orderBy: { installmentNumber: 'asc' },
+		});
+		if (orphan) return orphan.installmentNumber;
 	}
 
 	const count = await prisma.payment.count({ where: { enrollmentId } });
@@ -368,6 +382,18 @@ function paymentFieldsFromInvoice(
 	};
 }
 
+async function resolvePaymentIntentId(invoice: Stripe.Invoice): Promise<string | undefined> {
+	const fromPayload = paymentIntentIdFromInvoice(invoice);
+	if (fromPayload || !invoice.id) return fromPayload;
+	try {
+		const fresh = await retrieveInvoice(invoice.id);
+		return paymentIntentIdFromInvoice(fresh);
+	} catch (error) {
+		console.warn('[payments] retrieve invoice for PI', invoice.id, error);
+		return undefined;
+	}
+}
+
 export async function syncStripeInvoice(
 	invoice: Stripe.Invoice,
 	options: {
@@ -396,6 +422,14 @@ export async function syncStripeInvoice(
 	}
 
 	if (!enrollment) {
+		const paymentIntentId = paymentIntentIdFromInvoice(invoice);
+		if (paymentIntentId) {
+			const byPi = await findEnrollmentIdByPaymentIntentId(paymentIntentId);
+			if (byPi) enrollment = await findEnrollmentById(byPi);
+		}
+	}
+
+	if (!enrollment) {
 		return { ok: false as const, reason: 'enrollment_not_found' };
 	}
 
@@ -407,7 +441,7 @@ export async function syncStripeInvoice(
 			? `Tentative ${invoice.attempt_count}`
 			: null);
 
-	const paymentIntentId = paymentIntentIdFromInvoice(invoice);
+	const paymentIntentId = await resolvePaymentIntentId(invoice);
 	const fields = paymentFieldsFromInvoice(invoice, status, failureReason, paymentIntentId);
 
 	const previous = await prisma.payment.findUnique({
@@ -449,10 +483,8 @@ async function syncOneTimePaymentFromCheckout(
 	enrollment: EnrollmentWithUser,
 	session: Stripe.Checkout.Session,
 ) {
-	const invoiceId = typeof session.invoice === 'string' ? session.invoice : session.invoice?.id;
-
-	if (invoiceId) {
-		const invoice = await getStripe().invoices.retrieve(invoiceId);
+	const invoice = await findInvoiceForPaidCheckout(session);
+	if (invoice) {
 		await syncStripeInvoice(invoice, { enrollmentId: enrollment.id });
 		return;
 	}
@@ -850,6 +882,11 @@ export async function syncPaymentFromStripe(enrollmentId: string): Promise<Confi
 		if (enrollment.stripeSubscriptionId) {
 			await syncAllSubscriptionInvoices(enrollmentId);
 		} else {
+			const payments = await getPrisma().payment.findMany({
+				where: { enrollmentId },
+				orderBy: { installmentNumber: 'asc' },
+			});
+			await hydrateInvoiceUrls(payments);
 			await recomputeEnrollmentCollectionState(enrollmentId);
 		}
 		const ndaEnqueue = await ensureNdaAfterPayment(
@@ -886,35 +923,87 @@ export type PaidInvoiceLink = {
 	downloadUrl: string | null;
 };
 
-/** Recharge les URLs Stripe (PDF signé + page hébergée) si une des deux manque. */
+function invoiceLinkFields(invoice: Stripe.Invoice) {
+	return {
+		stripeInvoiceId: invoice.id,
+		invoicePdfUrl: invoice.invoice_pdf ?? null,
+		hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+		invoicedAt: invoice.created ? new Date(invoice.created * 1000) : null,
+		paidAt: invoice.status_transitions?.paid_at
+			? new Date(invoice.status_transitions.paid_at * 1000)
+			: null,
+	};
+}
+
+async function attachInvoiceToPayment(payment: Payment, invoice: Stripe.Invoice): Promise<Payment> {
+	const fields = invoiceLinkFields(invoice);
+	try {
+		return await getPrisma().payment.update({
+			where: { id: payment.id },
+			data: {
+				...fields,
+				stripePaymentIntentId: paymentIntentIdFromInvoice(invoice) ?? payment.stripePaymentIntentId,
+				paidAt: fields.paidAt ?? payment.paidAt,
+			},
+		});
+	} catch (error) {
+		if (
+			typeof error === 'object' &&
+			error &&
+			'code' in error &&
+			(error as { code: string }).code === 'P2002'
+		) {
+			return getPrisma().payment.update({
+				where: { id: payment.id },
+				data: {
+					invoicePdfUrl: fields.invoicePdfUrl ?? payment.invoicePdfUrl,
+					hostedInvoiceUrl: fields.hostedInvoiceUrl ?? payment.hostedInvoiceUrl,
+				},
+			});
+		}
+		throw error;
+	}
+}
+
+/** Recharge les URLs Stripe (PDF + page) ; sans invoice id, cherche via PaymentIntent. */
 export async function hydrateInvoiceUrls(payments: Payment[]): Promise<Payment[]> {
 	const missing = payments.filter(
-		(payment) => payment.stripeInvoiceId && (!payment.invoicePdfUrl || !payment.hostedInvoiceUrl),
+		(payment) =>
+			(payment.stripeInvoiceId &&
+				(!payment.invoicePdfUrl || !payment.hostedInvoiceUrl || !payment.stripePaymentIntentId)) ||
+			(!payment.stripeInvoiceId && payment.stripePaymentIntentId),
 	);
 	if (missing.length === 0) return payments;
 
-	const prisma = getPrisma();
 	const byId = new Map(payments.map((payment) => [payment.id, payment]));
 
 	await Promise.all(
 		missing.map(async (payment) => {
 			try {
-				const invoice = await retrieveInvoice(payment.stripeInvoiceId!);
+				const invoice = payment.stripeInvoiceId
+					? await retrieveInvoice(payment.stripeInvoiceId)
+					: await findInvoiceByPaymentIntent(payment.stripePaymentIntentId!);
+				if (!invoice) return;
+
 				const invoicePdfUrl = invoice.invoice_pdf ?? payment.invoicePdfUrl;
 				const hostedInvoiceUrl = invoice.hosted_invoice_url ?? payment.hostedInvoiceUrl;
-				if (
+				const paymentIntentId =
+					paymentIntentIdFromInvoice(invoice) ?? payment.stripePaymentIntentId;
+				const sameLinks =
+					Boolean(payment.stripeInvoiceId) &&
+					Boolean(payment.stripePaymentIntentId) &&
 					invoicePdfUrl === payment.invoicePdfUrl &&
-					hostedInvoiceUrl === payment.hostedInvoiceUrl
-				) {
-					return;
-				}
-				const updated = await prisma.payment.update({
-					where: { id: payment.id },
-					data: { invoicePdfUrl, hostedInvoiceUrl },
-				});
+					hostedInvoiceUrl === payment.hostedInvoiceUrl;
+				if (sameLinks && paymentIntentId === payment.stripePaymentIntentId) return;
+
+				const updated = await attachInvoiceToPayment(payment, invoice);
 				byId.set(payment.id, updated);
 			} catch (error) {
-				console.error('[payments] hydrate invoice', payment.stripeInvoiceId, error);
+				console.error(
+					'[payments] hydrate invoice',
+					payment.stripeInvoiceId ?? payment.stripePaymentIntentId,
+					error,
+				);
 			}
 		}),
 	);
