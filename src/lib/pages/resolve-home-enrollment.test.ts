@@ -68,7 +68,7 @@ describe('resolveHomeEnrollment GET ?token=', () => {
 
 		expect(result).toEqual({
 			kind: 'redirect',
-			redirectTo: '/?link=invalid',
+			redirectTo: '/?link=invalid#acces',
 			setCookie: null,
 		});
 		expect(consumeMagicLink).not.toHaveBeenCalled();
@@ -84,7 +84,7 @@ describe('completeMagicLinkConsume POST', () => {
 		});
 
 		await expect(completeMagicLinkConsume('tok', null)).resolves.toEqual({
-			redirectTo: '/?connected=1',
+			redirectTo: '/?connected=1#acces',
 			setCookie: 'sid=jwt:enr_1',
 		});
 		expect(consumeMagicLink).toHaveBeenCalledWith('tok');

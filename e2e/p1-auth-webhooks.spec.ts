@@ -42,9 +42,9 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		await seedMagicLink(enrollment.id, token);
 
 		await page.goto(`/?token=${token}`);
-		await expect(page.getByRole('heading', { name: 'Se connecter' })).toBeVisible();
-		await page.getByRole('button', { name: 'Se connecter' }).click();
-		await page.waitForURL(/connected=1/);
+		await expect(page.getByRole('heading', { name: 'Vous y êtes presque' })).toBeVisible();
+		await page.getByRole('button', { name: 'Voir mon inscription' }).click();
+		await page.waitForURL(/#acces/);
 
 		const cookies = await context.cookies();
 		expect(cookies.some((c) => c.name === 'dv_enrollment' && c.value)).toBeTruthy();

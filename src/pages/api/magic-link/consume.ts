@@ -5,7 +5,7 @@ export const POST: APIRoute = async ({ request }) => {
 	const form = await request.formData();
 	const token = String(form.get('token') ?? '').trim();
 	if (!token) {
-		return Response.redirect(new URL('/?link=invalid', request.url), 303);
+		return Response.redirect(new URL('/?link=invalid#acces', request.url), 303);
 	}
 
 	const result = await completeMagicLinkConsume(token, request.headers.get('cookie'));

@@ -4,11 +4,11 @@ export type MagicLinkLookup =
 	| { status: 'invalid' };
 
 export type MagicLinkOutcome =
-	| { action: 'set_session'; enrollmentId: string; redirectTo: '/?connected=1' }
-	| { action: 'silent_home'; redirectTo: '/' }
-	| { action: 'fail'; redirectTo: '/?link=invalid' };
+	| { action: 'set_session'; enrollmentId: string; redirectTo: '/?connected=1#acces' }
+	| { action: 'silent_home'; redirectTo: '/#acces' }
+	| { action: 'fail'; redirectTo: '/?link=invalid#acces' };
 
-export const MAGIC_LINK_CONNECTED_FLASH = 'Lien magique validé. Voici l’état de votre inscription.';
+export const MAGIC_LINK_CONNECTED_FLASH = 'Voici l’état de votre inscription.';
 export const MAGIC_LINK_INVALID_FLASH =
 	'Ce lien est invalide ou a expiré. Demandez-en un nouveau ci-dessous.';
 
@@ -21,11 +21,11 @@ export function decideMagicLinkOutcome(
 		return {
 			action: 'set_session',
 			enrollmentId: lookup.enrollmentId,
-			redirectTo: '/?connected=1',
+			redirectTo: '/?connected=1#acces',
 		};
 	}
 	if (lookup.status === 'used' && cookieEnrollmentId === lookup.enrollmentId) {
-		return { action: 'silent_home', redirectTo: '/' };
+		return { action: 'silent_home', redirectTo: '/#acces' };
 	}
-	return { action: 'fail', redirectTo: '/?link=invalid' };
+	return { action: 'fail', redirectTo: '/?link=invalid#acces' };
 }

@@ -16,16 +16,19 @@ const { token } = Astro.props;
 	>
 	</div>
 	<Container class="relative z-10 max-w-lg pt-32 pb-16 sm:pt-36">
-		<p class="text-gold-soft text-[11px] font-medium tracking-[0.28em] uppercase">Connexion</p>
-		<h1 class="font-display text-mist mt-4 text-4xl leading-tight sm:text-5xl">Se connecter</h1>
+		<p class="text-gold-soft text-[11px] font-medium tracking-[0.28em] uppercase">
+			Votre inscription
+		</p>
+		<h1 class="font-display text-mist mt-4 text-4xl leading-tight sm:text-5xl">
+			Vous y êtes presque
+		</h1>
 		<p class="text-mist/72 mt-4 text-base leading-relaxed">
-			Confirmez pour ouvrir votre espace d’inscription. Cette étape évite qu’un aperçu automatique
-			de messagerie consomme votre lien.
+			Cliquez pour ouvrir le suivi de votre inscription.
 		</p>
 		<form id="magic-confirm" method="post" action="/api/magic-link/consume" class="mt-8">
 			<input type="hidden" name="token" value={token} />
 			<Button type="submit" variant="primary" size="md" id="magic-confirm-submit">
-				Se connecter
+				Voir mon inscription
 			</Button>
 		</form>
 	</Container>
@@ -38,7 +41,7 @@ const { token } = Astro.props;
 	form?.addEventListener('submit', async (event) => {
 		event.preventDefault();
 		if (!form) return;
-		const lock = lockFormSubmit(form, { busyLabel: 'Connexion…' });
+		const lock = lockFormSubmit(form, { busyLabel: 'Ouverture…' });
 		if (!lock.locked) return;
 
 		try {
@@ -46,7 +49,9 @@ const { token } = Astro.props;
 				method: 'POST',
 				body: new FormData(form),
 			});
-			window.location.assign(res.url || '/?connected=1');
+			const next = new URL(res.url || '/?connected=1', window.location.origin);
+			next.hash = 'acces';
+			window.location.assign(`${next.pathname}${next.search}${next.hash}`);
 		} catch {
 			lock.unlock();
 		}
