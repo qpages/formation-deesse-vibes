@@ -118,6 +118,21 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	}
 
 	{showSignCard && ndaSignUrl && <SignLinkCard signUrl={ndaSignUrl} />}
+
+	{
+		enrollment.contractStatus === 'sent' && !closed && (
+			<div class="space-y-3">
+				<p class="text-ink-soft text-sm">
+					Après signature, cette page se met à jour automatiquement. Si ce n’est pas le cas, cliquez
+					ci-dessous.
+				</p>
+				<Button id="nda-confirm-signed" type="button" size="md" variant="secondary">
+					J’ai signé l’accord de confidentialité
+				</Button>
+				<p id="nda-confirm-feedback" class="text-ink-soft text-sm" aria-live="polite" />
+			</div>
+		)
+	}
 </div>
 
 <script>
@@ -127,14 +142,57 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		window.location.reload();
 	});
 
+	const confirmBtn = document.getElementById('nda-confirm-signed') as HTMLButtonElement | null;
+	const confirmFeedback = document.getElementById('nda-confirm-feedback');
+	const confirmLabel = confirmBtn?.textContent ?? 'J’ai signé l’accord de confidentialité';
+
+	confirmBtn?.addEventListener('click', async () => {
+		if (!confirmBtn || confirmBtn.disabled) return;
+		confirmBtn.disabled = true;
+		confirmBtn.textContent = 'Vérification…';
+		if (confirmFeedback) confirmFeedback.textContent = '';
+		try {
+			const res = await fetch('/api/enrollment/nda-sync', {
+				method: 'POST',
+				headers: { Accept: 'application/json' },
+				credentials: 'same-origin',
+			});
+			const data = (await res.json().catch(() => ({}))) as {
+				ok?: boolean;
+				signed?: boolean;
+				error?: string;
+				message?: string;
+			};
+			if (res.ok && data.signed) {
+				window.location.hash = 'acces';
+				window.location.reload();
+				return;
+			}
+			if (confirmFeedback) {
+				confirmFeedback.textContent =
+					data.message ??
+					data.error ??
+					'La signature n’est pas encore enregistrée. Réessaie dans quelques secondes.';
+			}
+		} catch {
+			if (confirmFeedback) {
+				confirmFeedback.textContent =
+					'Impossible de vérifier la signature pour le moment. Réessaie dans quelques secondes.';
+			}
+		}
+		confirmBtn.disabled = false;
+		confirmBtn.textContent = confirmLabel;
+	});
+
 	const panel = document.getElementById('status-panel');
 	if (panel?.dataset.poll === 'true') {
 		const initialFingerprint = panel.dataset.fingerprint ?? '';
 		const intervalMs = Number(panel.dataset.pollInterval) || 2000;
-		const maxMs = Number(panel.dataset.pollMax) || 90_000;
+		const maxMs = Number(panel.dataset.pollMax) || 180_000;
 		const startedAt = Date.now();
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		let stopped = false;
+		let inFlight = false;
 
 		const stop = () => {
 			stopped = true;
@@ -142,11 +200,15 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		};
 
 		const schedule = () => {
-			if (!stopped) timer = setTimeout(tick, intervalMs);
+			if (stopped) return;
+			if (timer !== undefined) clearTimeout(timer);
+			timer = setTimeout(() => {
+				void tick();
+			}, intervalMs);
 		};
 
 		const tick = async () => {
-			if (stopped) return;
+			if (stopped || inFlight) return;
 			if (Date.now() - startedAt >= maxMs) {
 				stop();
 				return;
@@ -155,6 +217,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 				schedule();
 				return;
 			}
+			inFlight = true;
 			try {
 				const res = await fetch('/api/enrollment/status', {
 					headers: { Accept: 'application/json' },
@@ -175,9 +238,17 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 				}
 			} catch {
 				// ignore transient network errors; keep polling until max
+			} finally {
+				inFlight = false;
 			}
 			schedule();
 		};
+
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible' && !stopped) {
+				void tick();
+			}
+		});
 
 		schedule();
 	}

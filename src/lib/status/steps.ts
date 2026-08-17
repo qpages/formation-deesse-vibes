@@ -1,5 +1,5 @@
 import type { YousignRequestStatus } from '../../generated/prisma/client';
-import { isPaidEnough } from '../enrollment-gates';
+import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
 import {
 	ACCESS_STATUS_LABELS,
 	COLLECTION_STATUS_LABELS,
@@ -12,7 +12,7 @@ import { YOUSIGN_FAILURE } from './yousign';
 export const TEACHIZY_ACADEMY_URL = 'https://jsmatriceacademy.teachizy.fr';
 
 export const ENROLLMENT_POLL_INTERVAL_MS = 2_000;
-export const ENROLLMENT_POLL_MAX_MS = 90_000;
+export const ENROLLMENT_POLL_MAX_MS = 180_000;
 
 export function stepTone(state: StepState): BadgeTone {
 	switch (state) {
@@ -139,13 +139,7 @@ export function shouldPollEnrollment(
 	},
 ): boolean {
 	if (input.collectionStatus === 'pending' && input.hasCheckoutSession) return true;
-	if (
-		isPaidEnough(input.collectionStatus) &&
-		input.contractStatus === 'pending' &&
-		!input.hasNdaSignUrl
-	) {
-		return true;
-	}
+	if (isAwaitingNda(input)) return true;
 	if (input.accessStatus === 'pending') return true;
 	return false;
 }

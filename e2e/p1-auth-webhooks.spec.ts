@@ -155,4 +155,22 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		const body = await second.json();
 		expect(body.duplicate).toBe(true);
 	});
+
+	test('12. nda-sync sans session → 401 ; déjà signé → signed true', async ({ request }) => {
+		const anonymous = await request.post('/api/enrollment/nda-sync');
+		expect(anonymous.status()).toBe(401);
+
+		const enrollment = await seedEnrollment({
+			email: uniqueEmail('ndasync'),
+			collectionStatus: 'paid',
+			contractStatus: 'signed',
+			accessStatus: 'active',
+		});
+		const cookie = await enrollmentCookie(enrollment.id);
+		const res = await request.post('/api/enrollment/nda-sync', {
+			headers: { Cookie: `dv_enrollment=${cookie.value}` },
+		});
+		expect(res.status(), await res.text()).toBe(200);
+		expect(await res.json()).toEqual({ ok: true, signed: true });
+	});
 });
