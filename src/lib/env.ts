@@ -50,6 +50,15 @@ export type ServerEnv = z.infer<typeof serverSchema>;
 /** Vite compile-time: true only for `astro dev` / `vite --mode development`. */
 export const isDev = import.meta.env.DEV;
 
+/**
+ * Inngest Cloud vs CLI local. A production Vercel build must never be "dev"
+ * even if `INNGEST_DEV=1` leaked into the hosting env (syncs stay unattached).
+ */
+export function isInngestDevMode(inngestDev?: string): boolean {
+	if (inngestDev === '0') return false;
+	return import.meta.env.DEV;
+}
+
 let cached: ServerEnv | null = null;
 
 export function getEnv(): ServerEnv {

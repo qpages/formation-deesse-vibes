@@ -1,6 +1,6 @@
 import { Inngest } from 'inngest';
 import { e2eMockProviders } from '../e2e-providers';
-import { env } from '../env';
+import { env, isInngestDevMode } from '../env';
 
 /**
  * Configuration du client Inngest
@@ -15,8 +15,7 @@ import { env } from '../env';
  * - Requiert INNGEST_EVENT_KEY
  * - Auto-découverte via l'endpoint /api/inngest
  */
-const isDev =
-	env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.MODE === 'development';
+const isDev = isInngestDevMode(env.INNGEST_DEV);
 
 export const inngest = new Inngest({
 	id: 'formation-deesse-vibes',

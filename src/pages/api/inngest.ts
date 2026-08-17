@@ -22,10 +22,9 @@
 import { serve } from 'inngest/astro';
 import { inngest } from '../../lib/inngest/client';
 import { inngestFunctions } from '../../lib/inngest/functions';
-import { env } from '../../lib/env';
+import { env, isInngestDevMode } from '../../lib/env';
 
-const isDev =
-	env.INNGEST_DEV === '1' || import.meta.env.DEV || import.meta.env.MODE === 'development';
+const isDev = isInngestDevMode(env.INNGEST_DEV);
 
 export const { GET, POST, PUT } = serve({
 	client: inngest,
