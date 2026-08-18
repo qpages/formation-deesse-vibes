@@ -30,6 +30,7 @@ pnpm-debug.log*
 
 # local tooling
 .cursor/
+task.md
 
 # macOS-specific files
 .DS_Store
