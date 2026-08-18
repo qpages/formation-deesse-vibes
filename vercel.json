@@ -1,4 +1,9 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"framework": "astro"
+	"framework": "astro",
+	"git": {
+		"deploymentEnabled": {
+			"dependabot/**": false
+		}
+	}
 }
