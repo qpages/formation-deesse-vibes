@@ -235,6 +235,13 @@ const linkClass =
 				</a>
 			) : null
 		}
+		{
+			signed && detail.yousignRequestId ? (
+				<a href={`/api/admin/enrollment/${enrollmentId}/nda`} class={linkClass}>
+					Télécharger le contrat
+				</a>
+			) : null
+		}
 		<dl class="mt-3 hidden w-full basis-full gap-x-6 gap-y-2 peer-open:grid sm:grid-cols-2">
 			{
 				techRows.map((row) => (

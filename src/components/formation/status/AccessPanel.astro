@@ -39,6 +39,8 @@ const {
 const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 const funnelFlash = showFunnel ? flash : null;
 const trackingFlash = showFunnel ? null : flash;
+const canDownloadNda =
+	enrollment?.contractStatus === 'signed' && Boolean(enrollment.yousignRequestId);
 ---
 
 {
@@ -146,6 +148,17 @@ const trackingFlash = showFunnel ? null : flash;
 									Contacter un administrateur
 								</a>
 							</p>
+							{canDownloadNda ? (
+								<p class="text-ink-soft text-sm">
+									<a
+										id="nda-download"
+										href="/api/enrollment/nda"
+										class="hover:text-ink underline-offset-4 hover:underline"
+									>
+										Télécharger le contrat de confidentialité
+									</a>
+								</p>
+							) : null}
 						</div>
 					</div>
 

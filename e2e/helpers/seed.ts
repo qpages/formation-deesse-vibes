@@ -45,6 +45,7 @@ export async function seedEnrollment(input: {
 	contractStatus?: 'pending' | 'sent' | 'signed';
 	accessStatus?: 'not_eligible' | 'pending' | 'active';
 	stripeCheckoutSessionId?: string | null;
+	yousignRequestId?: string | null;
 }) {
 	const db = getPrisma();
 	const user = await db.user.create({
@@ -66,6 +67,7 @@ export async function seedEnrollment(input: {
 			totalAmountCents: 184_900,
 			amountCents: 184_900,
 			stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? undefined,
+			yousignRequestId: input.yousignRequestId ?? undefined,
 			consentCgvAt: new Date(),
 			consentNdaAt: new Date(),
 			consentPrivacyAt: new Date(),

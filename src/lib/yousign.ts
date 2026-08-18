@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { getEnv, requireEnv } from './env';
+import { e2eMockProviders } from './e2e-providers';
+import { FORMATION, getEnv, requireEnv } from './env';
 
 export type YousignSignatureRequest = {
 	id: string;
@@ -17,12 +18,16 @@ export type ActivatedNda = {
 	signatureLink?: string;
 };
 
+function yousignAuthHeader(): { Authorization: string } {
+	return { Authorization: `Bearer ${requireEnv('YOUSIGN_API_KEY')}` };
+}
+
 async function yousignFetch<T>(path: string, init?: RequestInit): Promise<T> {
 	const env = getEnv();
 	const res = await fetch(`${env.YOUSIGN_API_BASE}${path}`, {
 		...init,
 		headers: {
-			Authorization: `Bearer ${requireEnv('YOUSIGN_API_KEY')}`,
+			...yousignAuthHeader(),
 			'Content-Type': 'application/json',
 			Accept: 'application/json',
 			...(init?.headers ?? {}),
@@ -37,8 +42,51 @@ async function yousignFetch<T>(path: string, init?: RequestInit): Promise<T> {
 	return res.json() as Promise<T>;
 }
 
+export type YousignDownloadedFile = {
+	bytes: Uint8Array;
+	contentType: string;
+};
+
+async function yousignFetchBinary(path: string): Promise<YousignDownloadedFile> {
+	const env = getEnv();
+	const res = await fetch(`${env.YOUSIGN_API_BASE}${path}`, {
+		headers: {
+			...yousignAuthHeader(),
+			Accept: 'application/pdf, application/zip',
+		},
+	});
+
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`Yousign ${res.status}: ${text}`);
+	}
+
+	const bytes = new Uint8Array(await res.arrayBuffer());
+	const contentType = res.headers.get('content-type')?.split(';')[0]?.trim() || 'application/pdf';
+	return { bytes, contentType };
+}
+
+/** PDF (ou zip) signé — uniquement si la demande est `done`. */
+export async function downloadSignedDocuments(requestId: string): Promise<YousignDownloadedFile> {
+	if (e2eMockProviders()) {
+		return {
+			bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]),
+			contentType: 'application/pdf',
+		};
+	}
+
+	return yousignFetchBinary(
+		`/signature_requests/${requestId}/documents/download?version=completed`,
+	);
+}
+
 export async function getSignatureRequest(requestId: string) {
 	return yousignFetch<YousignSignatureRequest>(`/signature_requests/${requestId}`);
+}
+
+/** Titre affiché dans l’e-mail Yousign (pas le nom du signataire — redondant côté destinataire). */
+export function ndaSignatureRequestName(): string {
+	return `Accord de confidentialité — ${FORMATION.name}`;
 }
 
 /** Crée un brouillon Yousign depuis le template (sans activer / sans e-mail). */
@@ -59,7 +107,7 @@ export async function createNdaDraft(input: {
 		method: 'POST',
 		body: JSON.stringify({
 			template_id: templateId,
-			name: `NDA — ${input.firstName} ${input.lastName}`,
+			name: ndaSignatureRequestName(),
 			delivery_mode: 'email',
 			timezone: 'Europe/Paris',
 			external_id: input.enrollmentId,

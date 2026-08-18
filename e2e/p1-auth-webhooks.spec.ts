@@ -173,4 +173,54 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		expect(res.status(), await res.text()).toBe(200);
 		expect(await res.json()).toEqual({ ok: true, signed: true });
 	});
+
+	test('13. nda PDF sans session → 401 ; pas signé → 409 ; admin sans session → 401', async ({
+		request,
+		page,
+		context,
+	}) => {
+		const anonymous = await request.get('/api/enrollment/nda');
+		expect(anonymous.status()).toBe(401);
+
+		const unsigned = await seedEnrollment({
+			email: uniqueEmail('nda-pdf-sent'),
+			collectionStatus: 'paid',
+			contractStatus: 'sent',
+		});
+		const unsignedCookie = await enrollmentCookie(unsigned.id);
+		const notSigned = await request.get('/api/enrollment/nda', {
+			headers: { Cookie: `dv_enrollment=${unsignedCookie.value}` },
+		});
+		expect(notSigned.status()).toBe(409);
+		expect((await notSigned.json()).reason).toBe('not_signed');
+
+		const signed = await seedEnrollment({
+			email: uniqueEmail('nda-pdf-signed'),
+			collectionStatus: 'paid',
+			contractStatus: 'signed',
+			accessStatus: 'active',
+			yousignRequestId: crypto.randomUUID(),
+		});
+		const signedCookie = await enrollmentCookie(signed.id);
+		const pdf = await request.get('/api/enrollment/nda', {
+			headers: { Cookie: `dv_enrollment=${signedCookie.value}` },
+		});
+		expect(pdf.status(), await pdf.text()).toBe(200);
+		expect(pdf.headers()['content-type']).toBe('application/pdf');
+		expect(pdf.headers()['content-disposition']).toContain('contrat-confidentialite.pdf');
+
+		await context.addCookies([signedCookie]);
+		await page.goto('/');
+		await expect(
+			page.getByRole('link', { name: 'Télécharger le contrat de confidentialité' }),
+		).toBeVisible();
+
+		const adminAnon = await request.get(`/api/admin/enrollment/${signed.id}/nda`);
+		expect(adminAnon.status()).toBe(401);
+
+		const learnerHitsAdmin = await request.get(`/api/admin/enrollment/${signed.id}/nda`, {
+			headers: { Cookie: `dv_enrollment=${unsignedCookie.value}` },
+		});
+		expect(learnerHitsAdmin.status()).toBe(401);
+	});
 });
