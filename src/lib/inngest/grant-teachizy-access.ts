@@ -53,10 +53,12 @@ export const grantTeachizyAccess = inngest.createFunction(
 
 				if (isSignatureCompleted) {
 					await step.run('mark-contract-signed', async () => {
-						await updateEnrollmentYousignMirror(enrollment.id, {
-							yousignStatus: 'done',
-							contractStatus: 'signed',
-						});
+						if (event.name === 'yousign/signature.done') {
+							await updateEnrollmentYousignMirror(enrollment.id, {
+								yousignStatus: 'done',
+								contractStatus: 'signed',
+							});
+						}
 						await applyAccessPolicy(enrollment.id);
 					});
 				}
