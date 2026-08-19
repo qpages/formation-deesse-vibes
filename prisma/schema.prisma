@@ -96,6 +96,15 @@ enum Provider {
   yousign
 }
 
+enum SignatureProvider {
+  yousign
+}
+
+enum SignKind {
+  redirect
+  embed
+}
+
 enum ProviderEventStatus {
   received
   processed
@@ -176,6 +185,7 @@ model Enrollment {
   payments     Payment[]
   magicLinks   MagicLink[]
   adminActions AdminAction[]
+  ndaRequest   NdaRequest?
 
   @@index([userId])
   @@index([collectionStatus])
@@ -257,4 +267,24 @@ model AdminAction {
   @@index([enrollmentId])
   @@index([createdAt])
   @@map("admin_actions")
+}
+
+model NdaRequest {
+  id                String            @id @default(cuid())
+  enrollmentId      String            @unique
+  enrollment        Enrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  provider          SignatureProvider
+  externalRequestId String
+  externalSignerId  String?
+  signKind          SignKind          @default(redirect)
+  providerStatus    String?
+  lastError         String?
+  lastErrorAt       DateTime?
+  metadata          Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([provider, externalRequestId])
+  @@index([enrollmentId])
+  @@map("nda_requests")
 }
