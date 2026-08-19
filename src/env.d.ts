@@ -20,13 +20,18 @@ interface ImportMetaEnv {
 	readonly YOUSIGN_TEMPLATE_ID?: string;
 	readonly YOUSIGN_WEBHOOK_SECRET?: string;
 	readonly YOUSIGN_API_BASE?: string;
+	readonly YOUSIGN_SIGNER_LABEL?: string;
 	readonly BREVO_API_KEY?: string;
 	readonly BREVO_FROM?: string;
 	readonly MAGIC_LINK_SECRET?: string;
 	readonly SESSION_SECRET?: string;
 	readonly PAYLOAD_ENCRYPTION_KEY?: string;
+	readonly INNGEST_DEV?: string;
 	readonly INNGEST_EVENT_KEY?: string;
 	readonly INNGEST_SIGNING_KEY?: string;
+	readonly TEACHIZY_API_KEY?: string;
+	readonly TEACHIZY_API_BASE?: string;
+	readonly TEACHIZY_TRAINING_UUID?: string;
 	readonly SLACK_WEBHOOK_URL?: string;
 	readonly ADMIN_EMAIL?: string;
 	readonly ADMIN_PASSWORD?: string;

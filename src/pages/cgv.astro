@@ -1,25 +1,350 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
+import Container from '../components/ui/Container.astro';
 import Section from '../components/ui/Section.astro';
+import BackLink from '../components/ui/BackLink.astro';
+import { getEnv } from '../lib/env';
+
+const env = getEnv();
+const contactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL ?? 'contact@deesse-vibes.com';
+const siteUrl = env.PUBLIC_SITE_URL ?? 'https://formation-deesse-vibes.vercel.app/';
+const siteHost = new URL(siteUrl).host;
+const updatedAt = '19 août 2026';
 ---
 
-<MarketingLayout title="CGV — Formation Matrice Évolution">
-	<div class="bg-ink h-24"></div>
+<MarketingLayout
+	title="CGV : Formation Matrice Évolution"
+	description={`Conditions générales de vente de la Formation Matrice Évolution sur ${siteHost}.`}
+	header="solid"
+	noindex={true}
+>
+	<Container class="pt-8 sm:pt-10">
+		<BackLink />
+	</Container>
 	<Section
+		class="pt-3 pb-10 sm:pt-4 sm:pb-14"
 		title="Conditions générales de vente"
-		description="Document à finaliser avant la mise en production."
+		description="Formation Matrice Évolution, vente à distance."
+		meta={`Dernière mise à jour : ${updatedAt}`}
 	>
-		<div class="prose-legal text-ink-soft max-w-2xl space-y-4 text-sm leading-relaxed">
+		<div class="prose-legal text-ink-soft max-w-2xl space-y-8 text-sm leading-relaxed">
 			<p>
-				Les présentes conditions régissent l’achat de la Formation Matrice Évolution au tarif de 1
-				849 € TTC en paiement unique (majoré en cas de paiement fractionné), dispensée en ligne via
-				Teachizy.
+				Les présentes conditions générales de vente (ci-après « CGV ») s’appliquent à toute commande
+				passée sur <strong>{siteHost}</strong> pour l’achat de la{" "}
+				<strong>Formation Matrice Évolution</strong>. En validant votre inscription, vous
+				reconnaissez les avoir lues et acceptées sans réserve.
 			</p>
-			<p>
-				L’accès à la formation est conditionné au paiement confirmé et à la signature de l’accord de
-				confidentialité. Les remboursements après ouverture des accès sont traités manuellement.
-			</p>
-			<p class="text-ink/50 text-xs">Brouillon — validation juridique requise.</p>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">1. Vendeur</h3>
+				<p>La vente est conclue avec :</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>
+						<strong>SEBBAH Jessica</strong>, entrepreneur individuel (Déesse Vibes, Jessica Stamck)
+					</li>
+					<li>11 chemin de la Ferrière, 06800 Cagnes-sur-Mer, France</li>
+					<li>SIREN : 891 304 610 ; SIRET : 891 304 610 00035</li>
+					<li>N° TVA intracommunautaire : FR08891304610</li>
+					<li>Immatriculation : RCS Antibes</li>
+					<li>
+						E-mail :{" "}
+						<a
+							href={`mailto:${contactEmail}`}
+							class="text-ink underline-offset-2 hover:underline">{contactEmail}</a
+						>
+					</li>
+				</ul>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">2. Objet : description de la formation</h3>
+				<p>
+					Le produit vendu est la <strong>Formation Matrice Évolution</strong>, formation
+					professionnelle en ligne dispensée via la plateforme <strong>Teachizy</strong>.
+				</p>
+				<p>La formation comprend :</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>l’accès aux contenus pédagogiques (vidéos, supports, exercices) sur Teachizy ;</li>
+					<li>le suivi de votre parcours d’inscription sur {siteHost} ;</li>
+					<li>
+						la signature électronique d’un contrat de confidentialité avant l’ouverture des accès.
+					</li>
+				</ul>
+				<p>
+					Les contenus pédagogiques et leur calendrier de mise à disposition sont définis par
+					Jessica Stamck / Déesse Vibes. Le site d’inscription ne remplace pas l’espace de formation
+					Teachizy, où vous accéderez aux modules une fois votre accès activé.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">3. Prix et modalités de paiement</h3>
+				<p>
+					Le prix de la formation est de <strong>1 849 € TTC</strong> en paiement unique. Des formules
+					en plusieurs échéances sont proposées, avec une majoration du prix total :
+				</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li><strong>Paiement unique :</strong> 1 849,00 €</li>
+					<li>
+						<strong>2 échéances</strong> (949,50 € × 2, tous les 30 jours) : 1 899,00 € au total
+					</li>
+					<li>
+						<strong>4 échéances</strong> (499,75 € × 4, tous les 30 jours) : 1 999,00 € au total
+					</li>
+					<li>
+						<strong>6 échéances</strong> (346,50 € × 6, tous les 30 jours) : 2 079,00 € au total
+					</li>
+				</ul>
+				<p>
+					Le montant applicable à votre commande est celui affiché au moment de votre choix sur la
+					page d’inscription. Des codes promotionnels peuvent être appliqués le cas échéant.
+				</p>
+				<p>
+					Le paiement est effectué en ligne via <strong>Stripe</strong> (carte bancaire et moyens proposés
+					par Stripe au moment du règlement). Vos coordonnées bancaires sont saisies directement chez
+					Stripe ; le vendeur n’y a pas accès.
+				</p>
+				<p>
+					En cas de paiement échelonné, l’accès à la formation peut être ouvert après le premier
+					règlement et la signature du contrat de confidentialité, sous réserve du bon déroulement
+					des échéances suivantes. Un impayé peut entraîner la suspension puis la révocation de
+					l’accès jusqu’à régularisation.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">4. Commande et accès à la formation</h3>
+				<p>Le parcours d’inscription est le suivant :</p>
+				<ol class="list-decimal space-y-1 pl-5">
+					<li>
+						Formulaire d’inscription (identité, e-mail, acceptation des CGV et de la politique de
+						confidentialité, engagement de signature du contrat de confidentialité) ;
+					</li>
+					<li>Paiement en ligne sur Stripe ;</li>
+					<li>
+						Signature électronique du contrat de confidentialité via Yousign (lien envoyé par
+						e-mail) ;
+					</li>
+					<li>Création de votre accès Teachizy et envoi de vos identifiants de connexion.</li>
+				</ol>
+				<p>
+					<strong
+						>L’accès à la formation n’est ouvert qu’après paiement confirmé et contrat de
+						confidentialité signé.</strong
+					>
+					Vous pouvez suivre l’avancement de ces étapes sur {siteHost}
+				</p>
+				<p>
+					La formation s’adresse aux <strong>personnes majeures</strong>. Le vendeur se réserve le
+					droit de refuser ou d’annuler une commande en cas d’erreur manifeste, de fraude ou de
+					non-respect des présentes CGV.
+				</p>
+			</section>
+
+			<section class="space-y-3" id="retractation">
+				<h3 class="text-ink font-medium">5. Droit de rétractation</h3>
+				<p>
+					Conformément aux articles L221-18 et suivants du Code de la consommation, vous disposez
+					d’un délai de <strong>14 jours calendaires</strong> à compter de la conclusion du contrat pour
+					exercer votre droit de rétractation, sans avoir à motiver votre décision.
+				</p>
+				<p>
+					<strong>Exception pour contenu numérique et prestation de formation en ligne :</strong> conformément
+					à l’article L221-28 du Code de la consommation, vous ne pouvez pas exercer votre droit de rétractation
+					une fois que :
+				</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>vous avez demandé l’exécution immédiate de la prestation (accès à la formation) ;</li>
+					<li>
+						vous avez expressément consenti à ce que l’accès au contenu numérique ou à la formation
+						commence avant l’expiration du délai de rétractation ;
+					</li>
+					<li>vous avez reconnu perdre votre droit de rétractation une fois l’accès ouvert.</li>
+				</ul>
+				<p>
+					En pratique, dès que votre accès Teachizy est activé après paiement et signature du
+					contrat de confidentialité,
+					<strong>le droit de rétractation ne s’applique plus</strong>, sous réserve que les
+					conditions ci-dessus aient été remplies au moment de votre inscription.
+				</p>
+				<p>
+					<strong>Avant l’ouverture de l’accès</strong> (paiement effectué mais contrat de confidentialité
+					non signé ou accès non encore créé), vous pouvez encore exercer votre rétractation en écrivant
+					à{" "}
+					<a
+						href={`mailto:${contactEmail}`}
+						class="text-ink underline-offset-2 hover:underline">{contactEmail}</a
+					>. Un remboursement intégral des sommes perçues sera alors effectué dans un délai maximal
+					de 14 jours, par le même moyen de paiement que celui utilisé lors de la commande, sauf
+					accord contraire.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">6. Remboursements et annulations</h3>
+				<p>
+					<strong>Avant ouverture de l’accès :</strong> rétractation possible (voir § 5) ou annulation
+					sur demande motivée ; remboursement traité manuellement par le vendeur via Stripe.
+				</p>
+				<p>
+					<strong>Après ouverture de l’accès Teachizy :</strong> le droit de rétractation ne s’applique
+					plus. Toute demande de remboursement est examinée au cas par cas par Jessica Stamck. Il n’existe
+					pas de remboursement automatique une fois la formation accessible. En cas de remboursement accordé,
+					l’accès Teachizy sera révoqué.
+				</p>
+				<p>
+					<strong>Paiement en plusieurs échéances :</strong> en cas de remboursement ou de résiliation
+					acceptée, les échéances non encore prélevées pourront être annulées. Les sommes déjà encaissées
+					ne sont remboursées que selon la décision du vendeur et les circonstances du dossier.
+				</p>
+				<p>
+					Pour toute demande : contactez{" "}
+					<a
+						href={`mailto:${contactEmail}`}
+						class="text-ink underline-offset-2 hover:underline">{contactEmail}</a
+					>.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">7. Propriété intellectuelle</h3>
+				<p>
+					L’ensemble des contenus de la formation (vidéos, textes, méthodes, outils, supports,
+					marque « Matrice Évolution » et « Déesse Vibes ») est la propriété exclusive de Jessica
+					Stamck / Déesse Vibes et est protégé par le droit d’auteur.
+				</p>
+				<p>
+					L’achat de la formation confère une <strong
+						>licence d’usage personnelle, non exclusive et non transférable</strong
+					>, limitée à votre propre apprentissage. Sont notamment interdits, sans autorisation
+					écrite préalable :
+				</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>la reproduction, diffusion ou mise à disposition publique des contenus ;</li>
+					<li>la revente, le partage de compte ou l’accès à des tiers ;</li>
+					<li>toute utilisation commerciale des supports pédagogiques.</li>
+				</ul>
+				<p>
+					Le contrat de confidentialité signé avant l’accès complète ces engagements. En cas de
+					violation, le vendeur pourra suspendre ou révoquer l’accès sans remboursement et engager
+					les recours appropriés.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">8. Obligations de l’acheteur</h3>
+				<p>Vous vous engagez à :</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>fournir des informations exactes lors de l’inscription ;</li>
+					<li>signer le contrat de confidentialité dans les délais impartis ;</li>
+					<li>respecter les conditions d’usage de Teachizy et les présentes CGV ;</li>
+					<li>ne pas tenter de contourner les mesures de protection des contenus.</li>
+				</ul>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">9. Responsabilité</h3>
+				<p>
+					Le vendeur s’engage à fournir la formation conformément à sa description. Elle ne garantit
+					cependant pas un résultat professionnel ou personnel particulier : la formation est un
+					accompagnement pédagogique dont l’application dépend de chaque participant.
+				</p>
+				<p>Le vendeur ne saurait être tenue responsable :</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>des indisponibilités temporaires du site, de Stripe, de Yousign ou de Teachizy ;</li>
+					<li>
+						des dysfonctionnements imputables à votre équipement ou à votre connexion internet ;
+					</li>
+					<li>de l’usage que vous faites des enseignements au-delà du cadre pédagogique prévu.</li>
+				</ul>
+				<p>
+					En tout état de cause, la responsabilité du vendeur est limitée au montant effectivement
+					payé par vous pour la formation, sauf faute lourde ou dolosive ou disposition légale
+					d’ordre public contraire.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">10. Données personnelles</h3>
+				<p>
+					Le traitement de vos données personnelles est décrit dans notre{" "}
+					<a href="/confidentialite" class="text-ink underline-offset-2 hover:underline"
+						>politique de confidentialité</a
+					>. Vous disposez de droits d’accès, de rectification, d’effacement, de limitation,
+					d’opposition et de portabilité, exercables à {contactEmail}.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">11. Médiation et réclamations</h3>
+				<p>
+					Pour toute réclamation relative à votre commande, contactez d’abord{" "}
+					<a
+						href={`mailto:${contactEmail}`}
+						class="text-ink underline-offset-2 hover:underline">{contactEmail}</a
+					>.
+				</p>
+				<p>
+					À défaut de résolution amiable, vous pouvez recourir gratuitement à la médiation de la
+					consommation auprès du <strong>CM2C</strong> (Centre de la Médiation de la Consommation de Conciliateurs
+					de Justice) :
+				</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>
+						En ligne :
+						<a
+							href="https://www.cm2c.net"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-ink underline-offset-2 hover:underline">www.cm2c.net</a
+						>
+					</li>
+					<li>Courrier : CM2C, 49 Rue de Ponthieu, 75008 Paris</li>
+					<li>
+						E-mail :
+						<a
+							href="mailto:declarer-un-litige@cm2c.net"
+							class="text-ink underline-offset-2 hover:underline">declarer-un-litige@cm2c.net</a
+						>
+					</li>
+				</ul>
+				<p>
+					Vous pouvez également utiliser la plateforme européenne de règlement en ligne des litiges
+					:{" "}
+					<a
+						href="https://ec.europa.eu/consumers/odr"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-ink underline-offset-2 hover:underline"
+						>https://ec.europa.eu/consumers/odr</a
+					>.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">12. Droit applicable</h3>
+				<p>
+					Les présentes CGV sont soumises au <strong>droit français</strong>. Les dispositions
+					protectrices du consommateur demeurent applicables lorsque la loi l’exige.
+				</p>
+				<p>
+					En cas de litige et à défaut de médiation satisfaisante, les tribunaux compétents seront
+					déterminés conformément aux règles de droit commun applicables aux consommateurs.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">13. Modification des CGV</h3>
+				<p>
+					Le vendeur peut mettre à jour les présentes CGV pour refléter l’évolution du service ou de
+					la réglementation. La version applicable est celle en vigueur à la date de votre commande,
+					sauf modification imposée par la loi. La date en tête de page indique la dernière
+					révision.
+				</p>
+			</section>
+		</div>
+		<div class="mt-10 sm:mt-12">
+			<BackLink variant="primary" />
 		</div>
 	</Section>
 </MarketingLayout>

@@ -4,11 +4,37 @@ import Button from './Button.astro';
 interface Props {
 	href?: string;
 	label?: string;
+	variant?: 'primary' | 'ghost';
 }
 
-const { href = '/', label = 'Retour à l’accueil' } = Astro.props;
+const { href = '/', label = 'Retour à l’accueil', variant = 'ghost' } = Astro.props;
 ---
 
-<Button href={href} variant="secondary" size="sm">
-	{label}
-</Button>
+{
+	variant === 'primary' ? (
+		<Button href={href} variant="primary" size="md">
+			{label}
+		</Button>
+	) : (
+		<a
+			href={href}
+			class="text-ink-soft hover:text-ink focus-visible:outline-blush group inline-flex min-h-9 items-center gap-1.5 text-sm underline-offset-4 transition-colors hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+		>
+			<svg
+				class="size-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-0.5"
+				viewBox="0 0 16 16"
+				fill="none"
+				aria-hidden="true"
+			>
+				<path
+					d="M13 8H3.5M7 4.25 3.25 8 7 11.75"
+					stroke="currentColor"
+					stroke-width="1.5"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				/>
+			</svg>
+			{label}
+		</a>
+	)
+}

@@ -7,18 +7,35 @@ import { isDev } from '../lib/env';
 interface Props {
 	title?: string;
 	description?: string;
+	noindex?: boolean;
+	/** `overlay` = header clair sur hero sombre ; `solid` = même barre sombre, dans le flux (pages légales). */
+	header?: 'overlay' | 'solid';
 }
 
-const { title, description } = Astro.props;
+const { title, description, noindex, header = 'overlay' } = Astro.props;
+const overlayHeader = header === 'overlay';
+const footerLinkClass =
+	'hover:text-ink focus-visible:outline-blush inline-flex min-h-11 items-center md:min-h-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2';
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout title={title} description={description} noindex={noindex}>
 	<div class="flex min-h-screen flex-col">
-		<header class="animate-fade absolute inset-x-0 top-0 z-20">
-			<Container class="flex items-center justify-between py-6">
-				<a href="/" class="font-display text-mist text-xl tracking-wide sm:text-2xl">
-					Déesse Vibes
-				</a>
+		<header
+			class:list={[
+				'animate-fade text-mist z-20',
+				overlayHeader ? 'absolute inset-x-0 top-0' : 'bg-ink relative overflow-hidden',
+			]}
+		>
+			{
+				!overlayHeader && (
+					<div
+						class="absolute inset-0 bg-[radial-gradient(ellipse_at_16%_10%,rgb(196_120_106/0.2),transparent_42%),radial-gradient(ellipse_at_88%_45%,rgb(184_149_108/0.13),transparent_38%),linear-gradient(145deg,#17120f_0%,#241c18_58%,#18130f_100%)]"
+						aria-hidden="true"
+					/>
+				)
+			}
+			<Container class="relative flex items-center justify-between py-6">
+				<a href="/" class="font-display text-xl tracking-wide sm:text-2xl"> Déesse Vibes </a>
 				<nav class="flex items-center gap-4 sm:gap-6" aria-label="Navigation">
 					<a href="/" class="text-mist/70 hover:text-mist text-[11px] tracking-[0.2em] uppercase">
 						Formation
@@ -40,16 +57,44 @@ const { title, description } = Astro.props;
 		<main class="flex-1">
 			<slot />
 		</main>
-		<footer class="border-ink/10 border-t py-10">
+		<footer class="border-ink/10 border-t py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
 			<Container
-				class="text-ink-soft flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+				class="text-ink-soft flex flex-col gap-6 text-sm md:grid md:grid-cols-[1fr_auto] md:items-start md:gap-x-8 md:gap-y-1"
 			>
-				<p>© {new Date().getFullYear()} Déesse Vibes — Formation Matrice Évolution</p>
-				<div class="flex gap-5">
-					<a href="/#programme" class="hover:text-ink">Programme</a>
-					<a href="/#faq" class="hover:text-ink">FAQ</a>
-					<a href="/mentions-legales" class="hover:text-ink">Mentions légales</a>
-					<a href="/confidentialite" class="hover:text-ink">Confidentialité</a>
+				<p>© {new Date().getFullYear()} Déesse Vibes · Formation Matrice Évolution</p>
+				<div class="flex flex-col md:contents">
+					<nav
+						class="flex flex-col gap-1 md:col-start-2 md:row-span-2 md:flex-row md:flex-wrap md:justify-end md:gap-x-5 md:gap-y-1"
+						aria-label="Pied de page"
+					>
+						<a href="/#programme" class={footerLinkClass}>Programme</a>
+						<a href="/#faq" class={footerLinkClass}>FAQ</a>
+						<a href="/cgv" class={footerLinkClass}>CGV</a>
+						<a href="/mentions-legales" class={footerLinkClass}>Mentions légales</a>
+						<a href="/confidentialite" class={footerLinkClass}>Confidentialité</a>
+					</nav>
+					<a
+						href="https://www.deesse-vibes.com/"
+						class="hover:text-ink focus-visible:outline-blush group border-ink/10 mt-5 inline-flex min-h-11 items-center gap-1.5 border-t pt-5 italic transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 md:col-start-1 md:row-start-2 md:mt-0 md:min-h-0 md:border-0 md:pt-0"
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						Découvrir tout l’univers de Jessica Stamck
+						<svg
+							class="size-3 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+							viewBox="0 0 16 16"
+							fill="none"
+							aria-hidden="true"
+						>
+							<path
+								d="M4.5 11.5 11.5 4.5M6.75 4.5H11.5V9.25"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"></path>
+						</svg>
+						<span class="sr-only">(nouvel onglet)</span>
+					</a>
 				</div>
 			</Container>
 		</footer>

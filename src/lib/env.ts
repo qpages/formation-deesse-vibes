@@ -34,7 +34,10 @@ const serverSchema = z.object({
 	ADMIN_EMAIL: z.string().email().default('admin@deesse-vibes.com'),
 	ADMIN_PASSWORD: z.string().min(1).default(''),
 	PUBLIC_SITE_URL: z.string().url().default('http://localhost:4321'),
-	PUBLIC_ADMIN_CONTACT_EMAIL: z.string().email().default('admin@deesse-vibes.com'),
+	PUBLIC_ADMIN_CONTACT_EMAIL: z.preprocess(
+		(value) => (value === '' || value === undefined || value === null ? undefined : value),
+		z.string().email().default('contact@deesse-vibes.com'),
+	),
 	PUBLIC_WHATSAPP_NUMBER: z.preprocess(
 		(value) => (value === '' || value === undefined || value === null ? undefined : value),
 		z

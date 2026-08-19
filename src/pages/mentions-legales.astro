@@ -3,19 +3,173 @@ import MarketingLayout from '../layouts/MarketingLayout.astro';
 import Container from '../components/ui/Container.astro';
 import Section from '../components/ui/Section.astro';
 import BackLink from '../components/ui/BackLink.astro';
+import { getEnv } from '../lib/env';
+
+const env = getEnv();
+const contactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL ?? 'contact@deesse-vibes.com';
+const siteUrl = env.PUBLIC_SITE_URL ?? 'https://formation-deesse-vibes.vercel.app/';
+const siteHost = new URL(siteUrl).host;
+const updatedAt = '19 août 2026';
 ---
 
-<MarketingLayout title="Mentions légales — Déesse Vibes">
-	<div class="bg-ink h-24"></div>
+<MarketingLayout
+	title="Mentions légales : Déesse Vibes"
+	description="Informations légales du portail d’inscription Formation Matrice Évolution."
+	header="solid"
+	noindex={true}
+>
 	<Container class="pt-8 sm:pt-10">
 		<BackLink />
 	</Container>
-	<Section title="Mentions légales">
-		<div class="text-ink-soft max-w-2xl space-y-4 text-sm leading-relaxed">
-			<p>Éditeur : Déesse Vibes — à compléter (raison sociale, SIRET, adresse, contact).</p>
-			<p>Hébergement : Vercel Inc.</p>
-			<p>Contact formation : formation@deesse-vibes.com</p>
-			<p class="text-ink/50 text-xs">Brouillon — à finaliser avant production.</p>
+	<Section
+		class="pt-3 pb-10 sm:pt-4 sm:pb-14"
+		title="Mentions légales"
+		description="Informations légales du portail d’inscription Formation Matrice Évolution."
+		meta={`Dernière mise à jour : ${updatedAt}`}
+	>
+		<div class="prose-legal text-ink-soft max-w-2xl space-y-8 text-sm leading-relaxed">
+			<p>
+				Ces mentions légales s’appliquent au site <strong>{siteHost}</strong>,
+				dédié à l’inscription à la Formation Matrice Évolution.
+			</p>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">1. Éditeur du site</h3>
+				<p>Le site est édité par :</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>
+						<strong>SEBBAH Jessica</strong>, entrepreneur individuel (Déesse Vibes, Jessica Stamck)
+					</li>
+					<li>11 chemin de la Ferrière, 06800 Cagnes-sur-Mer, France</li>
+					<li>SIREN : 891 304 610 ; SIRET : 891 304 610 00035</li>
+					<li>N° TVA intracommunautaire : FR08891304610</li>
+					<li>Immatriculation : RCS Antibes</li>
+					<li>
+						E-mail :{" "}
+						<a
+							href={`mailto:${contactEmail}`}
+							class="text-ink hover:underline underline-offset-2">{contactEmail}</a
+						>
+					</li>
+				</ul>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">2. Directeur de la publication</h3>
+				<p>Jessica Stamck.</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">3. Hébergement</h3>
+				<p>Le site est hébergé par :</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li><strong>Vercel Inc.</strong></li>
+					<li>440 N Barranca Avenue #4133, Covina, CA 91723, États-Unis</li>
+					<li>
+						<a
+							href="https://vercel.com"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-ink hover:underline underline-offset-2">vercel.com</a
+						>
+					</li>
+				</ul>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">4. Objet du site</h3>
+				<p>
+					Ce site permet de découvrir la <strong>Formation Matrice Évolution</strong>, de s’y
+					inscrire, de régler le paiement, de signer le contrat de confidentialité et de suivre
+					l’avancement de son parcours jusqu’à l’accès à la formation en ligne.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">5. Propriété intellectuelle</h3>
+				<p>
+					Les textes, visuels, marque et contenus présents sur ce site sont protégés. Toute
+					reproduction ou réutilisation sans autorisation écrite préalable est interdite.
+				</p>
+				<p>
+					Les contenus pédagogiques de la formation restent la propriété de Jessica Stamck /
+					Déesse Vibes. Ils ne sont accessibles qu’aux personnes inscrites, selon les{" "}
+					<a href="/cgv" class="text-ink hover:underline underline-offset-2"
+						>conditions générales de vente</a
+					>.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">6. Données personnelles</h3>
+				<p>
+					Pour savoir comment vos données sont utilisées, consultez notre{" "}
+					<a href="/confidentialite" class="text-ink hover:underline underline-offset-2"
+						>politique de confidentialité</a
+					>.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">7. Médiation et litiges</h3>
+				<p>
+					En cas de différend relatif à votre achat, vous pouvez contacter d’abord{" "}
+					<a
+						href={`mailto:${contactEmail}`}
+						class="text-ink hover:underline underline-offset-2">{contactEmail}</a
+					>
+					{" "}pour tenter une résolution amiable.
+				</p>
+				<p>
+					À défaut d’accord, vous pouvez recourir gratuitement à la médiation de la consommation
+					auprès du <strong>CM2C</strong> (Centre de la Médiation de la Consommation de
+					Conciliateurs de Justice) :
+				</p>
+				<ul class="list-disc space-y-1 pl-5">
+					<li>
+						En ligne :
+						<a
+							href="https://www.cm2c.net"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-ink hover:underline underline-offset-2">www.cm2c.net</a
+						>
+					</li>
+					<li>Courrier : CM2C, 49 Rue de Ponthieu, 75008 Paris</li>
+					<li>
+						E-mail :
+						<a
+							href="mailto:declarer-un-litige@cm2c.net"
+							class="text-ink hover:underline underline-offset-2">declarer-un-litige@cm2c.net</a
+						>
+					</li>
+				</ul>
+				<p>
+					Si la médiation n’aboutit pas, vous pouvez saisir le tribunal compétent conformément
+					aux règles applicables aux consommateurs.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">8. Responsabilité</h3>
+				<p>
+					L’éditeur veille à la fiabilité des informations publiées, sans garantir l’absence
+					d’erreur ni de coupure de service. Elle ne saurait être tenue responsable des
+					indisponibilités ou dysfonctionnements des services tiers utilisés pour le paiement,
+					la signature ou l’accès à la formation.
+				</p>
+			</section>
+
+			<section class="space-y-3">
+				<h3 class="text-ink font-medium">9. Droit applicable</h3>
+				<p>
+					Le site et les présentes mentions légales sont régis par le droit français. Les
+					dispositions protectrices du consommateur demeurent applicables lorsque la loi l’exige.
+				</p>
+			</section>
+		</div>
+		<div class="mt-10 sm:mt-12">
+			<BackLink variant="primary" />
 		</div>
 	</Section>
 </MarketingLayout>
