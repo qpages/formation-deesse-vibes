@@ -15,12 +15,13 @@ import { persistNdaDraftRequestId, persistNdaProvisioned } from './persist';
 describe('persist DocuSeal', () => {
 	it('persistNdaDraftRequestId écrit nda_requests docuseal sans yousignRequestId', async () => {
 		const upsert = vi.fn();
+		const update = vi.fn();
 		const findUniqueOrThrow = vi.fn().mockResolvedValue({ id: 'enr_1' });
 		getPrisma.mockReturnValue({
 			$transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
 				fn({
 					ndaRequest: { upsert },
-					enrollment: { findUniqueOrThrow },
+					enrollment: { findUniqueOrThrow, update },
 				}),
 		});
 
@@ -35,6 +36,7 @@ describe('persist DocuSeal', () => {
 				}),
 			}),
 		);
+		expect(update).not.toHaveBeenCalled();
 	});
 
 	it('persistNdaProvisioned stocke embed_src en metadata', async () => {
