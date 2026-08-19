@@ -1,5 +1,6 @@
 import { yousignAdapter, type YouSignAdapter } from './adapters/yousign';
-import type { SignaturePort, SignatureWebhookAdapter } from './types';
+import type { NdaSignatureProvider } from './nda-request';
+import type { SignatureOps, SignaturePort, SignatureWebhookAdapter } from './types';
 import { getEnv } from '../env';
 
 function resolveProvider(): 'yousign' {
@@ -20,7 +21,14 @@ export function getSignatureWebhookAdapter(): SignatureWebhookAdapter {
 	return yousignAdapter;
 }
 
-/** Accès adapter complet (sync / resend) — à retirer en Slice 2 via nda_requests. */
+export function getSignatureOps(provider: NdaSignatureProvider): SignatureOps {
+	if (provider !== 'yousign') {
+		throw new Error(`Unsupported NDA provider: ${provider}`);
+	}
+	return yousignAdapter;
+}
+
+/** Sync/resend YouSign-specific — resend/recreate until Slice 4+. */
 export function getSignatureAdapter(): YouSignAdapter {
 	resolveProvider();
 	return yousignAdapter;

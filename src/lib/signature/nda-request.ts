@@ -8,8 +8,15 @@ export type NdaRequestLookup = {
 type EnrollmentNdaFields = {
 	yousignRequestId?: string | null;
 	yousignSignerId?: string | null;
-	ndaRequest?: Pick<NdaRequest, 'externalRequestId' | 'externalSignerId'> | null;
+	ndaRequest?: Pick<NdaRequest, 'provider' | 'externalRequestId' | 'externalSignerId'> | null;
 };
+
+export type NdaSignatureProvider = 'yousign';
+
+/** Dual-read provider: nda_requests first, fallback yousign. */
+export function resolveNdaProvider(enrollment: EnrollmentNdaFields): NdaSignatureProvider {
+	return (enrollment.ndaRequest?.provider ?? 'yousign') as NdaSignatureProvider;
+}
 
 /** Dual-read: nda_requests first, fallback enrollment yousign* columns. */
 export function resolveNdaRequestIds(enrollment: EnrollmentNdaFields): NdaRequestLookup | null {

@@ -1,3 +1,5 @@
+import type { EnqueueResult } from '../inngest/client';
+
 export type SignedDocument = {
 	bytes: Uint8Array;
 	contentType: string;
@@ -50,4 +52,21 @@ export interface SignaturePort {
 export interface SignatureWebhookAdapter {
 	verify(rawBody: string, signatureHeader: string | null): boolean;
 	mapCompletedEvent(payload: unknown): SignatureCompletedEvent | null;
+}
+
+export type SyncNdaStatusResult =
+	| { ok: true; providerStatus: string; followUp: EnqueueResult }
+	| {
+			ok: false;
+			reason:
+				| 'enrollment_not_found'
+				| 'no_nda_request'
+				| 'unmapped_status'
+				| 'draft_not_activated';
+			detail?: string;
+	  };
+
+/** Provider-specific NDA status sync (admin / learner « j’ai signé »). */
+export interface SignatureOps {
+	sync(enrollmentId: string): Promise<SyncNdaStatusResult>;
 }

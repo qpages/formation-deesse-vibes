@@ -8,11 +8,15 @@ import type {
 	ProvisionNdaInput,
 	ProvisionNdaResult,
 	SignatureCompletedEvent,
+	SignatureOps,
 	SignaturePort,
 	SignatureWebhookAdapter,
 	SignedDocument,
+	SignSurface,
 	SignSurfaceInput,
+	SyncNdaStatusResult,
 } from '../types';
+import { syncYousignNda } from './yousign-sync';
 
 export type YousignSignatureRequest = {
 	id: string;
@@ -208,9 +212,10 @@ async function provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResul
 	return activateNdaRequest(input.requestId);
 }
 
-async function getSignSurface(input: SignSurfaceInput): Promise<string | null> {
+async function getSignSurface(input: SignSurfaceInput): Promise<SignSurface | null> {
 	const signer = await getSigner(input.requestId, input.signerId);
-	return signer.signature_link ?? null;
+	const url = signer.signature_link ?? null;
+	return url ? { kind: 'redirect', url } : null;
 }
 
 async function downloadSignedPdf(requestId: string): Promise<SignedDocument> {
@@ -226,9 +231,17 @@ async function downloadSignedPdf(requestId: string): Promise<SignedDocument> {
 	);
 }
 
-/** Ops hors port Slice 1 — migrées vers nda_requests en Slice 2. */
+async function sync(enrollmentId: string): Promise<SyncNdaStatusResult> {
+	return syncYousignNda(enrollmentId, {
+		getSignatureRequest,
+		getSigner,
+	});
+}
+
+/** Ops hors port Slice 1 — IDs via nda_requests; port extension Slice 3. */
 export type YouSignAdapter = SignaturePort &
-	SignatureWebhookAdapter & {
+	SignatureWebhookAdapter &
+	SignatureOps & {
 		getSignatureRequest(requestId: string): Promise<YousignSignatureRequest>;
 		getSigner(requestId: string, signerId: string): Promise<YousignSigner>;
 		reactivateNda(requestId: string): Promise<YousignSignatureRequest>;
@@ -240,6 +253,7 @@ export const yousignAdapter: YouSignAdapter = {
 	downloadSignedPdf,
 	verify: verifyYousignSignature,
 	mapCompletedEvent,
+	sync,
 	getSignatureRequest,
 	getSigner,
 	reactivateNda: (requestId: string) =>

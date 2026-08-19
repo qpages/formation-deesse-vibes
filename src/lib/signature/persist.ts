@@ -1,3 +1,8 @@
+import type {
+	ContractStatus,
+	YousignRequestStatus,
+	YousignSignerStatus,
+} from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
 
 const YOUSIGN_ERROR_MAX_LEN = 1000;
@@ -139,4 +144,69 @@ export async function recordYousignError(enrollmentId: string, message: string) 
 	} catch (error) {
 		console.error('[recordYousignError] persist failed', error);
 	}
+}
+
+/** Dual-write sync mirror: enrollment yousign* + nda_requests providerStatus / lastError. */
+export async function persistNdaSyncMirror(
+	enrollmentId: string,
+	data: {
+		yousignStatus?: YousignRequestStatus;
+		contractStatus?: ContractStatus;
+		providerStatus?: string | null;
+		yousignSignerId?: string | null;
+		yousignSignerStatus?: YousignSignerStatus | null;
+		signatureLinkExpiresAt?: Date | null;
+		ndaNotifiedAt?: Date | null;
+		ndaSignedAt?: Date | null;
+		yousignLastError?: string | null;
+		yousignLastErrorAt?: Date | null;
+	},
+) {
+	const prisma = getPrisma();
+	return prisma.$transaction(async (tx) => {
+		const enrollment = await tx.enrollment.update({
+			where: { id: enrollmentId },
+			data: {
+				...(data.yousignStatus !== undefined ? { yousignStatus: data.yousignStatus } : {}),
+				...(data.contractStatus ? { contractStatus: data.contractStatus } : {}),
+				...(data.yousignSignerId !== undefined ? { yousignSignerId: data.yousignSignerId } : {}),
+				...(data.yousignSignerStatus !== undefined
+					? { yousignSignerStatus: data.yousignSignerStatus }
+					: {}),
+				...(data.signatureLinkExpiresAt !== undefined
+					? { signatureLinkExpiresAt: data.signatureLinkExpiresAt }
+					: {}),
+				...(data.ndaNotifiedAt !== undefined ? { ndaNotifiedAt: data.ndaNotifiedAt } : {}),
+				...(data.ndaSignedAt !== undefined ? { ndaSignedAt: data.ndaSignedAt } : {}),
+				...(data.yousignLastError !== undefined ? { yousignLastError: data.yousignLastError } : {}),
+				...(data.yousignLastErrorAt !== undefined
+					? { yousignLastErrorAt: data.yousignLastErrorAt }
+					: {}),
+			},
+			include: { user: true, ndaRequest: true },
+		});
+
+		const ndaUpdate: {
+			providerStatus?: string | null;
+			lastError?: string | null;
+			lastErrorAt?: Date | null;
+		} = {};
+		if (data.providerStatus !== undefined) ndaUpdate.providerStatus = data.providerStatus;
+		if (data.yousignLastError === null) {
+			ndaUpdate.lastError = null;
+			ndaUpdate.lastErrorAt = null;
+		} else if (data.yousignLastError !== undefined) {
+			ndaUpdate.lastError = truncateError(data.yousignLastError);
+			ndaUpdate.lastErrorAt = data.yousignLastErrorAt ?? new Date();
+		}
+
+		if (Object.keys(ndaUpdate).length > 0) {
+			await tx.ndaRequest.updateMany({
+				where: { enrollmentId },
+				data: ndaUpdate,
+			});
+		}
+
+		return enrollment;
+	});
 }
