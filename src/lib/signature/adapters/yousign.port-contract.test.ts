@@ -85,7 +85,7 @@ describe('YouSign adapter port contract', () => {
 
 		await expect(
 			port.getSignSurface({ requestId: 'req_1', signerId: 'sig_1' }),
-		).resolves.toBe('https://sign/here');
+		).resolves.toEqual({ kind: 'redirect', url: 'https://sign/here' });
 	});
 
 	it('webhook.verify valide la signature HMAC', () => {

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { findEnrollmentById, syncYousignStatus } = vi.hoisted(() => ({
+const { findEnrollmentById, syncNdaStatus } = vi.hoisted(() => ({
 	findEnrollmentById: vi.fn(),
-	syncYousignStatus: vi.fn(),
+	syncNdaStatus: vi.fn(),
 }));
 
 vi.mock('./enrollment', () => ({ findEnrollmentById }));
-vi.mock('./yousign-events', () => ({ syncYousignStatus }));
+vi.mock('../signature/sync-nda', () => ({ syncNdaStatus }));
 
 import { confirmLearnerNdaSignature } from './nda-sync';
 
@@ -32,29 +32,29 @@ describe('confirmLearnerNdaSignature', () => {
 			ok: true,
 			signed: true,
 		});
-		expect(syncYousignStatus).not.toHaveBeenCalled();
+		expect(syncNdaStatus).not.toHaveBeenCalled();
 	});
 
 	it('Yousign done → signed true', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
-		syncYousignStatus.mockResolvedValue({
+		syncNdaStatus.mockResolvedValue({
 			ok: true,
-			yousignStatus: 'done',
-			followUp: { status: 'ok' },
+			providerStatus: 'done',
+			followUp: { status: 'enqueued' },
 		});
 
 		await expect(confirmLearnerNdaSignature('enr_1')).resolves.toEqual({
 			ok: true,
 			signed: true,
 		});
-		expect(syncYousignStatus).toHaveBeenCalledWith('enr_1');
+		expect(syncNdaStatus).toHaveBeenCalledWith('enr_1');
 	});
 
 	it('Yousign encore ongoing → signed false', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
-		syncYousignStatus.mockResolvedValue({
+		syncNdaStatus.mockResolvedValue({
 			ok: true,
-			yousignStatus: 'ongoing',
+			providerStatus: 'ongoing',
 			followUp: { status: 'skipped' },
 		});
 
@@ -73,12 +73,12 @@ describe('confirmLearnerNdaSignature', () => {
 			ok: false,
 			reason: 'not_awaiting',
 		});
-		expect(syncYousignStatus).not.toHaveBeenCalled();
+		expect(syncNdaStatus).not.toHaveBeenCalled();
 	});
 
 	it('sans demande Yousign → no_yousign_request', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
-		syncYousignStatus.mockResolvedValue({ ok: false, reason: 'no_yousign_request' });
+		syncNdaStatus.mockResolvedValue({ ok: false, reason: 'no_nda_request' });
 
 		await expect(confirmLearnerNdaSignature('enr_1')).resolves.toEqual({
 			ok: false,

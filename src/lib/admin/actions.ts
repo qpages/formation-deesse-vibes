@@ -29,6 +29,7 @@ export const adminActionKeys = [
 	'retrigger_teachizy',
 	'sync_teachizy',
 	'sync_payment',
+	'sync_nda',
 	'sync_yousign',
 	'recreate_nda',
 	'copy_nda_link',
@@ -96,6 +97,17 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		confirm: 'Synchroniser',
 	},
 	{
+		action: 'sync_nda',
+		label: 'Sync NDA',
+		zone: 'actions',
+		execution: 'sync',
+		eyebrow: 'Action',
+		title: 'Synchroniser le NDA',
+		description:
+			'Lire le statut de signature de {name} chez le provider et aligner contractStatus. Invite Teachizy si le NDA est signé (si la file est disponible).',
+		confirm: 'Synchroniser',
+	},
+	{
 		action: 'sync_yousign',
 		label: 'Sync statut Yousign',
 		zone: 'actions',
@@ -103,7 +115,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Action',
 		title: 'Synchroniser Yousign',
 		description:
-			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus. Invite Teachizy si le NDA est signé (si la file est disponible).',
+			'Alias de « Sync NDA » — même comportement. Conservé pour compatibilité API.',
 		confirm: 'Synchroniser',
 	},
 	{
@@ -188,6 +200,7 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 			return e.accessStatus !== 'revoked' && e.contractStatus === 'signed';
 		case 'sync_payment':
 			return Boolean(e.stripeCheckoutSessionId);
+		case 'sync_nda':
 		case 'sync_yousign':
 			return Boolean(requestId);
 		default:

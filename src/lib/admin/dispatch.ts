@@ -4,7 +4,7 @@ import { canResendNda, findEnrollmentById } from '../services/enrollment';
 import { syncPaymentFromStripe } from '../services/payments';
 import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncTeachizyAccess } from '../services/teachizy-access';
-import { syncYousignStatus } from '../services/yousign-events';
+import { syncNdaStatus } from '../signature/sync-nda';
 import { getSignaturePort } from '../signature/factory';
 import {
 	resolveExternalRequestId,
@@ -26,6 +26,7 @@ const ADMIN_NOTIFY_SEVERITY: Partial<Record<AdminActionKey, OpsSeverity>> = {
 	retrigger_teachizy: 'info',
 	sync_teachizy: 'info',
 	sync_payment: 'info',
+	sync_nda: 'info',
 	sync_yousign: 'info',
 	recreate_nda: 'warn',
 };
@@ -58,17 +59,17 @@ const handlers = {
 		return { ok: true };
 	},
 
-	async sync_yousign(enrollment) {
-		const result = await syncYousignStatus(enrollment.id);
+	async sync_nda(enrollment) {
+		const result = await syncNdaStatus(enrollment.id);
 		if (!result.ok) {
 			const messages: Record<string, string> = {
 				enrollment_not_found: 'Inscription introuvable.',
-				no_yousign_request: 'Aucune demande Yousign associée.',
+				no_nda_request: 'Aucune demande de signature NDA associée.',
 				draft_not_activated:
-					'Yousign : demande en brouillon (draft), jamais activée — aucun e-mail envoyé. Recréez le lien Yousign.',
+					'Demande en brouillon (draft), jamais activée — aucun e-mail envoyé. Recréez le lien de signature.',
 				unmapped_status: result.detail
-					? `Statut Yousign inconnu : ${result.detail}`
-					: 'Statut Yousign inconnu.',
+					? `Statut provider inconnu : ${result.detail}`
+					: 'Statut provider inconnu.',
 			};
 			return {
 				ok: false,
@@ -81,10 +82,14 @@ const handlers = {
 				ok: true,
 				toast: 'info',
 				message:
-					'Statut Yousign synchronisé. Invitation Teachizy non déclenchée (file indisponible) — relancez « Inviter à la formation ».',
+					'Statut NDA synchronisé. Invitation Teachizy non déclenchée (file indisponible) — relancez « Inviter à la formation ».',
 			};
 		}
 		return { ok: true };
+	},
+
+	async sync_yousign(enrollment) {
+		return handlers.sync_nda(enrollment);
 	},
 
 	async sync_teachizy(enrollment) {
