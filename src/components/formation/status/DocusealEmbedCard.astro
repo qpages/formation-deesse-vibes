@@ -1,0 +1,30 @@
+---
+import { getEnv } from '../../../lib/env';
+
+interface Props {
+	src: string;
+	email: string;
+}
+
+const { src, email } = Astro.props;
+const apiBase = getEnv().DOCUSEAL_API_BASE;
+const cdnBase = apiBase.includes('.eu') ? 'https://cdn.docuseal.eu' : 'https://cdn.docuseal.com';
+---
+
+<div class="space-y-3">
+	<docuseal-form id="nda-docuseal-form" data-src={src} data-email={email}></docuseal-form>
+	<p class="text-ink-soft text-sm">
+		Signez directement ci-dessus. Cette page se met à jour automatiquement après signature.
+	</p>
+</div>
+
+<script is:inline src={`${cdnBase}/js/form.js`}></script>
+<script>
+	const form = document.getElementById('nda-docuseal-form');
+	form?.addEventListener('completed', () => {
+		if (typeof window.toast === 'function') {
+			window.toast('Signature envoyée. Mise à jour en cours…', 'success');
+		}
+		window.setTimeout(() => window.location.reload(), 1500);
+	});
+</script>

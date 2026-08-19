@@ -11,7 +11,7 @@ import {
 	findEnrollmentByCheckoutSession,
 	findEnrollmentById,
 	peekMagicLink,
-	resolveNdaSignUrl,
+	resolveNdaSignSurface,
 	type EnrollmentWithUser,
 } from '../services/enrollment';
 import {
@@ -22,6 +22,7 @@ import {
 } from '../services/payments';
 import { notifyOps } from '../services/slack';
 import { checkoutSuccessFlash, stepStates } from '../status';
+import type { SignSurface } from '../signature/types';
 import { isNdaFullyProvisioned } from '../signature/helpers';
 import {
 	decideMagicLinkOutcome,
@@ -38,7 +39,7 @@ export type HomeEnrollmentView = {
 	showFunnel: boolean;
 	showTracking: boolean;
 	steps: ReturnType<typeof stepStates>;
-	ndaSignUrl: string | null;
+	ndaSignSurface: SignSurface | null;
 	invoiceLinks: Awaited<ReturnType<typeof listPaidInvoiceLinks>>;
 	magicLinkFailed: boolean;
 };
@@ -190,12 +191,12 @@ export async function resolveHomeEnrollment(input: {
 			})
 		: { paiement: 'a_faire' as const, nda: 'a_faire' as const, acces: 'a_faire' as const };
 
-	let ndaSignUrl: string | null = null;
+	let ndaSignSurface: SignSurface | null = null;
 	if (enrollment && isAwaitingNda(enrollment)) {
 		try {
-			ndaSignUrl = await resolveNdaSignUrl(enrollment);
+			ndaSignSurface = await resolveNdaSignSurface(enrollment);
 		} catch {
-			ndaSignUrl = null;
+			ndaSignSurface = null;
 		}
 	}
 
@@ -215,7 +216,7 @@ export async function resolveHomeEnrollment(input: {
 			showFunnel,
 			showTracking,
 			steps,
-			ndaSignUrl,
+			ndaSignSurface,
 			invoiceLinks,
 			magicLinkFailed: link === 'invalid',
 		},

@@ -11,7 +11,7 @@ vi.mock('../services/enrollment', () => ({
 	consumeMagicLink,
 	findEnrollmentById,
 	findEnrollmentByCheckoutSession: vi.fn(),
-	resolveNdaSignUrl: vi.fn(),
+	resolveNdaSignSurface: vi.fn(),
 }));
 
 vi.mock('../services/payments', () => ({

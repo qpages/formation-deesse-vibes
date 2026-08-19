@@ -25,7 +25,7 @@ describe('shouldPollEnrollment', () => {
 				...base,
 				collectionStatus: 'paid',
 				contractStatus: 'sent',
-				hasNdaSignUrl: true,
+				hasNdaSignSurface: true,
 			}),
 		).toBe(true);
 	});
@@ -36,7 +36,7 @@ describe('shouldPollEnrollment', () => {
 				...base,
 				collectionStatus: 'paid',
 				contractStatus: 'pending',
-				hasNdaSignUrl: false,
+				hasNdaSignSurface: false,
 			}),
 		).toBe(true);
 	});
@@ -57,7 +57,7 @@ describe('shouldPollEnrollment', () => {
 				collectionStatus: 'paid',
 				contractStatus: 'signed',
 				accessStatus: 'active',
-				hasNdaSignUrl: true,
+				hasNdaSignSurface: true,
 			}),
 		).toBe(false);
 	});

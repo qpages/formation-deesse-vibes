@@ -39,7 +39,7 @@ const enrollment = view?.enrollment ?? null;
 const flash = view?.flash ?? null;
 const checkoutCancel = view?.checkoutCancel ?? false;
 const showTracking = view?.showTracking ?? false;
-const ndaSignUrl = view?.ndaSignUrl ?? null;
+const ndaSignSurface = view?.ndaSignSurface ?? null;
 const invoiceLinks = view?.invoiceLinks ?? [];
 const magicLinkFailed = view?.magicLinkFailed ?? false;
 
@@ -88,7 +88,7 @@ const heroCta = showTracking
 					<AccessPanel
 						showFunnel={!showTracking}
 						enrollment={enrollment}
-						ndaSignUrl={ndaSignUrl}
+						ndaSignSurface={ndaSignSurface}
 						invoiceLinks={invoiceLinks}
 						flash={flash}
 						checkoutCancel={checkoutCancel}

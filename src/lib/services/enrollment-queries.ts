@@ -1,7 +1,7 @@
-import type { Enrollment, User } from '../../generated/prisma/client';
+import type { Enrollment, NdaRequest, SignatureProvider, User } from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
 
-export type EnrollmentWithUser = Enrollment & { user: User };
+export type EnrollmentWithUser = Enrollment & { user: User; ndaRequest?: NdaRequest | null };
 
 export const withUser = { include: { user: true, ndaRequest: true } } as const;
 
@@ -67,7 +67,7 @@ export async function findEnrollmentByYousignRequestOrExternalId(
 }
 
 export async function findEnrollmentByExternalRequestId(
-	provider: 'yousign',
+	provider: SignatureProvider,
 	requestId: string,
 ) {
 	const prisma = getPrisma();
@@ -78,6 +78,8 @@ export async function findEnrollmentByExternalRequestId(
 	});
 	if (viaNda) return viaNda;
 
+	if (provider !== 'yousign') return null;
+
 	return prisma.enrollment.findUnique({
 		where: { yousignRequestId: requestId },
 		...withUser,
@@ -85,7 +87,7 @@ export async function findEnrollmentByExternalRequestId(
 }
 
 export async function findEnrollmentByExternalRequestOrEnrollmentId(
-	provider: 'yousign',
+	provider: SignatureProvider,
 	requestId: string,
 	externalId?: string,
 ) {
@@ -95,7 +97,7 @@ export async function findEnrollmentByExternalRequestOrEnrollmentId(
 		where: {
 			OR: [
 				{ ndaRequest: { provider, externalRequestId: requestId } },
-				{ yousignRequestId: requestId },
+				...(provider === 'yousign' ? [{ yousignRequestId: requestId }] : []),
 				...(externalId ? [{ id: externalId }] : []),
 			],
 		},

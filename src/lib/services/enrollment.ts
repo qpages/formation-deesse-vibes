@@ -14,9 +14,11 @@ import { getSignaturePort } from '../signature/factory';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
+	resolveNdaProvider,
 } from '../signature/nda-request';
+import type { SignSurface } from '../signature/types';
 import { sendMagicLinkEmail } from './brevo';
-import { findEnrollmentByEmail, withUser } from './enrollment-queries';
+import { findEnrollmentByEmail, withUser, type EnrollmentWithUser } from './enrollment-queries';
 
 export type { EnrollmentWithUser } from './enrollment-queries';
 export {
@@ -29,6 +31,7 @@ export {
 	findEnrollmentBySubscriptionId,
 	findEnrollmentByYousignRequestId,
 	findEnrollmentByYousignRequestOrExternalId,
+	findEnrollmentByExternalRequestOrEnrollmentId,
 	findEnrollmentIdByPaymentIntentId,
 	findEnrollmentForAccessPolicy,
 	findEnrollmentIdByStripeInvoiceId,
@@ -259,7 +262,10 @@ export async function canResendNda(
 		return { ok: false, reason: 'Le contrat de confidentialité n’est pas en attente de signature.' };
 	}
 	if (!resolveExternalRequestId(enrollment)) {
-		return { ok: false, reason: 'Aucune demande Yousign associée.' };
+		return { ok: false, reason: 'Aucune demande de signature associée.' };
+	}
+	if (resolveNdaProvider(enrollment) === 'docuseal') {
+		return { ok: false, reason: 'Signature intégrée sur la page — pas de renvoi par e-mail.' };
 	}
 
 	const now = Date.now();
@@ -302,14 +308,28 @@ export async function markNdaResent(enrollment: Enrollment) {
 	});
 }
 
-export async function resolveNdaSignUrl(enrollment: Enrollment): Promise<string | null> {
+type NdaRequestMetadata = { embed_src?: string };
+
+export async function resolveNdaSignSurface(
+	enrollment: EnrollmentWithUser,
+): Promise<SignSurface | null> {
 	const requestId = resolveExternalRequestId(enrollment);
 	const signerId = resolveExternalSignerId(enrollment);
 	if (!requestId || !signerId) return null;
+
+	if (enrollment.ndaRequest?.signKind === 'embed') {
+		const metadata = enrollment.ndaRequest.metadata as NdaRequestMetadata | null;
+		const src = metadata?.embed_src;
+		if (src) {
+			return { kind: 'embed', src, email: enrollment.user.email };
+		}
+	}
+
 	try {
 		return await getSignaturePort().getSignSurface({
 			requestId,
 			signerId,
+			email: enrollment.user.email,
 		});
 	} catch {
 		return null;

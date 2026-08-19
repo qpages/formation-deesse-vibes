@@ -3,6 +3,7 @@ import type { EnrollmentWithUser } from '../../../lib/services/enrollment';
 import type { PaidInvoiceLink } from '../../../lib/services/payments';
 import { getEnv } from '../../../lib/env';
 import { resolveExternalRequestId } from '../../../lib/signature/nda-request';
+import type { SignSurface } from '../../../lib/signature/types';
 import { whatsappHelpHref } from '../../../lib/whatsapp';
 import CheckoutForm from '../landing/CheckoutForm.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
@@ -18,7 +19,7 @@ const adminContactExternal = adminContactHref.startsWith('https://');
 interface Props {
 	showFunnel: boolean;
 	enrollment: EnrollmentWithUser | null;
-	ndaSignUrl?: string | null;
+	ndaSignSurface?: SignSurface | null;
 	invoiceLinks?: PaidInvoiceLink[];
 	flash?: string | null;
 	checkoutCancel?: boolean;
@@ -29,7 +30,7 @@ interface Props {
 const {
 	showFunnel,
 	enrollment,
-	ndaSignUrl = null,
+	ndaSignSurface = null,
 	invoiceLinks = [],
 	flash = null,
 	checkoutCancel = false,
@@ -115,7 +116,7 @@ const canDownloadNda =
 			{enrollment && (
 				<div class="space-y-8">
 					<div>
-						<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} />
+						<StatusPanel enrollment={enrollment} ndaSignSurface={ndaSignSurface} />
 					</div>
 
 					<div>

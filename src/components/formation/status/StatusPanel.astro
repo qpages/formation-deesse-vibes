@@ -1,5 +1,6 @@
 ---
 import type { Enrollment } from '../../../generated/prisma/client';
+import type { SignSurface } from '../../../lib/signature/types';
 import { isPaidEnough } from '../../../lib/enrollment-gates';
 import {
 	ENROLLMENT_POLL_INTERVAL_MS,
@@ -10,26 +11,27 @@ import {
 } from '../../../lib/status';
 import Alert from '../../ui/Alert.astro';
 import Button from '../../ui/Button.astro';
+import DocusealEmbedCard from './DocusealEmbedCard.astro';
 import SignLinkCard from './SignLinkCard.astro';
 
 interface Props {
 	enrollment: Enrollment;
-	ndaSignUrl?: string | null;
+	ndaSignSurface?: SignSurface | null;
 }
 
-const { enrollment, ndaSignUrl } = Astro.props;
+const { enrollment, ndaSignSurface = null } = Astro.props;
 const orthogonal = {
 	collectionStatus: enrollment.collectionStatus,
 	contractStatus: enrollment.contractStatus,
 	accessStatus: enrollment.accessStatus,
 };
-const action = primaryAction(orthogonal, ndaSignUrl);
+const action = primaryAction(orthogonal, ndaSignSurface);
 const message = statusMessage(orthogonal);
-const showSignCard = Boolean(ndaSignUrl);
+const showSignSurface = Boolean(ndaSignSurface);
 const poll = shouldPollEnrollment({
 	...orthogonal,
 	hasCheckoutSession: Boolean(enrollment.stripeCheckoutSessionId),
-	hasNdaSignUrl: showSignCard,
+	hasNdaSignUrl: showSignSurface,
 });
 const closed = enrollment.accessStatus === 'revoked' || enrollment.collectionStatus === 'refunded';
 const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractStatus}|${enrollment.accessStatus}`;
@@ -43,7 +45,12 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	data-poll-interval={ENROLLMENT_POLL_INTERVAL_MS}
 	data-poll-max={ENROLLMENT_POLL_MAX_MS}
 >
-	{showSignCard && <p class="text-ink-soft">Le lien de signature est prêt.</p>}
+	{showSignSurface && ndaSignSurface?.kind === 'embed' && (
+		<p class="text-ink-soft">Votre contrat est prêt à signer ci-dessous.</p>
+	)}
+	{showSignSurface && ndaSignSurface?.kind === 'redirect' && (
+		<p class="text-ink-soft">Le lien de signature est prêt.</p>
+	)}
 
 	{
 		enrollment.collectionStatus === 'pending' && enrollment.stripeCheckoutSessionId && (
@@ -55,14 +62,14 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	{
 		isPaidEnough(enrollment.collectionStatus) &&
 			enrollment.contractStatus === 'pending' &&
-			!showSignCard && (
+			!showSignSurface && (
 				<p class="text-ink-soft">
 					Votre paiement est bien confirmé. Le lien de signature apparaît ici dès qu’il est prêt.
 				</p>
 			)
 	}
 	{
-		enrollment.contractStatus === 'sent' && !showSignCard && (
+		enrollment.contractStatus === 'sent' && !showSignSurface && (
 			<p class="text-ink-soft">
 				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page ou
 				contactez un administrateur.
@@ -70,7 +77,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		)
 	}
 	{
-		!showSignCard && action.kind === 'open_platform' ? (
+		!showSignSurface && action.kind === 'open_platform' ? (
 			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
 				{message && (
 					<div class="max-w-prose space-y-1.5">
@@ -103,7 +110,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	}
 
 	{
-		!showSignCard && action.kind === 'refresh' && (
+		!showSignSurface && action.kind === 'refresh' && (
 			<Button href="/#acces" size="md" variant="primary" id="status-refresh">
 				{action.label}
 			</Button>
@@ -117,21 +124,26 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		)
 	}
 
-	{showSignCard && ndaSignUrl && <SignLinkCard signUrl={ndaSignUrl} />}
+	{ndaSignSurface?.kind === 'redirect' && <SignLinkCard signUrl={ndaSignSurface.url} />}
+	{ndaSignSurface?.kind === 'embed' && (
+		<DocusealEmbedCard src={ndaSignSurface.src} email={ndaSignSurface.email} />
+	)}
 
 	{
-		enrollment.contractStatus === 'sent' && !closed && (
-			<div class="space-y-3">
-				<p class="text-ink-soft text-sm">
-					Après signature, cette page se met à jour automatiquement. Si ce n’est pas le cas, cliquez
-					ci-dessous.
-				</p>
-				<Button id="nda-confirm-signed" type="button" size="md" variant="secondary">
-					J’ai signé le contrat de confidentialité
-				</Button>
-				<p id="nda-confirm-feedback" class="text-ink-soft text-sm" aria-live="polite" />
-			</div>
-		)
+		enrollment.contractStatus === 'sent' &&
+			!closed &&
+			ndaSignSurface?.kind !== 'embed' && (
+				<div class="space-y-3">
+					<p class="text-ink-soft text-sm">
+						Après signature, cette page se met à jour automatiquement. Si ce n’est pas le cas, cliquez
+						ci-dessous.
+					</p>
+					<Button id="nda-confirm-signed" type="button" size="md" variant="secondary">
+						J’ai signé le contrat de confidentialité
+					</Button>
+					<p id="nda-confirm-feedback" class="text-ink-soft text-sm" aria-live="polite" />
+				</div>
+			)
 	}
 </div>
 

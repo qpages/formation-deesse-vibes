@@ -6,6 +6,7 @@ import {
 	CONTRACT_STATUS_LABELS,
 	YOUSIGN_STATUS_LABELS,
 } from './labels';
+import type { SignSurface } from '../signature/types';
 import type { BadgeTone, OrthogonalStatuses, PrimaryAction, StepKey, StepState } from './types';
 import { YOUSIGN_FAILURE } from './yousign';
 
@@ -135,7 +136,7 @@ export function adminPipelineBadges(
 export function shouldPollEnrollment(
 	input: OrthogonalStatuses & {
 		hasCheckoutSession?: boolean;
-		hasNdaSignUrl?: boolean;
+		hasNdaSignSurface?: boolean;
 	},
 ): boolean {
 	if (input.collectionStatus === 'pending' && input.hasCheckoutSession) return true;
@@ -182,7 +183,7 @@ export function statusMessage(input: OrthogonalStatuses): string[] | null {
 
 export function primaryAction(
 	input: OrthogonalStatuses,
-	ndaSignUrl?: string | null,
+	ndaSignSurface?: SignSurface | null,
 ): PrimaryAction {
 	if (input.accessStatus === 'revoked' || input.collectionStatus === 'refunded') {
 		return { kind: 'none', label: 'Contacter un administrateur' };
@@ -191,9 +192,10 @@ export function primaryAction(
 		return { kind: 'checkout', label: 'Je m’inscris' };
 	}
 	if (input.contractStatus === 'pending' || input.contractStatus === 'sent') {
-		return ndaSignUrl
-			? { kind: 'sign_nda', label: 'Signer mon accord', href: ndaSignUrl }
-			: { kind: 'refresh', label: 'Actualiser' };
+		if (ndaSignSurface?.kind === 'redirect') {
+			return { kind: 'sign_nda', label: 'Signer mon accord', href: ndaSignSurface.url };
+		}
+		return { kind: 'refresh', label: 'Actualiser' };
 	}
 	if (input.accessStatus === 'pending' || input.accessStatus === 'not_eligible') {
 		return { kind: 'refresh', label: 'Actualiser' };
