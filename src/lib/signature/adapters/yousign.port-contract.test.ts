@@ -15,8 +15,10 @@ vi.mock('../../env', () => ({
 		if (key === 'YOUSIGN_SIGNER_LABEL') return 'signer';
 		throw new Error(`missing ${key}`);
 	},
+	isInngestDevMode: () => true,
 	FORMATION: { name: 'Formation Matrice Évolution', brand: 'Déesse Vibes' },
 }));
+vi.mock('../../inngest/client', () => ({ sendInngestSafe: vi.fn() }));
 vi.mock('../../e2e-providers', () => ({ e2eMockProviders: () => false }));
 
 const port: SignaturePort = yousignAdapter;

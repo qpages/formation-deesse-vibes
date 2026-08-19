@@ -9,8 +9,10 @@ vi.mock('../../env', () => ({
 		if (key === 'YOUSIGN_API_KEY') return 'ys_test_key';
 		throw new Error(`missing ${key}`);
 	},
+	isInngestDevMode: () => true,
 	FORMATION: { name: 'Formation Matrice Évolution', brand: 'Déesse Vibes' },
 }));
+vi.mock('../../inngest/client', () => ({ sendInngestSafe: vi.fn() }));
 vi.mock('../../e2e-providers', () => ({ e2eMockProviders: () => false }));
 
 import { ndaSignatureRequestName, yousignAdapter } from './yousign';

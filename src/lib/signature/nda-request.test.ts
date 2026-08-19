@@ -14,6 +14,7 @@ describe('resolveNdaRequestIds', () => {
 				yousignRequestId: 'legacy_req',
 				yousignSignerId: 'legacy_signer',
 				ndaRequest: {
+					provider: 'yousign',
 					externalRequestId: 'nda_req',
 					externalSignerId: 'nda_signer',
 				},
@@ -46,7 +47,7 @@ describe('resolveExternalRequestId', () => {
 		expect(
 			resolveExternalRequestId({
 				yousignRequestId: 'old',
-				ndaRequest: { externalRequestId: 'new', externalSignerId: null },
+				ndaRequest: { externalRequestId: 'new', externalSignerId: null, provider: 'yousign' },
 			}),
 		).toBe('new');
 	});
@@ -57,7 +58,7 @@ describe('resolveExternalSignerId', () => {
 		expect(
 			resolveExternalSignerId({
 				yousignSignerId: 'old',
-				ndaRequest: { externalRequestId: 'req', externalSignerId: 'new' },
+				ndaRequest: { externalRequestId: 'req', externalSignerId: 'new', provider: 'yousign' },
 			}),
 		).toBe('new');
 	});
@@ -67,7 +68,7 @@ describe('isNdaFullyProvisioned', () => {
 	it('true when ndaRequest has request + signer ids', () => {
 		expect(
 			isNdaFullyProvisioned({
-				ndaRequest: { externalRequestId: 'req', externalSignerId: 'signer' },
+				ndaRequest: { externalRequestId: 'req', externalSignerId: 'signer', provider: 'yousign' },
 			}),
 		).toBe(true);
 	});

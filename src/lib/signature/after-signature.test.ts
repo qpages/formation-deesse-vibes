@@ -63,4 +63,26 @@ describe('ensureTeachizyAfterSignature', () => {
 		expect(result).toEqual({ status: 'skipped' });
 		expect(sendInngestSafe).not.toHaveBeenCalled();
 	});
+
+	it('docuseal: émet uniquement nda/signature.completed', async () => {
+		findEnrollmentById.mockResolvedValue({
+			id: 'enr_1',
+			contractStatus: 'signed',
+			teachizyInvitedAt: null,
+			accessStatus: 'pending',
+		});
+
+		await ensureTeachizyAfterSignature('enr_1', 'evt_src', 'req_1', { provider: 'docuseal' });
+
+		expect(sendInngestSafe).toHaveBeenCalledTimes(1);
+		expect(sendInngestSafe).toHaveBeenCalledWith({
+			id: 'teachizy-after-signature:nda:enr_1',
+			name: 'nda/signature.completed',
+			data: {
+				enrollmentId: 'enr_1',
+				providerEventId: 'evt_src',
+				requestId: 'req_1',
+			},
+		});
+	});
 });
