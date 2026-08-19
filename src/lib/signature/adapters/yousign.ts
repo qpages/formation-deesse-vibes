@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { e2eMockProviders } from '../../e2e-providers';
 import { FORMATION, getEnv, requireEnv } from '../../env';
+import { eventOccurredAt } from '../event-time';
 import type {
 	ProvisionNdaActivateResult,
 	ProvisionNdaDraftResult,
@@ -181,22 +182,6 @@ function verifyYousignSignature(rawBody: string, signatureHeader: string | null)
 	} catch {
 		return false;
 	}
-}
-
-function eventOccurredAt(payload: YousignWebhookPayload): Date {
-	const raw = payload.event_time;
-	if (typeof raw === 'number') {
-		return new Date(raw > 1e12 ? raw : raw * 1000);
-	}
-	if (typeof raw === 'string' && raw.trim()) {
-		const asNumber = Number(raw);
-		if (!Number.isNaN(asNumber)) {
-			return new Date(asNumber > 1e12 ? asNumber : asNumber * 1000);
-		}
-		const parsed = new Date(raw);
-		if (!Number.isNaN(parsed.getTime())) return parsed;
-	}
-	return new Date();
 }
 
 function mapCompletedEvent(payload: unknown): SignatureCompletedEvent | null {

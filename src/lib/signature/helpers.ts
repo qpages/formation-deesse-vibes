@@ -1,10 +1,5 @@
 /** NDA pleinement provisionné (brouillon activé + IDs persistés). */
-export function isNdaFullyProvisioned(enrollment: {
-	yousignRequestId?: string | null;
-	yousignSignerId?: string | null;
-}): boolean {
-	return Boolean(enrollment.yousignRequestId && enrollment.yousignSignerId);
-}
+export { isNdaFullyProvisioned } from './nda-request';
 
 /** Lien App Yousign vers une demande de signature. */
 export function yousignAppUrl(requestId?: string | null): string | null {
