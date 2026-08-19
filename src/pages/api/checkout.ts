@@ -14,6 +14,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 			consentCgv: body.consentCgv === true || body.consentCgv === 'true',
 			consentNda: body.consentNda === true || body.consentNda === 'true',
 			consentPrivacy: body.consentPrivacy === true || body.consentPrivacy === 'true',
+			consentWithdrawalWaiver:
+				body.consentWithdrawalWaiver === true || body.consentWithdrawalWaiver === 'true',
 		});
 
 		if (!parsed.success) {

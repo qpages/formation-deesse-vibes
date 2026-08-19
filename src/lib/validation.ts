@@ -17,6 +17,9 @@ export const checkoutSchema = z.object({
 	consentPrivacy: z.literal(true, {
 		error: 'Acceptation de la politique de confidentialité requise',
 	}),
+	consentWithdrawalWaiver: z.literal(true, {
+		error: 'Renonciation au droit de rétractation requise pour l’accès immédiat',
+	}),
 });
 
 export const magicLinkSchema = z.object({

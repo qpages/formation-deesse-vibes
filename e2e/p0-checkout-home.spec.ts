@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { checkoutBody, enrollmentCookie, seedEnrollment, uniqueEmail } from './helpers/seed';
+import {
+	checkoutBody,
+	enrollmentCookie,
+	findEnrollmentByEmail,
+	seedEnrollment,
+	uniqueEmail,
+} from './helpers/seed';
 
 test.describe('P0 checkout + home', () => {
 	test('1. checkout nouveau → 200 JSON { url }, pas 500', async ({ request }) => {
@@ -74,5 +80,30 @@ test.describe('P0 checkout + home', () => {
 		await expect(
 			page.getByRole('link', { name: 'Télécharger le contrat de confidentialité' }),
 		).toHaveCount(0);
+	});
+
+	test('5. checkout sans renonciation rétractation → 400', async ({ request }) => {
+		const email = uniqueEmail('no-waiver');
+		const res = await request.post('/api/checkout', {
+			data: { ...checkoutBody(email), consentWithdrawalWaiver: false },
+		});
+		expect(res.status()).toBe(400);
+		const body = await res.json();
+		expect(body.error).toMatch(/rétractation/i);
+	});
+
+	test('6. checkout avec renonciation → consentWithdrawalWaiverAt persisté', async ({
+		request,
+	}) => {
+		const email = uniqueEmail('waiver');
+		const res = await request.post('/api/checkout', { data: checkoutBody(email) });
+		expect(res.status(), await res.text()).toBe(200);
+
+		const enrollment = await findEnrollmentByEmail(email);
+		expect(enrollment).not.toBeNull();
+		expect(enrollment!.consentWithdrawalWaiverAt).not.toBeNull();
+		expect(enrollment!.consentCgvAt).not.toBeNull();
+		expect(enrollment!.consentNdaAt).not.toBeNull();
+		expect(enrollment!.consentPrivacyAt).not.toBeNull();
 	});
 });

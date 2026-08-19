@@ -71,6 +71,7 @@ export async function seedEnrollment(input: {
 			consentCgvAt: new Date(),
 			consentNdaAt: new Date(),
 			consentPrivacyAt: new Date(),
+			consentWithdrawalWaiverAt: new Date(),
 		},
 		include: { user: true },
 	});
@@ -84,6 +85,14 @@ export async function seedMagicLink(enrollmentId: string, token: string, used = 
 			expiresAt: new Date(Date.now() + 30 * 60 * 1000),
 			usedAt: used ? new Date() : null,
 		},
+	});
+}
+
+export async function findEnrollmentByEmail(email: string) {
+	return getPrisma().enrollment.findFirst({
+		where: { user: { email: email.toLowerCase() } },
+		orderBy: { createdAt: 'desc' },
+		include: { user: true },
 	});
 }
 
@@ -109,4 +118,5 @@ export const checkoutBody = (email: string) => ({
 	consentCgv: true,
 	consentNda: true,
 	consentPrivacy: true,
+	consentWithdrawalWaiver: true,
 });

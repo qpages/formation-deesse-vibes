@@ -127,9 +127,10 @@ model Enrollment {
   contractStatus   ContractStatus   @default(pending)
   accessStatus     AccessStatus     @default(not_eligible)
 
-  consentCgvAt     DateTime?
-  consentNdaAt     DateTime?
-  consentPrivacyAt DateTime?
+  consentCgvAt                DateTime?
+  consentNdaAt                DateTime?
+  consentPrivacyAt            DateTime?
+  consentWithdrawalWaiverAt   DateTime?
 
   currency             String              @default("eur")
   amountCents          Int                 @default(184900)

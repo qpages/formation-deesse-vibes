@@ -166,6 +166,7 @@ export async function createPendingEnrollment(input: {
 	consentCgv: boolean;
 	consentNda: boolean;
 	consentPrivacy: boolean;
+	consentWithdrawalWaiver: boolean;
 }) {
 	const email = input.email.trim().toLowerCase();
 	const firstName = normalizePersonName(input.firstName);
@@ -200,6 +201,7 @@ export async function createPendingEnrollment(input: {
 		consentCgvAt: input.consentCgv ? now : null,
 		consentNdaAt: input.consentNda ? now : null,
 		consentPrivacyAt: input.consentPrivacy ? now : null,
+		consentWithdrawalWaiverAt: input.consentWithdrawalWaiver ? now : null,
 		paymentPlan: plan.id,
 		installmentsTotal: plan.installments,
 		totalAmountCents: plan.totalAmountCents,
