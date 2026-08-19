@@ -10,7 +10,7 @@ import { isAwaitingNda } from '../enrollment-gates';
 import { getEnv } from '../env';
 import { getPaymentPlan } from '../payment-plans';
 import { getPrisma } from '../prisma';
-import { getSignatureLink } from '../yousign';
+import { getSignaturePort } from '../signature/factory';
 import { sendMagicLinkEmail } from './brevo';
 import { findEnrollmentByEmail, withUser } from './enrollment-queries';
 
@@ -352,7 +352,10 @@ export async function markNdaResent(enrollment: Enrollment) {
 export async function resolveNdaSignUrl(enrollment: Enrollment): Promise<string | null> {
 	if (!enrollment.yousignRequestId || !enrollment.yousignSignerId) return null;
 	try {
-		return await getSignatureLink(enrollment.yousignRequestId, enrollment.yousignSignerId);
+		return await getSignaturePort().getSignSurface({
+			requestId: enrollment.yousignRequestId,
+			signerId: enrollment.yousignSignerId,
+		});
 	} catch {
 		return null;
 	}

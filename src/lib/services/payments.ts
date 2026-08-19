@@ -41,7 +41,7 @@ import {
 	retrieveInvoice,
 	retrieveSubscription,
 } from '../stripe';
-import { isNdaFullyProvisioned } from '../yousign';
+import { isNdaFullyProvisioned } from '../signature/helpers';
 
 const COLLECTION_NOTIFY: Partial<
 	Record<CollectionStatus, { kind: OpsKind; severity: OpsSeverity; title: string }>

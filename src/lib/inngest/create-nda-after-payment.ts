@@ -12,7 +12,8 @@ import {
 	notifyOps,
 	withJobLifecycleAlerts,
 } from '../services/slack';
-import { activateNdaRequest, createNdaDraft, isNdaFullyProvisioned } from '../yousign';
+import { getSignaturePort } from '../signature/factory';
+import { isNdaFullyProvisioned } from '../signature/helpers';
 import { inngest } from './client';
 
 /** Command: créer / activer NDA après paiement (aussi admin recreate/retrigger). */
@@ -62,10 +63,12 @@ export const createNdaAfterPayment = inngest.createFunction(
 					});
 				}
 
+				const signature = getSignaturePort();
 				const requestId =
 					(!isRecreate && enrollment.yousignRequestId) ||
 					(await step.run('create-yousign-draft', async () => {
-						const draft = await createNdaDraft({
+						const draft = await signature.provisionNda({
+							step: 'draft',
 							enrollmentId: enrollment.id,
 							email: enrollment.user.email,
 							firstName: enrollment.user.firstName,
@@ -81,7 +84,11 @@ export const createNdaAfterPayment = inngest.createFunction(
 				}
 
 				const nda = await step.run('activate-yousign-request', async () => {
-					return activateNdaRequest(requestId);
+					const activated = await signature.provisionNda({ step: 'activate', requestId });
+					if (!('signerId' in activated)) {
+						throw new Error('Yousign: activation sans signataire');
+					}
+					return activated;
 				});
 
 				await step.run('persist-nda', async () => {

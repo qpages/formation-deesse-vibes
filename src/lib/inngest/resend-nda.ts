@@ -5,7 +5,7 @@ import {
 	recordYousignError,
 } from '../services/enrollment';
 import { alertFinalFailure, formatErrorDetail, withJobLifecycleAlerts } from '../services/slack';
-import { reactivateNda } from '../yousign';
+import { getSignatureAdapter } from '../signature/factory';
 import { inngest } from './client';
 
 /** Command: resend Yousign NDA (admin resend_nda / api nda/resend). */
@@ -49,7 +49,7 @@ export const resendNda = inngest.createFunction(
 					if (!enrollment.yousignRequestId) {
 						throw new Error('no_yousign_request');
 					}
-					await reactivateNda(enrollment.yousignRequestId);
+					await getSignatureAdapter().reactivateNda(enrollment.yousignRequestId);
 					await markNdaResent(enrollment);
 				});
 

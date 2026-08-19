@@ -7,7 +7,7 @@ import {
 	mapYousignSignerApiStatus,
 	yousignStatusFromEvent,
 } from '../status';
-import { getSignatureRequest, getSigner } from '../yousign';
+import { getSignatureAdapter } from '../signature/factory';
 import { applyAccessPolicy } from './access';
 import {
 	findEnrollmentById,
@@ -125,7 +125,7 @@ export async function syncYousignStatus(enrollmentId: string): Promise<SyncYousi
 		return { ok: false, reason: 'no_yousign_request' };
 	}
 
-	const remote = await getSignatureRequest(enrollment.yousignRequestId);
+	const remote = await getSignatureAdapter().getSignatureRequest(enrollment.yousignRequestId);
 	const rawStatus = remote.status?.toLowerCase() ?? '';
 
 	// Un brouillon = demande jamais activée : ne PAS la faire passer pour « envoyée ».
@@ -159,7 +159,7 @@ export async function syncYousignStatus(enrollmentId: string): Promise<SyncYousi
 	if (signerId) {
 		signerMirror.yousignSignerId = signerId;
 		try {
-			const signer = await getSigner(enrollment.yousignRequestId, signerId);
+			const signer = await getSignatureAdapter().getSigner(enrollment.yousignRequestId, signerId);
 			const signerStatus = mapYousignSignerApiStatus(signer.status);
 			if (signerStatus) signerMirror.yousignSignerStatus = signerStatus;
 			signerMirror.signatureLinkExpiresAt = signer.signature_link_expiration_date

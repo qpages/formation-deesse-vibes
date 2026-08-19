@@ -1,5 +1,5 @@
 import { json } from '../http';
-import { downloadSignedDocuments } from '../yousign';
+import { getSignaturePort } from '../signature/factory';
 import { findEnrollmentById } from './enrollment';
 
 export type SignedNdaFailureReason =
@@ -42,7 +42,7 @@ export async function getSignedNdaPdf(enrollmentId: string): Promise<SignedNdaRe
 	}
 
 	try {
-		const file = await downloadSignedDocuments(enrollment.yousignRequestId);
+		const file = await getSignaturePort().downloadSignedPdf(enrollment.yousignRequestId);
 		return {
 			ok: true,
 			bytes: file.bytes,

@@ -22,7 +22,7 @@ import {
 } from '../services/payments';
 import { notifyOps } from '../services/slack';
 import { checkoutSuccessFlash, stepStates } from '../status';
-import { isNdaFullyProvisioned } from '../yousign';
+import { isNdaFullyProvisioned } from '../signature/helpers';
 import {
 	decideMagicLinkOutcome,
 	MAGIC_LINK_CONNECTED_FLASH,

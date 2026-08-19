@@ -5,7 +5,7 @@ import { syncPaymentFromStripe } from '../services/payments';
 import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncTeachizyAccess } from '../services/teachizy-access';
 import { syncYousignStatus } from '../services/yousign-events';
-import { getSignatureLink } from '../yousign';
+import { getSignaturePort } from '../signature/factory';
 import { ADMIN_ACTIONS, adminActionExecution, type AdminActionKey } from './actions';
 
 export type AdminDispatchResult =
@@ -180,7 +180,10 @@ const handlers = {
 				status: 400,
 			};
 		}
-		const url = await getSignatureLink(enrollment.yousignRequestId, enrollment.yousignSignerId);
+		const url = await getSignaturePort().getSignSurface({
+			requestId: enrollment.yousignRequestId,
+			signerId: enrollment.yousignSignerId,
+		});
 		if (!url) {
 			return {
 				ok: false,
