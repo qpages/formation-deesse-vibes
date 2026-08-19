@@ -35,7 +35,12 @@ export type ProvisionNdaResult = ProvisionNdaDraftResult | ProvisionNdaActivateR
 export type SignSurfaceInput = {
 	requestId: string;
 	signerId: string;
+	email?: string;
 };
+
+export type SignSurface =
+	| { kind: 'redirect'; url: string }
+	| { kind: 'embed'; src: string; email: string };
 
 export type SignatureCompletedEvent = {
 	requestId: string;
@@ -45,7 +50,7 @@ export type SignatureCompletedEvent = {
 
 export interface SignaturePort {
 	provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResult>;
-	getSignSurface(input: SignSurfaceInput): Promise<string | null>;
+	getSignSurface(input: SignSurfaceInput): Promise<SignSurface | null>;
 	downloadSignedPdf(requestId: string): Promise<SignedDocument>;
 }
 

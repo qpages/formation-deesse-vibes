@@ -2,6 +2,7 @@ import { purgeOldWebhookPayloads } from '../services/enrollment';
 import { createNdaAfterPayment } from './create-nda-after-payment';
 import { grantTeachizyAccess } from './grant-teachizy-access';
 import { inngest } from './client';
+import { processDocusealWebhook } from './process-docuseal-webhook';
 import { processStripeWebhook } from './process-stripe-webhook';
 import { processYousignWebhook } from './process-yousign-webhook';
 import { reconcileEnrollments } from './reconcile-enrollments';
@@ -9,6 +10,7 @@ import { resendNda } from './resend-nda';
 
 export { createNdaAfterPayment } from './create-nda-after-payment';
 export { grantTeachizyAccess } from './grant-teachizy-access';
+export { processDocusealWebhook } from './process-docuseal-webhook';
 export { processStripeWebhook } from './process-stripe-webhook';
 export { processYousignWebhook } from './process-yousign-webhook';
 export { reconcileEnrollments } from './reconcile-enrollments';
@@ -29,6 +31,7 @@ export const purgeWebhookPayloads = inngest.createFunction(
 export const inngestFunctions = [
 	processStripeWebhook,
 	processYousignWebhook,
+	processDocusealWebhook,
 	createNdaAfterPayment,
 	grantTeachizyAccess,
 	resendNda,

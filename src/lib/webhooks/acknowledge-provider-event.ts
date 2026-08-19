@@ -6,6 +6,7 @@ import { recordProviderEvent } from '../services/provider-events';
 const EVENT_NAME = {
 	stripe: 'provider/stripe-event.received',
 	yousign: 'provider/yousign-event.received',
+	docuseal: 'provider/docuseal-event.received',
 } as const;
 
 function needsEnqueue(status: string | undefined): boolean {

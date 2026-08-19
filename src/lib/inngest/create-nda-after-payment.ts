@@ -97,6 +97,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 					await persistNdaProvisioned(enrollment.id, {
 						requestId: nda.requestId,
 						signerId: nda.signerId,
+						signatureLink: 'signatureLink' in nda ? nda.signatureLink : undefined,
 					});
 				});
 

@@ -11,7 +11,7 @@ type EnrollmentNdaFields = {
 	ndaRequest?: Pick<NdaRequest, 'provider' | 'externalRequestId' | 'externalSignerId'> | null;
 };
 
-export type NdaSignatureProvider = 'yousign';
+export type NdaSignatureProvider = 'yousign' | 'docuseal';
 
 /** Dual-read provider: nda_requests first, fallback yousign. */
 export function resolveNdaProvider(enrollment: EnrollmentNdaFields): NdaSignatureProvider {

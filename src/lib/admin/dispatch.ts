@@ -9,7 +9,9 @@ import { getSignaturePort } from '../signature/factory';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
+	resolveNdaProvider,
 } from '../signature/nda-request';
+import type { SignSurface } from '../signature/types';
 import { ADMIN_ACTIONS, adminActionExecution, type AdminActionKey } from './actions';
 
 export type AdminDispatchResult =
@@ -30,6 +32,35 @@ const ADMIN_NOTIFY_SEVERITY: Partial<Record<AdminActionKey, OpsSeverity>> = {
 	sync_yousign: 'info',
 	recreate_nda: 'warn',
 };
+
+async function runSyncNda(enrollment: Enrollment): Promise<AdminDispatchResult> {
+	const result = await syncNdaStatus(enrollment.id);
+	if (!result.ok) {
+		const messages: Record<string, string> = {
+			enrollment_not_found: 'Inscription introuvable.',
+			no_nda_request: 'Aucune demande de signature NDA associée.',
+			draft_not_activated:
+				'Demande en brouillon (draft), jamais activée — aucun e-mail envoyé. Recréez le lien de signature.',
+			unmapped_status: result.detail
+				? `Statut provider inconnu : ${result.detail}`
+				: 'Statut provider inconnu.',
+		};
+		return {
+			ok: false,
+			error: messages[result.reason] ?? result.reason,
+			status: 400,
+		};
+	}
+	if (result.followUp.status === 'failed') {
+		return {
+			ok: true,
+			toast: 'info',
+			message:
+				'Statut NDA synchronisé. Invitation Teachizy non déclenchée (file indisponible) — relancez « Inviter à la formation ».',
+		};
+	}
+	return { ok: true };
+}
 
 const handlers = {
 	// --- Actions « sync » : l'effet primaire est le miroir DB. -------------------
@@ -60,36 +91,11 @@ const handlers = {
 	},
 
 	async sync_nda(enrollment) {
-		const result = await syncNdaStatus(enrollment.id);
-		if (!result.ok) {
-			const messages: Record<string, string> = {
-				enrollment_not_found: 'Inscription introuvable.',
-				no_nda_request: 'Aucune demande de signature NDA associée.',
-				draft_not_activated:
-					'Demande en brouillon (draft), jamais activée — aucun e-mail envoyé. Recréez le lien de signature.',
-				unmapped_status: result.detail
-					? `Statut provider inconnu : ${result.detail}`
-					: 'Statut provider inconnu.',
-			};
-			return {
-				ok: false,
-				error: messages[result.reason] ?? result.reason,
-				status: 400,
-			};
-		}
-		if (result.followUp.status === 'failed') {
-			return {
-				ok: true,
-				toast: 'info',
-				message:
-					'Statut NDA synchronisé. Invitation Teachizy non déclenchée (file indisponible) — relancez « Inviter à la formation ».',
-			};
-		}
-		return { ok: true };
+		return runSyncNda(enrollment);
 	},
 
 	async sync_yousign(enrollment) {
-		return handlers.sync_nda(enrollment);
+		return runSyncNda(enrollment);
 	},
 
 	async sync_teachizy(enrollment) {
@@ -182,6 +188,14 @@ const handlers = {
 	// --- Actions « read » : lecture pure, aucun effet persistant. -----------------
 
 	async copy_nda_link(enrollment) {
+		if (resolveNdaProvider(enrollment) === 'docuseal') {
+			return {
+				ok: false,
+				error: 'Signature intégrée (embed) — pas de lien à copier.',
+				status: 400,
+			};
+		}
+
 		const requestId = resolveExternalRequestId(enrollment);
 		const signerId = resolveExternalSignerId(enrollment);
 		if (!requestId || !signerId) {
@@ -191,11 +205,11 @@ const handlers = {
 				status: 400,
 			};
 		}
-		const url = await getSignaturePort().getSignSurface({
+		const surface: SignSurface | null = await getSignaturePort().getSignSurface({
 			requestId,
 			signerId,
 		});
-		if (!url) {
+		if (!surface || surface.kind !== 'redirect') {
 			return {
 				ok: false,
 				error: 'Lien de signature indisponible (signataire pas encore notifié ?).',
@@ -205,7 +219,7 @@ const handlers = {
 		return {
 			ok: true,
 			message: 'Lien copié dans le presse-papiers.',
-			copyUrl: url,
+			copyUrl: surface.url,
 		};
 	},
 } satisfies Record<AdminActionKey, Handler>;

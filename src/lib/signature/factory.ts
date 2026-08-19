@@ -1,35 +1,31 @@
+import { docusealAdapter } from './adapters/docuseal';
 import { yousignAdapter, type YouSignAdapter } from './adapters/yousign';
 import type { NdaSignatureProvider } from './nda-request';
 import type { SignatureOps, SignaturePort, SignatureWebhookAdapter } from './types';
 import { getEnv } from '../env';
 
-function resolveProvider(): 'yousign' {
-	const provider = getEnv().SIGNATURE_PROVIDER;
-	if (provider !== 'yousign') {
-		throw new Error(`Unsupported SIGNATURE_PROVIDER: ${provider}`);
-	}
-	return provider;
+export type SignatureProviderName = 'yousign' | 'docuseal';
+
+function resolveProvider(): SignatureProviderName {
+	return getEnv().SIGNATURE_PROVIDER;
 }
 
 export function getSignaturePort(): SignaturePort {
-	resolveProvider();
-	return yousignAdapter;
+	return resolveProvider() === 'docuseal' ? docusealAdapter : yousignAdapter;
 }
 
 export function getSignatureWebhookAdapter(): SignatureWebhookAdapter {
-	resolveProvider();
-	return yousignAdapter;
+	return resolveProvider() === 'docuseal' ? docusealAdapter : yousignAdapter;
 }
 
 export function getSignatureOps(provider: NdaSignatureProvider): SignatureOps {
-	if (provider !== 'yousign') {
-		throw new Error(`Unsupported NDA provider: ${provider}`);
-	}
-	return yousignAdapter;
+	return provider === 'docuseal' ? docusealAdapter : yousignAdapter;
 }
 
-/** Sync/resend YouSign-specific — resend/recreate until Slice 4+. */
+/** Sync/resend YouSign-specific — unavailable when SIGNATURE_PROVIDER=docuseal. */
 export function getSignatureAdapter(): YouSignAdapter {
-	resolveProvider();
+	if (resolveProvider() !== 'yousign') {
+		throw new Error('getSignatureAdapter() is only available when SIGNATURE_PROVIDER=yousign');
+	}
 	return yousignAdapter;
 }

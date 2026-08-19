@@ -68,6 +68,9 @@ export type AppEvents = {
 	'provider/yousign-event.received': {
 		data: { providerEventId: string };
 	};
+	'provider/docuseal-event.received': {
+		data: { providerEventId: string };
+	};
 	'enrollment/access.grant': {
 		data: { enrollmentId: string };
 	};

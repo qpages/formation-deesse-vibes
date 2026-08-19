@@ -31,7 +31,7 @@ const showSignSurface = Boolean(ndaSignSurface);
 const poll = shouldPollEnrollment({
 	...orthogonal,
 	hasCheckoutSession: Boolean(enrollment.stripeCheckoutSessionId),
-	hasNdaSignUrl: showSignSurface,
+	hasNdaSignSurface: showSignSurface,
 });
 const closed = enrollment.accessStatus === 'revoked' || enrollment.collectionStatus === 'refunded';
 const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractStatus}|${enrollment.accessStatus}`;
