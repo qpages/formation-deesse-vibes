@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { findEnrollmentById, downloadSignedDocuments } = vi.hoisted(() => ({
+const { findEnrollmentById, downloadSignedPdf } = vi.hoisted(() => ({
 	findEnrollmentById: vi.fn(),
-	downloadSignedDocuments: vi.fn(),
+	downloadSignedPdf: vi.fn(),
 }));
 
 vi.mock('./enrollment', () => ({ findEnrollmentById }));
-vi.mock('../yousign', () => ({ downloadSignedDocuments }));
+vi.mock('../signature/factory', () => ({
+	getSignaturePort: () => ({ downloadSignedPdf }),
+}));
 
 import { getSignedNdaPdf, toSignedNdaResponse } from './nda-download';
 
@@ -32,7 +34,7 @@ describe('getSignedNdaPdf', () => {
 			ok: false,
 			reason: 'enrollment_not_found',
 		});
-		expect(downloadSignedDocuments).not.toHaveBeenCalled();
+		expect(downloadSignedPdf).not.toHaveBeenCalled();
 	});
 
 	it('pas encore signé → not_signed', async () => {
@@ -42,7 +44,7 @@ describe('getSignedNdaPdf', () => {
 			ok: false,
 			reason: 'not_signed',
 		});
-		expect(downloadSignedDocuments).not.toHaveBeenCalled();
+		expect(downloadSignedPdf).not.toHaveBeenCalled();
 	});
 
 	it('signé sans demande Yousign → no_yousign_request', async () => {
@@ -52,13 +54,13 @@ describe('getSignedNdaPdf', () => {
 			ok: false,
 			reason: 'no_yousign_request',
 		});
-		expect(downloadSignedDocuments).not.toHaveBeenCalled();
+		expect(downloadSignedPdf).not.toHaveBeenCalled();
 	});
 
 	it('Yousign OK → PDF live, non persisté', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
 		const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
-		downloadSignedDocuments.mockResolvedValue({
+		downloadSignedPdf.mockResolvedValue({
 			bytes,
 			contentType: 'application/pdf',
 		});
@@ -69,12 +71,12 @@ describe('getSignedNdaPdf', () => {
 			contentType: 'application/pdf',
 			filename: 'contrat-confidentialite.pdf',
 		});
-		expect(downloadSignedDocuments).toHaveBeenCalledWith('req_1');
+		expect(downloadSignedPdf).toHaveBeenCalledWith('req_1');
 	});
 
 	it('plusieurs documents → zip', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
-		downloadSignedDocuments.mockResolvedValue({
+		downloadSignedPdf.mockResolvedValue({
 			bytes: new Uint8Array([0x50, 0x4b]),
 			contentType: 'application/zip',
 		});
@@ -89,7 +91,7 @@ describe('getSignedNdaPdf', () => {
 
 	it('erreur Yousign → yousign_error', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
-		downloadSignedDocuments.mockRejectedValue(new Error('Yousign 400: not done'));
+		downloadSignedPdf.mockRejectedValue(new Error('Yousign 400: not done'));
 
 		await expect(getSignedNdaPdf('enr_1')).resolves.toEqual({
 			ok: false,
