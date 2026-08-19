@@ -16,7 +16,6 @@ interface ImportMetaEnv {
 	readonly STRIPE_PRICE_X2?: string;
 	readonly STRIPE_PRICE_X4?: string;
 	readonly STRIPE_PRICE_X6?: string;
-	readonly STRIPE_AMOUNT_CENTS?: string;
 	readonly YOUSIGN_API_KEY?: string;
 	readonly YOUSIGN_TEMPLATE_ID?: string;
 	readonly YOUSIGN_WEBHOOK_SECRET?: string;

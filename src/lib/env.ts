@@ -14,7 +14,6 @@ const serverSchema = z.object({
 	STRIPE_PRICE_X2: z.string().optional(),
 	STRIPE_PRICE_X4: z.string().optional(),
 	STRIPE_PRICE_X6: z.string().optional(),
-	STRIPE_AMOUNT_CENTS: z.coerce.number().int().positive().default(184_900),
 	YOUSIGN_API_KEY: z.string().optional(),
 	YOUSIGN_TEMPLATE_ID: z.string().optional(),
 	YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
@@ -76,7 +75,6 @@ export function getEnv(): ServerEnv {
 		STRIPE_PRICE_X2: import.meta.env.STRIPE_PRICE_X2 ?? process.env.STRIPE_PRICE_X2,
 		STRIPE_PRICE_X4: import.meta.env.STRIPE_PRICE_X4 ?? process.env.STRIPE_PRICE_X4,
 		STRIPE_PRICE_X6: import.meta.env.STRIPE_PRICE_X6 ?? process.env.STRIPE_PRICE_X6,
-		STRIPE_AMOUNT_CENTS: import.meta.env.STRIPE_AMOUNT_CENTS ?? process.env.STRIPE_AMOUNT_CENTS,
 		YOUSIGN_API_KEY: import.meta.env.YOUSIGN_API_KEY ?? process.env.YOUSIGN_API_KEY,
 		YOUSIGN_TEMPLATE_ID: import.meta.env.YOUSIGN_TEMPLATE_ID ?? process.env.YOUSIGN_TEMPLATE_ID,
 		YOUSIGN_WEBHOOK_SECRET:
@@ -124,9 +122,6 @@ export function getAdminAllowlist(): string[] {
 export const FORMATION = {
 	name: 'Formation Matrice Évolution',
 	brand: 'Déesse Vibes',
-	priceLabel: '1 849 €',
-	priceCents: 184_900,
-	currency: 'eur',
 } as const;
 
 export const env = getEnv();

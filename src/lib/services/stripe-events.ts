@@ -1,13 +1,6 @@
 import type Stripe from 'stripe';
 import { decryptPayload } from '../crypto';
-import {
-	findEnrollmentByCheckoutSession,
-	findEnrollmentById,
-	findEnrollmentByScheduleId,
-	findEnrollmentBySubscriptionId,
-	findEnrollmentIdByPaymentIntentId,
-	findEnrollmentIdByStripeInvoiceId,
-} from './enrollment';
+import { findEnrollmentById, findEnrollmentIdByPaymentIntentId } from './enrollment';
 import {
 	confirmPaidCheckout,
 	ensureNdaAfterPayment,
@@ -36,52 +29,6 @@ const HANDLED = new Set([
 
 export function isHandledStripeEventType(eventType: string) {
 	return HANDLED.has(eventType);
-}
-
-/**
- * Corrélation enrollment : metadata enrollmentId d’abord, jamais email seul.
- */
-export async function resolveEnrollmentFromStripeObject(object: unknown): Promise<string | null> {
-	const obj = object as Record<string, unknown>;
-	const meta = obj.metadata as Stripe.Metadata | null | undefined;
-	if (meta?.enrollmentId) {
-		const byMeta = await findEnrollmentById(meta.enrollmentId);
-		if (byMeta) return byMeta.id;
-	}
-
-	if (obj.object === 'checkout.session' && typeof obj.id === 'string') {
-		const bySession = await findEnrollmentByCheckoutSession(obj.id);
-		if (bySession) return bySession.id;
-		if (typeof obj.client_reference_id === 'string') {
-			const byRef = await findEnrollmentById(obj.client_reference_id);
-			if (byRef) return byRef.id;
-		}
-	}
-
-	if (obj.object === 'subscription' && typeof obj.id === 'string') {
-		const bySub = await findEnrollmentBySubscriptionId(obj.id);
-		if (bySub) return bySub.id;
-	}
-
-	if (obj.object === 'subscription_schedule' && typeof obj.id === 'string') {
-		const bySchedule = await findEnrollmentByScheduleId(obj.id);
-		if (bySchedule) return bySchedule.id;
-	}
-
-	if (obj.object === 'invoice') {
-		if (typeof obj.id === 'string') {
-			const byPayment = await findEnrollmentIdByStripeInvoiceId(obj.id);
-			if (byPayment) return byPayment;
-		}
-		const sub = obj.subscription;
-		const subId = typeof sub === 'string' ? sub : (sub as { id?: string } | null)?.id;
-		if (subId) {
-			const bySub = await findEnrollmentBySubscriptionId(subId);
-			if (bySub) return bySub.id;
-		}
-	}
-
-	return null;
 }
 
 function stripeRefId(ref: unknown): string | undefined {
