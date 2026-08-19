@@ -54,7 +54,10 @@ const heroCta = showTracking
 	: { label: "M'inscrire à la formation", href: '#acces', external: false };
 ---
 
-<MarketingLayout title={confirmToken ? 'Voir mon inscription' : undefined}>
+<MarketingLayout
+	title={confirmToken ? 'Voir mon inscription' : undefined}
+	noindex={Boolean(confirmToken)}
+>
 	{
 		confirmToken ? (
 			<MagicLinkConfirm token={confirmToken} />

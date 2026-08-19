@@ -8,10 +8,17 @@ interface Props {
 }
 
 const {
-	title = 'Formation Matrice Évolution — Déesse Vibes',
-	description = 'Formation en ligne Matrice Évolution. Inscription, signature de l’accord de confidentialité et accès Teachizy.',
-	noindex = true,
+	title = 'Formation Matrice Évolution · Déesse Vibes',
+	description = 'Formation en ligne Matrice Évolution par Jessica Stamck (Déesse Vibes). Paiement, contrat de confidentialité, puis accès Teachizy.',
+	noindex = false,
 } = Astro.props;
+
+const site = Astro.site ?? new URL('https://formation.jessica-stamck.com');
+const canonical = new URL(Astro.url.pathname, site);
+canonical.search = '';
+canonical.hash = '';
+const ogImage = new URL('/og-image.png', site);
+const ogImageAlt = 'Visuel de la formation Matrice Évolution par Jessica Stamck';
 ---
 
 <!doctype html>
@@ -19,12 +26,39 @@ const {
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
+		<meta name="theme-color" content="#1a1410" />
+		<link rel="icon" href="/favicon.ico" sizes="48x48" />
+		<link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
+		<link rel="icon" type="image/png" href="/favicon-48x48.png" sizes="48x48" />
+		<link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+		<link rel="icon" type="image/png" href="/favicon-192x192.png" sizes="192x192" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+		<link rel="canonical" href={canonical.href} />
+		<link rel="sitemap" href="/sitemap.xml" />
+		<link rel="describedby" href="/llms.txt" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<meta name="description" content={description} />
 		{noindex && <meta name="robots" content="noindex, nofollow" />}
+
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonical.href} />
+		<meta property="og:type" content="website" />
+		<meta property="og:locale" content="fr_FR" />
+		<meta property="og:site_name" content="Déesse Vibes" />
+		<meta property="og:image" content={ogImage.href} />
+		<meta property="og:image:type" content="image/png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={ogImageAlt} />
+
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={ogImage.href} />
+		<meta name="twitter:image:alt" content={ogImageAlt} />
+
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link

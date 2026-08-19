@@ -1,0 +1,23 @@
+# Formation Matrice Évolution
+
+> Portail d’inscription de la formation en ligne Matrice Évolution, créée par Jessica Stamck (Déesse Vibes).
+
+Ce site (formation.jessica-stamck.com) sert à découvrir la formation, s’inscrire, payer, signer le contrat de confidentialité, puis obtenir l’accès à la plateforme Teachizy.
+
+- Prix : 1 849 € TTC en paiement unique. Formules en 2, 4 ou 6 échéances (montant total majoré).
+- Accès Teachizy uniquement après paiement confirmé et contrat de confidentialité signé.
+- Pas de compte à créer : l’e-mail de paiement suffit. Pour revenir plus tard, utiliser « Déjà inscrit·e » sur la page d’accueil (lien magique par e-mail).
+- Contact : contact@deesse-vibes.com
+- Éditeur : SEBBAH Jessica, entrepreneur individuel (Déesse Vibes / Jessica Stamck), Cagnes-sur-Mer, France.
+
+## Pages
+
+- [Accueil — inscription](https://formation.jessica-stamck.com/) : présentation, programme (11 modules), FAQ, paiement Stripe et suivi d’inscription
+- [Conditions générales de vente](https://formation.jessica-stamck.com/cgv) : prix, droit de rétractation, conditions de la vente à distance
+- [Politique de confidentialité](https://formation.jessica-stamck.com/confidentialite) : données collectées à l’inscription (RGPD)
+- [Mentions légales](https://formation.jessica-stamck.com/mentions-legales) : éditeur, hébergeur, propriété intellectuelle
+
+## Optional
+
+- [Univers Jessica Stamck](https://www.deesse-vibes.com/) : site principal de Déesse Vibes
+- [Connexion Teachizy](https://jsmatriceacademy.teachizy.fr) : accès aux cours après invitation (mot de passe oublié si l’e-mail Teachizy n’est pas retrouvé)
