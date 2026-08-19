@@ -11,7 +11,6 @@ const { findUnique, updateMany, getPrisma } = vi.hoisted(() => {
 });
 
 vi.mock('../prisma', () => ({ getPrisma }));
-vi.mock('../yousign', () => ({ getSignatureLink: vi.fn() }));
 vi.mock('./brevo', () => ({ sendMagicLinkEmail: vi.fn() }));
 
 import { hashToken } from '../crypto';
