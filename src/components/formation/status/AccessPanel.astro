@@ -8,10 +8,10 @@ import MagicLinkForm from './MagicLinkForm.astro';
 import StatusPanel from './StatusPanel.astro';
 
 const env = getEnv();
-const adminContactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL;
+const contactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL ?? 'contact@deesse-vibes.com';
 const adminContactHref =
 	whatsappHelpHref(env.PUBLIC_WHATSAPP_NUMBER) ??
-	`mailto:${adminContactEmail}?subject=${encodeURIComponent('Formation Matrice Évolution')}`;
+	`mailto:${contactEmail}?subject=${encodeURIComponent('Formation Matrice Évolution')}`;
 const adminContactExternal = adminContactHref.startsWith('https://');
 
 interface Props {
@@ -103,7 +103,7 @@ const canDownloadNda =
 				data-access-panel="retrouver"
 			>
 				<p class="text-ink-soft mb-1 text-sm">
-					Saisissez l’e-mail utilisé lors du paiement pour retrouver votre inscription.
+					Saisissez l’e-mail utilisé lors du paiement pour vous reconnecter sur le site.
 				</p>
 				<MagicLinkForm />
 			</div>
@@ -148,17 +148,6 @@ const canDownloadNda =
 									Contacter un administrateur
 								</a>
 							</p>
-							{canDownloadNda ? (
-								<p class="text-ink-soft text-sm">
-									<a
-										id="nda-download"
-										href="/api/enrollment/nda"
-										class="hover:text-ink underline-offset-4 hover:underline"
-									>
-										Télécharger le contrat de confidentialité
-									</a>
-								</p>
-							) : null}
 						</div>
 					</div>
 
@@ -196,6 +185,21 @@ const canDownloadNda =
 							</ul>
 						</div>
 					)}
+
+					{canDownloadNda ? (
+						<div>
+							<p class="text-ink/40 mb-3 text-[10px] tracking-[0.12em] uppercase">Contrat</p>
+							<p class="text-ink-soft text-sm">
+								<a
+									id="nda-download"
+									href="/api/enrollment/nda"
+									class="hover:text-ink underline-offset-4 hover:underline"
+								>
+									Télécharger le contrat de confidentialité
+								</a>
+							</p>
+						</div>
+					) : null}
 				</div>
 			)}
 		</div>

@@ -29,7 +29,7 @@ const linkClass =
 
 let hint: string | null = null;
 if (detail.contractStatus !== 'signed') {
-	hint = 'Après signature du NDA';
+	hint = 'Après signature du contrat de confidentialité';
 } else if (detail.accessStatus === 'suspended') {
 	hint = 'Coupé — réinvitez si paiement OK';
 }

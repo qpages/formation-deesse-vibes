@@ -15,7 +15,7 @@ import { downloadSignedDocuments, ndaSignatureRequestName } from './yousign';
 describe('ndaSignatureRequestName', () => {
 	it('libellé orienté apprenant, sans nom du signataire', () => {
 		expect(ndaSignatureRequestName()).toBe(
-			'Accord de confidentialité — Formation Matrice Évolution',
+			'Contrat de confidentialité — Formation Matrice Évolution',
 		);
 	});
 });

@@ -23,7 +23,7 @@ const { token } = Astro.props;
 			Vous y êtes presque
 		</h1>
 		<p class="text-mist/72 mt-4 text-base leading-relaxed">
-			Cliquez pour ouvrir le suivi de votre inscription.
+			Cliquez pour ouvrir votre espace d’inscription sur le site.
 		</p>
 		<form id="magic-confirm" method="post" action="/api/magic-link/consume" class="mt-8">
 			<input type="hidden" name="token" value={token} />

@@ -100,7 +100,7 @@ function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date
 		timeStyle: 'short',
 		timeZone: 'Europe/Paris',
 	});
-	return `${name} a signé l'accord de confidentialité le ${when}`;
+	return `${name} a signé le contrat de confidentialité le ${when}`;
 }
 
 export function isHandledYousignEventType(eventType: string) {

@@ -46,14 +46,14 @@ const {
 				simple vous mène du paiement à la formation.
 			</p>
 			<div
-				class="animate-rise mt-8 flex flex-wrap items-center gap-3"
+				class="animate-rise mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center"
 				style="animation-delay: 300ms"
 			>
 				<Button
 					href={ctaHref}
 					variant="primary"
 					size="md"
-					class="bg-mist text-ink hover:bg-gold-soft"
+					class="bg-mist text-ink hover:bg-gold-soft w-full whitespace-nowrap sm:w-auto"
 					target={ctaExternal ? '_blank' : undefined}
 					rel={ctaExternal ? 'noopener noreferrer' : undefined}
 				>
@@ -63,7 +63,7 @@ const {
 					href="#programme"
 					variant="secondary"
 					size="md"
-					class="border-mist/25 text-mist hover:border-mist/50 hover:bg-mist/10"
+					class="border-mist/25 text-mist hover:border-mist/50 hover:bg-mist/10 w-full whitespace-nowrap sm:w-auto"
 				>
 					Découvrir le programme
 				</Button>

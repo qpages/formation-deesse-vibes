@@ -303,7 +303,7 @@ export async function canResendNda(
 	enrollment: Enrollment,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
 	if (!isAwaitingNda(enrollment)) {
-		return { ok: false, reason: 'Le NDA n’est pas en attente de signature.' };
+		return { ok: false, reason: 'Le contrat de confidentialité n’est pas en attente de signature.' };
 	}
 	if (!enrollment.yousignRequestId) {
 		return { ok: false, reason: 'Aucune demande Yousign associée.' };

@@ -8,7 +8,7 @@ import { env, isInngestDevMode } from '../env';
  * **Mode développement** (INNGEST_DEV=1 ou import.meta.env.DEV === true):
  * - Se connecte au dev server local (port 8288)
  * - Pas de clé API requise
- * - Lancé via `npm run inngest:dev`
+ * - Lancé via `pnpm dev:inngest`
  *
  * **Mode production** (INNGEST_DEV !== 1):
  * - Se connecte à Inngest Cloud
@@ -33,7 +33,7 @@ export type EnqueueResult =
 
 /**
  * `inngest.send` qui ne jette jamais : isole une panne de la file (dev sans
- * `inngest:dev`, réseau) de l'effet primaire déjà persisté en base.
+ * `dev:inngest`, réseau) de l'effet primaire déjà persisté en base.
  * Les appelants « durs » (webhook) re-jettent sur `failed` pour garder le retry.
  */
 export async function sendInngestSafe(

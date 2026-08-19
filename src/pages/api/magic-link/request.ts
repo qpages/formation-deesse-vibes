@@ -31,7 +31,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 		return json({
 			ok: true,
 			message:
-				'Si une inscription correspond à cet e-mail, vous recevrez un lien dans quelques instants.',
+				'Si une inscription correspond à cet e-mail, consultez votre boîte mail pour ouvrir le site.',
 		});
 	} catch (error) {
 		console.error('[magic-link]', error);

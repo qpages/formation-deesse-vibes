@@ -86,7 +86,7 @@ export async function getSignatureRequest(requestId: string) {
 
 /** Titre affiché dans l’e-mail Yousign (pas le nom du signataire — redondant côté destinataire). */
 export function ndaSignatureRequestName(): string {
-	return `Accord de confidentialité — ${FORMATION.name}`;
+	return `Contrat de confidentialité — ${FORMATION.name}`;
 }
 
 /** Crée un brouillon Yousign depuis le template (sans activer / sans e-mail). */

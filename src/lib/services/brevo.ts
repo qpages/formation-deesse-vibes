@@ -31,10 +31,10 @@ export async function sendMagicLinkEmail(input: { to: string; firstName: string;
 		body: JSON.stringify({
 			sender: { email: env.BREVO_FROM, name: FORMATION.brand },
 			to: [{ email: input.to, name: input.firstName }],
-			subject: `Votre suivi — ${FORMATION.name}`,
+			subject: `Votre inscription — ${FORMATION.name}`,
 			htmlContent: `
 			<p>Bonjour ${firstName},</p>
-			<p>Voici votre lien pour retrouver l’état de votre inscription à la ${FORMATION.name} :</p>
+			<p>Voici le lien pour ouvrir votre espace d’inscription sur formation.jessica-stamck.com :</p>
 			<p><a href="${htmlUrl}">Voir mon inscription</a></p>
 			<p>Ce lien expire dans 30 minutes. Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>
 			<p>— ${FORMATION.brand}</p>

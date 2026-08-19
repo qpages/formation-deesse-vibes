@@ -36,7 +36,7 @@ test.describe('P0 checkout + home', () => {
 		await expect(page.locator('#access-tracking')).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Votre inscription' })).toBeVisible();
 		await expect(
-			page.getByText('Paiement reçu. Nous préparons votre accord de confidentialité.'),
+			page.getByText('Paiement reçu. Nous préparons votre contrat de confidentialité.'),
 		).toBeVisible({
 			timeout: 8_000,
 		});

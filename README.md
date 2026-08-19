@@ -1,15 +1,15 @@
 # Formation Déesse Vibes
 
-Portail `formation.deesse-vibes.com` — Formation Matrice Évolution (1 849 €).
+Portail `formation.jessica-stamck.com` — Formation Matrice Évolution (1 849 €).
 
 Parcours : landing → Stripe Checkout → NDA Yousign → Teachizy.  
-Suivi sur la même page via lien magique Resend. Accès Teachizy uniquement via API directe après signature vérifiée.
+Suivi sur la même page via lien magique Brevo. Accès Teachizy uniquement via API directe après signature vérifiée.
 
 ## Stack
 
 - Astro 7 SSR + Vercel Functions
 - Postgres + Prisma ORM
-- Stripe, Yousign, Inngest, Resend, Teachizy, Slack
+- Stripe, Yousign, Inngest, Brevo, Teachizy, Slack
 - Admin : `/admin` (credentials env `ADMIN_EMAIL` / `ADMIN_PASSWORD`)
 
 ## Liens utiles
@@ -23,19 +23,19 @@ Suivi sur la même page via lien magique Resend. Accès Teachizy uniquement via 
 
 ```bash
 cp .env.example .env   # remplir les secrets
-npm install
-npm run db:migrate
-npm run dev
+pnpm install
+pnpm db:migrate
+pnpm dev
 ```
 
 En local, le parcours paiement → NDA nécessite aussi :
 
 ```bash
-npm run inngest:dev
-npm run webhook:stripe   # coller le whsec_… affiché dans .env → STRIPE_WEBHOOK_SECRET
+pnpm dev:inngest
+pnpm webhook:stripe   # coller le whsec_… affiché dans .env → STRIPE_WEBHOOK_SECRET
 ```
 
-Scripts utiles : `npm test`, `npm run build`, `npm run db:deploy`.
+Scripts utiles : `pnpm test`, `pnpm build`, `pnpm db:deploy`.
 
 Vue d’ensemble (parcours, statuts, invariants, tests, gate live) : [`docs/overview.md`](./docs/overview.md).
 

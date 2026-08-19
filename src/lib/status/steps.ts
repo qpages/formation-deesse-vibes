@@ -149,10 +149,10 @@ export function checkoutSuccessFlash(input: OrthogonalStatuses): string | null {
 		return 'Paiement en cours de confirmation. Cette page se met à jour automatiquement.';
 	}
 	if (input.contractStatus === 'sent') {
-		return 'Paiement reçu. Signez votre accord de confidentialité pour continuer.';
+		return 'Paiement reçu. Signez votre contrat de confidentialité pour continuer.';
 	}
 	if (input.contractStatus === 'pending') {
-		return 'Paiement reçu. Nous préparons votre accord de confidentialité.';
+		return 'Paiement reçu. Nous préparons votre contrat de confidentialité.';
 	}
 	return null;
 }
@@ -166,7 +166,7 @@ export function statusMessage(input: OrthogonalStatuses): string[] | null {
 	}
 	if (input.accessStatus === 'pending' && input.contractStatus === 'signed') {
 		return [
-			'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation — cette page se met à jour automatiquement.',
+			'Paiement reçu, contrat de confidentialité signé. Nous préparons votre invitation. Cette page se met à jour automatiquement.',
 		];
 	}
 	if (input.accessStatus === 'suspended') {

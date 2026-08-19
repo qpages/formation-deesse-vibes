@@ -13,7 +13,9 @@ export const checkoutSchema = z.object({
 	email: z.string().trim().email('E-mail invalide').max(254),
 	paymentPlan: paymentPlanIdSchema,
 	consentCgv: z.literal(true, { error: 'Acceptation des CGV requise' }),
-	consentNda: z.literal(true, { error: 'Acceptation du NDA requise' }),
+	consentNda: z.literal(true, {
+		error: 'Engagement de signature du contrat de confidentialité requis',
+	}),
 	consentPrivacy: z.literal(true, {
 		error: 'Acceptation de la politique de confidentialité requise',
 	}),

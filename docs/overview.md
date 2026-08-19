@@ -1,19 +1,19 @@
 # Formation Matrice Évolution
 
-Portail `formation.deesse-vibes.com` — 1 849 € TTC (paiement unique ; majoration en échéances). Accès Teachizy uniquement après paiement + NDA signé (jamais depuis une page succès client).
+Portail `formation.jessica-stamck.com` — 1 849 € TTC (paiement unique ; majoration en échéances). Accès Teachizy uniquement après paiement + NDA signé (jamais depuis une page succès client).
 
 ## Parcours
 
 ```
 Landing → Stripe Checkout → NDA Yousign → Teachizy (API)
               ↑                              ↓
-       même page `/` ← suivi / lien magique Resend
+       même page `/` ← reconnexion sur le site (e-mail d’ouverture Brevo)
 ```
 
 1. Formulaire (nom, prénom, e-mail, consentements) → Checkout Stripe
 2. Webhook Stripe vérifié → Inngest `createNdaAfterPayment` → demande Yousign
 3. Signature NDA → webhook Yousign → Inngest `grantTeachizyAccess` → API Teachizy
-4. Retour plus tard : e-mail → lien magique Resend → même page
+4. Retour plus tard : e-mail d’ouverture → formation.jessica-stamck.com (même page)
 
 ```
 Checkout ouvert
@@ -175,7 +175,7 @@ Sans `SLACK_WEBHOOK_URL` : warn console, parcours métier inchangé.
 
 ## Stack
 
-Astro 7 SSR (Vercel) · Neon Postgres + Prisma · Stripe · Yousign · Teachizy · Inngest · Resend · Slack  
+Astro 7 SSR (Vercel) · Prisma Postgres + Prisma ORM · Stripe · Yousign · Teachizy · Inngest · Brevo · Slack  
 Admin `/admin` : `ADMIN_EMAIL` / `ADMIN_PASSWORD` + JWT
 
 ## Inngest
@@ -206,9 +206,9 @@ cf. `AdminActionDef.execution` dans `src/lib/admin/actions.ts`.
 Local : 3 process en parallèle —
 
 ```bash
-npm run dev
-npm run inngest:dev          # http://localhost:8288
-npm run webhook:stripe       # coller le whsec_… dans .env
+pnpm dev
+pnpm dev:inngest             # http://localhost:8288
+pnpm webhook:stripe          # coller le whsec_… dans .env
 ```
 
 Endpoint app : `/api/inngest`  
@@ -226,10 +226,10 @@ Dashboard Inngest : http://localhost:8288
 
 | Outil | URL / notes |
 | --- | --- |
-| Neon | https://console.neon.tech |
+| Prisma Postgres | https://console.prisma.io |
 | Stripe | prix `STRIPE_PRICE_UNIQUE` (1 849 €) + X2/X4/X6 |
 | Yousign | template NDA côté Yousign (pas dans le repo) |
-| Resend | from `formation@deesse-vibes.com` |
+| Brevo | from `formation@deesse-vibes.com` |
 | Inngest | https://app.inngest.com |
 | Teachizy | https://developer.teachizy.fr/ |
 | Vercel | hosting SSR |
@@ -245,7 +245,7 @@ Secrets : `.env.example` → `.env` (local) / Vercel (prod).
 - Renvoi NDA : max 1 / 15 min, 5 / jour
 - NDA signé stocké chez Yousign (IDs seulement en DB)
 - Payloads webhook chiffrés, rétention 30 jours
-- Preview ≠ prod (Stripe / Yousign / Teachizy / Neon)
+- Preview ≠ prod (Stripe / Yousign / Teachizy / Prisma Postgres)
 - Slack = canal ops (facade `notifyOps`), pas un second journal d’événements
 
 ## Qualité : invariants → tests → gate live
@@ -281,7 +281,7 @@ Minimum avant live — au-delà = bonus.
 
 | Niveau | Quoi | Done when |
 | --- | --- | --- |
-| Unitaire | Payload `ensureSubscriptionSchedule` : `duration` + `end_behavior: cancel` ; pas de `iterations` | `npm test` rouge si on régresse |
+| Unitaire | Payload `ensureSubscriptionSchedule` : `duration` + `end_behavior: cancel` ; pas de `iterations` | `pnpm test` rouge si on régresse |
 | Unitaire | Eligibility accès + mapping refund/past_due → statut accès | Idem |
 | Unitaire / intégration | Idempotence `ProviderEvent` (replay même id) | Pas de double side-effect |
 | E2E test-mode | Parcours **unique** : payé → NDA → invite Teachizy | Checklist `task.md` §3 |
@@ -308,13 +308,13 @@ Copier dans la PR ou le runbook ; cocher seulement avec preuve (lien Dashboard, 
 - [ ] Teachizy : UUID formation + invite OK ; coupe accès réelle si 5 exigé
 - [ ] DB prod migrée (`prisma migrate deploy`)
 - [ ] Secrets prod ≠ défauts ; admin password fort ; secrets JWT/session ≥ 32
-- [ ] DNS `formation.deesse-vibes.com` → Vercel ; e-mail from domaine vérifié
+- [ ] DNS `formation.jessica-stamck.com` → Vercel (`formation-deesse-vibes.vercel.app` en fallback) ; e-mail from domaine vérifié
 - [ ] Inngest cloud branché sur `/api/inngest`
 
 **Fortement recommandés**
 
 - [ ] Slack ops branché (`notifyOps`)
-- [ ] CGV / confidentialité / mentions
+- [x] CGV / confidentialité / mentions
 - [ ] Handoff accès outils au client (`task.md` §5)
 
 **Verdict**

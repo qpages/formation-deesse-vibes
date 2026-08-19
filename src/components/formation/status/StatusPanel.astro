@@ -127,7 +127,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 					ci-dessous.
 				</p>
 				<Button id="nda-confirm-signed" type="button" size="md" variant="secondary">
-					J’ai signé l’accord de confidentialité
+					J’ai signé le contrat de confidentialité
 				</Button>
 				<p id="nda-confirm-feedback" class="text-ink-soft text-sm" aria-live="polite" />
 			</div>
@@ -144,7 +144,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 
 	const confirmBtn = document.getElementById('nda-confirm-signed') as HTMLButtonElement | null;
 	const confirmFeedback = document.getElementById('nda-confirm-feedback');
-	const confirmLabel = confirmBtn?.textContent ?? 'J’ai signé l’accord de confidentialité';
+	const confirmLabel = confirmBtn?.textContent ?? 'J’ai signé le contrat de confidentialité';
 
 	confirmBtn?.addEventListener('click', async () => {
 		if (!confirmBtn || confirmBtn.disabled) return;

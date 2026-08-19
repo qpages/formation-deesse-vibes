@@ -39,7 +39,7 @@ import Input from '../../ui/Input.astro';
 			}
 			window.toast?.(
 				json.message ||
-					'Si une inscription correspond à cet e-mail, vous recevrez un lien dans quelques instants.',
+					'Si une inscription correspond à cet e-mail, consultez votre boîte mail pour ouvrir le site.',
 				'success',
 			);
 			window.setTimeout(() => lock.unlock(), 8_000);

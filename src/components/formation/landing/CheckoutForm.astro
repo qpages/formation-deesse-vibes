@@ -52,7 +52,7 @@ const { lockedEmail } = Astro.props;
 			<input type="checkbox" name="consentWithdrawalWaiver" value="true" required class="mt-1" />
 			<span>
 				Je demande l’accès immédiat à la formation dès que les conditions sont remplies (paiement
-				et signature de l’accord de confidentialité) et je reconnais perdre mon{' '}
+				et signature du contrat de confidentialité) et je reconnais perdre mon{' '}
 				<a href="/cgv#retractation" class="hover:text-ink underline underline-offset-2"
 					>droit de rétractation</a
 				>{' '}
@@ -63,28 +63,10 @@ const { lockedEmail } = Astro.props;
 		<label class="flex gap-3">
 			<input type="checkbox" name="consentNda" value="true" required class="mt-1" />
 			<span>
-				J’ai pris connaissance de l’accord de confidentialité et m’engage à le signer après
-				paiement.
+				Je m’engage à signer le contrat de confidentialité qui me sera envoyé par e-mail après
+				paiement. Sans signature, l’accès à la formation sur Teachizy ne sera pas possible.
 			</span>
 		</label>
-		<details class="border-ink/10 bg-surface/50 rounded-sm border px-4 py-3">
-			<summary class="text-ink-soft hover:text-ink cursor-pointer text-sm">
-				Aperçu de l’accord de confidentialité
-			</summary>
-			<div class="text-ink-soft mt-3 space-y-3 text-sm leading-relaxed">
-				<p>
-					Avant de recevoir vos accès, vous signerez un accord de confidentialité (NDA) via Yousign,
-					par e-mail, sans création de compte.
-				</p>
-				<ul class="list-disc space-y-1.5 pl-5">
-					<li>Protection du contenu pédagogique et des outils Matrice Évolution</li>
-					<li>Interdiction de redistribution non autorisée</li>
-					<li>
-						Conservation du document signé chez Yousign (nous stockons uniquement l’identifiant)
-					</li>
-				</ul>
-			</div>
-		</details>
 	</div>
 
 	<Button type="submit" size="md" class="w-full sm:w-auto" id="checkout-submit">
