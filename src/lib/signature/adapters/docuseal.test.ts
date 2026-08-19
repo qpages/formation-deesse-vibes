@@ -44,6 +44,25 @@ describe('DocuSeal adapter', () => {
 		});
 	});
 
+	it('mapCompletedEvent extrait requestId depuis submission.completed', () => {
+		const payload = {
+			event_type: 'submission.completed',
+			timestamp: '2023-09-24T13:48:36Z',
+			data: {
+				id: 12,
+				external_id: 'enr_1',
+				completed_at: '2023-08-20T10:12:47.579Z',
+				submitters: [{ external_id: 'enr_1' }],
+			},
+		};
+
+		expect(mapDocusealCompletedEvent(payload)).toEqual({
+			requestId: '12',
+			externalId: 'enr_1',
+			occurredAt: new Date('2023-08-20T10:12:47.579Z'),
+		});
+	});
+
 	it('webhook.verify valide X-Docuseal-Signature', () => {
 		const rawBody = '{"event_type":"form.completed"}';
 		const timestamp = String(Math.floor(Date.now() / 1000));
@@ -53,5 +72,15 @@ describe('DocuSeal adapter', () => {
 
 		expect(docusealAdapter.verify(rawBody, `${timestamp}.${signature}`)).toBe(true);
 		expect(docusealAdapter.verify(rawBody, 'bad')).toBe(false);
+	});
+
+	it('webhook.verify rejette timestamp expiré (>5 min)', () => {
+		const rawBody = '{"event_type":"form.completed"}';
+		const timestamp = String(Math.floor(Date.now() / 1000) - 400);
+		const signature = createHmac('sha256', 'whsec_test')
+			.update(`${timestamp}.${rawBody}`)
+			.digest('hex');
+
+		expect(docusealAdapter.verify(rawBody, `${timestamp}.${signature}`)).toBe(false);
 	});
 });

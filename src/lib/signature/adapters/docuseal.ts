@@ -43,6 +43,7 @@ type DocusealWebhookPayload = {
 		submission_id?: number;
 		external_id?: string | null;
 		completed_at?: string | null;
+		submitters?: Array<{ external_id?: string | null }>;
 		submission?: {
 			id?: number;
 			external_id?: string | null;
@@ -176,11 +177,17 @@ export function mapDocusealCompletedEvent(payload: unknown): SignatureCompletedE
 	const eventType = body.event_type;
 	if (eventType !== 'form.completed' && eventType !== 'submission.completed') return null;
 
-	const requestId = String(body.data?.submission?.id ?? body.data?.submission_id ?? '').trim();
+	const requestId =
+		eventType === 'submission.completed'
+			? String(body.data?.id ?? '').trim()
+			: String(body.data?.submission?.id ?? body.data?.submission_id ?? '').trim();
 	if (!requestId) return null;
 
 	const externalId =
-		body.data?.external_id ?? body.data?.submission?.external_id ?? undefined;
+		body.data?.external_id ??
+		body.data?.submission?.external_id ??
+		body.data?.submitters?.[0]?.external_id ??
+		undefined;
 
 	return {
 		requestId,

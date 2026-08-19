@@ -13,6 +13,7 @@ export type DocusealWebhookPayload = {
 		submission_id?: number;
 		external_id?: string | null;
 		completed_at?: string | null;
+		submitters?: Array<{ external_id?: string | null }>;
 		submission?: {
 			id?: number;
 			external_id?: string | null;
@@ -38,13 +39,16 @@ export function isHandledDocusealEventType(eventType: string) {
 
 export function synthesizeDocusealProviderEventId(payload: DocusealWebhookPayload): string {
 	const eventType = payload.event_type ?? 'unknown';
-	const submitterId = payload.data?.id ?? 'none';
+	const entityId =
+		eventType === 'submission.completed'
+			? (payload.data?.id ?? 'none')
+			: (payload.data?.id ?? payload.data?.submission?.id ?? 'none');
 	const completedAt =
 		payload.data?.completed_at ??
 		payload.data?.submission?.completed_at ??
 		payload.timestamp ??
 		'unknown';
-	return `${eventType}:${submitterId}:${completedAt}`;
+	return `${eventType}:${entityId}:${completedAt}`;
 }
 
 export async function handleDocusealProviderEvent(input: {
