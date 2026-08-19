@@ -6,6 +6,10 @@ import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncTeachizyAccess } from '../services/teachizy-access';
 import { syncYousignStatus } from '../services/yousign-events';
 import { getSignaturePort } from '../signature/factory';
+import {
+	resolveExternalRequestId,
+	resolveExternalSignerId,
+} from '../signature/nda-request';
 import { ADMIN_ACTIONS, adminActionExecution, type AdminActionKey } from './actions';
 
 export type AdminDispatchResult =
@@ -173,7 +177,9 @@ const handlers = {
 	// --- Actions « read » : lecture pure, aucun effet persistant. -----------------
 
 	async copy_nda_link(enrollment) {
-		if (!enrollment.yousignRequestId || !enrollment.yousignSignerId) {
+		const requestId = resolveExternalRequestId(enrollment);
+		const signerId = resolveExternalSignerId(enrollment);
+		if (!requestId || !signerId) {
 			return {
 				ok: false,
 				error: 'Demande ou signataire Yousign manquant.',
@@ -181,8 +187,8 @@ const handlers = {
 			};
 		}
 		const url = await getSignaturePort().getSignSurface({
-			requestId: enrollment.yousignRequestId,
-			signerId: enrollment.yousignSignerId,
+			requestId,
+			signerId,
 		});
 		if (!url) {
 			return {

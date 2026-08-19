@@ -2,8 +2,10 @@
 import type { EnrollmentWithUser } from '../../../lib/services/enrollment';
 import type { PaidInvoiceLink } from '../../../lib/services/payments';
 import { getEnv } from '../../../lib/env';
+import { resolveExternalRequestId } from '../../../lib/signature/nda-request';
 import { whatsappHelpHref } from '../../../lib/whatsapp';
 import CheckoutForm from '../landing/CheckoutForm.astro';
+import DocusealPreview from '../landing/DocusealPreview.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
 import StatusPanel from './StatusPanel.astro';
 
@@ -40,7 +42,8 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 const funnelFlash = showFunnel ? flash : null;
 const trackingFlash = showFunnel ? null : flash;
 const canDownloadNda =
-	enrollment?.contractStatus === 'signed' && Boolean(enrollment.yousignRequestId);
+	enrollment?.contractStatus === 'signed' &&
+	Boolean(enrollment && resolveExternalRequestId(enrollment));
 ---
 
 {
@@ -92,6 +95,7 @@ const canDownloadNda =
 					Renseignez vos informations, puis réglez en toute sécurité via la plateforme de paiement
 					Stripe.
 				</p>
+				<DocusealPreview />
 				<CheckoutForm />
 			</div>
 

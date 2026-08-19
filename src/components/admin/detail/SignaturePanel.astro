@@ -108,8 +108,8 @@ const techRows: Array<{ label: string; value: string }> = [
 				? `${detail.ndaResendCount} · dernier ${formatDateTime(detail.ndaLastResendAt) ?? '—'}`
 				: 'Aucun',
 	},
-	{ label: 'Request ID', value: detail.yousignRequestId ?? '—' },
-	{ label: 'Signer ID', value: detail.yousignSignerId ?? '—' },
+	{ label: 'Request ID', value: detail.externalRequestId ?? '—' },
+	{ label: 'Signer ID', value: detail.externalSignerId ?? '—' },
 	{
 		label: 'Dernière erreur',
 		value: detail.yousignLastError
@@ -236,7 +236,7 @@ const linkClass =
 			) : null
 		}
 		{
-			signed && detail.yousignRequestId ? (
+			signed && detail.externalRequestId ? (
 				<a href={`/api/admin/enrollment/${enrollmentId}/nda`} class={linkClass}>
 					Télécharger le contrat
 				</a>

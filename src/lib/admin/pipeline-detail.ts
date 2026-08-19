@@ -1,6 +1,10 @@
 import type { AdminEnrollmentDetail } from './enrollments';
 import type { AdminPaymentSummary } from './payments';
 import { formatMoney } from '../payment-plans';
+import {
+	resolveExternalRequestId,
+	resolveExternalSignerId,
+} from '../signature/nda-request';
 import type { BadgeTone } from '../status';
 import { COLLECTION_STATUS_LABELS, CONTRACT_STATUS_LABELS, ACCESS_STATUS_LABELS } from '../status';
 
@@ -120,11 +124,13 @@ type SignatureDiagnosticInput = Pick<
 	AdminEnrollmentDetail,
 	| 'collectionStatus'
 	| 'contractStatus'
-	| 'yousignRequestId'
-	| 'yousignSignerId'
 	| 'yousignLastError'
 	| 'ndaDeliveryFailedAt'
->;
+> & {
+	yousignRequestId?: string | null;
+	yousignSignerId?: string | null;
+	ndaRequest?: AdminEnrollmentDetail['ndaRequest'];
+};
 
 /**
  * Diagnostic signature = faits, pas de narratif.
@@ -148,8 +154,11 @@ export function signatureDiagnostic(detail: SignatureDiagnosticInput): Signature
 	// Signature pas encore due : pas un problème à signaler ici.
 	if (!paid) return null;
 
+	const requestId = resolveExternalRequestId(detail);
+	const signerId = resolveExternalSignerId(detail);
+
 	// 2. Pas d'erreur captée : on décrit l'état et on pointe l'action qui révèle le motif.
-	if (!detail.yousignRequestId) {
+	if (!requestId) {
 		return {
 			level: 'warn',
 			title: 'Aucune demande Yousign créée.',
@@ -157,7 +166,7 @@ export function signatureDiagnostic(detail: SignatureDiagnosticInput): Signature
 		};
 	}
 
-	if (!detail.yousignSignerId && detail.contractStatus === 'pending') {
+	if (!signerId && detail.contractStatus === 'pending') {
 		return {
 			level: 'warn',
 			title: 'Demande Yousign présente mais sans signataire, et aucune erreur enregistrée.',
@@ -219,7 +228,7 @@ function buildSignatureHint(detail: AdminEnrollmentDetail): string {
 		return 'En attente de signature';
 	}
 
-	if (detail.yousignRequestId) {
+	if (resolveExternalRequestId(detail)) {
 		return `Yousign · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
 	}
 

@@ -6,6 +6,10 @@ import type {
 	Enrollment,
 } from '../../generated/prisma/client';
 import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
+import {
+	resolveExternalRequestId,
+	resolveExternalSignerId,
+} from '../signature/nda-request';
 
 export const adminActionZones = ['metier', 'actions'] as const;
 export type AdminActionZone = (typeof adminActionZones)[number];
@@ -161,19 +165,21 @@ type VisibilityInput = Pick<
 	| 'yousignRequestId'
 	| 'yousignSignerId'
 	| 'stripeCheckoutSessionId'
->;
+> & {
+	ndaRequest?: { externalRequestId: string; externalSignerId: string | null } | null;
+};
 
 /** Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.). */
 export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boolean {
 	const paidEnough = isPaidEnough(e.collectionStatus);
+	const requestId = resolveExternalRequestId(e);
+	const signerId = resolveExternalSignerId(e);
 
 	switch (action) {
 		case 'resend_nda':
-			return isAwaitingNda(e) && Boolean(e.yousignRequestId);
+			return isAwaitingNda(e) && Boolean(requestId);
 		case 'copy_nda_link':
-			return (
-				e.contractStatus === 'sent' && Boolean(e.yousignRequestId) && Boolean(e.yousignSignerId)
-			);
+			return e.contractStatus === 'sent' && Boolean(requestId) && Boolean(signerId);
 		case 'recreate_nda':
 			return paidEnough && e.contractStatus !== 'signed';
 		case 'retrigger_teachizy':
@@ -183,7 +189,7 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 		case 'sync_payment':
 			return Boolean(e.stripeCheckoutSessionId);
 		case 'sync_yousign':
-			return Boolean(e.yousignRequestId);
+			return Boolean(requestId);
 		default:
 			return false;
 	}

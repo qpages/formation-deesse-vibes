@@ -7,7 +7,9 @@ import {
 	mapYousignSignerApiStatus,
 	yousignStatusFromEvent,
 } from '../status';
-import { getSignatureAdapter } from '../signature/factory';
+import { eventOccurredAt } from '../signature/event-time';
+import { getSignatureAdapter, getSignatureWebhookAdapter } from '../signature/factory';
+import { resolveExternalRequestId, resolveExternalSignerId } from '../signature/nda-request';
 import { applyAccessPolicy } from './access';
 import {
 	findEnrollmentById,
@@ -76,23 +78,6 @@ function extractReason(payload: YousignWebhookPayload) {
 	);
 }
 
-function eventOccurredAt(payload: YousignWebhookPayload): Date {
-	const raw = payload.event_time;
-	if (typeof raw === 'number') {
-		// Yousign envoie souvent un epoch unix (secondes).
-		return new Date(raw > 1e12 ? raw : raw * 1000);
-	}
-	if (typeof raw === 'string' && raw.trim()) {
-		const asNumber = Number(raw);
-		if (!Number.isNaN(asNumber)) {
-			return new Date(asNumber > 1e12 ? asNumber : asNumber * 1000);
-		}
-		const parsed = new Date(raw);
-		if (!Number.isNaN(parsed.getTime())) return parsed;
-	}
-	return new Date();
-}
-
 function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date()) {
 	const name = `${firstName} ${lastName}`.trim() || 'Un acheteur';
 	const when = at.toLocaleString('fr-FR', {
@@ -121,11 +106,12 @@ export async function syncYousignStatus(enrollmentId: string): Promise<SyncYousi
 	if (!enrollment) {
 		return { ok: false, reason: 'enrollment_not_found' };
 	}
-	if (!enrollment.yousignRequestId) {
+	const requestId = resolveExternalRequestId(enrollment);
+	if (!requestId) {
 		return { ok: false, reason: 'no_yousign_request' };
 	}
 
-	const remote = await getSignatureAdapter().getSignatureRequest(enrollment.yousignRequestId);
+	const remote = await getSignatureAdapter().getSignatureRequest(requestId);
 	const rawStatus = remote.status?.toLowerCase() ?? '';
 
 	// Un brouillon = demande jamais activée : ne PAS la faire passer pour « envoyée ».
@@ -145,7 +131,7 @@ export async function syncYousignStatus(enrollmentId: string): Promise<SyncYousi
 	const contractStatus = contractStatusFromYousignRequest(yousignStatus);
 	const becameSigned = yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
 
-	const signerId = enrollment.yousignSignerId ?? remote.signers?.[0]?.id ?? null;
+	const signerId = resolveExternalSignerId(enrollment) ?? remote.signers?.[0]?.id ?? null;
 	const signerMirror: {
 		yousignSignerId?: string | null;
 		yousignSignerStatus?: ReturnType<typeof mapYousignSignerApiStatus>;
@@ -159,7 +145,7 @@ export async function syncYousignStatus(enrollmentId: string): Promise<SyncYousi
 	if (signerId) {
 		signerMirror.yousignSignerId = signerId;
 		try {
-			const signer = await getSignatureAdapter().getSigner(enrollment.yousignRequestId, signerId);
+			const signer = await getSignatureAdapter().getSigner(requestId, signerId);
 			const signerStatus = mapYousignSignerApiStatus(signer.status);
 			if (signerStatus) signerMirror.yousignSignerStatus = signerStatus;
 			signerMirror.signatureLinkExpiresAt = signer.signature_link_expiration_date
@@ -205,7 +191,7 @@ export async function syncYousignStatus(enrollmentId: string): Promise<SyncYousi
 			? await ensureTeachizyAfterSignature(
 					enrollmentId,
 					`sync-yousign:${enrollmentId}`,
-					enrollment.yousignRequestId,
+					requestId,
 				)
 			: { status: 'skipped' };
 
@@ -279,15 +265,19 @@ export async function handleYousignProviderEvent(input: {
 	}
 
 	if (eventName === 'signature_request.done') {
-		const { requestId, externalId } = extractRequestIds(payload);
-		if (!requestId) throw new Error('signature_request.done sans request id');
+		const completed = getSignatureWebhookAdapter().mapCompletedEvent(payload);
+		if (!completed) throw new Error('signature_request.done sans request id');
 
-		const enrollment = await findEnrollmentByYousignRequestOrExternalId(requestId, externalId);
+		const enrollment = await findEnrollmentByYousignRequestOrExternalId(
+			completed.requestId,
+			completed.externalId,
+		);
 		if (!enrollment) {
-			throw new Error(`Enrollment introuvable pour Yousign ${requestId}`);
+			throw new Error(`Enrollment introuvable pour Yousign ${completed.requestId}`);
 		}
 
 		const becameSigned = enrollment.contractStatus !== 'signed';
+		const at = completed.occurredAt;
 
 		await updateEnrollmentYousignMirror(enrollment.id, {
 			yousignStatus: 'done',
@@ -311,7 +301,7 @@ export async function handleYousignProviderEvent(input: {
 		const followUp = await ensureTeachizyAfterSignature(
 			enrollment.id,
 			input.providerEventId,
-			requestId,
+			completed.requestId,
 		);
 		if (followUp.status === 'failed') {
 			throw new Error(`Enqueue Teachizy échoué: ${followUp.error}`);

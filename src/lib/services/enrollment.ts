@@ -11,6 +11,10 @@ import { getEnv } from '../env';
 import { getPaymentPlan } from '../payment-plans';
 import { getPrisma } from '../prisma';
 import { getSignaturePort } from '../signature/factory';
+import {
+	resolveExternalRequestId,
+	resolveExternalSignerId,
+} from '../signature/nda-request';
 import { sendMagicLinkEmail } from './brevo';
 import { findEnrollmentByEmail, withUser } from './enrollment-queries';
 
@@ -29,6 +33,12 @@ export {
 	findEnrollmentForAccessPolicy,
 	findEnrollmentIdByStripeInvoiceId,
 } from './enrollment-queries';
+export {
+	clearNdaFields,
+	persistNdaDraftRequestId,
+	persistNdaProvisioned,
+	recordYousignError,
+} from '../signature/persist';
 export {
 	markProviderEventFailed,
 	markProviderEventIgnored,
@@ -89,63 +99,6 @@ export async function updateEnrollmentYousignMirror(
 				? { yousignLastErrorAt: data.yousignLastErrorAt }
 				: {}),
 		},
-		...withUser,
-	});
-}
-
-/** Max longueur stockée pour une erreur Yousign (colonne TEXT, on borne l'affichage admin). */
-const YOUSIGN_ERROR_MAX_LEN = 1000;
-
-/** Persiste la dernière erreur Yousign pour diagnostic admin. Ne throw jamais. */
-export async function recordYousignError(enrollmentId: string, message: string) {
-	try {
-		const prisma = getPrisma();
-		const data = {
-			yousignLastError: message.slice(0, YOUSIGN_ERROR_MAX_LEN),
-			yousignLastErrorAt: new Date(),
-		};
-		await prisma.enrollment.update({
-			where: { id: enrollmentId },
-			data,
-		});
-		// Création jamais aboutie : pending + erreur ≠ « à envoyer ».
-		await prisma.enrollment.updateMany({
-			where: { id: enrollmentId, contractStatus: 'pending' },
-			data: { contractStatus: 'error' },
-		});
-	} catch (error) {
-		console.error('[recordYousignError] persist failed', error);
-	}
-}
-
-export async function persistNdaProvisioned(
-	enrollmentId: string,
-	nda: { requestId: string; signerId: string },
-) {
-	return getPrisma().enrollment.update({
-		where: { id: enrollmentId },
-		data: {
-			yousignRequestId: nda.requestId,
-			yousignSignerId: nda.signerId,
-			yousignStatus: 'ongoing',
-			contractStatus: 'sent',
-			yousignSignerStatus: null,
-			signatureLinkExpiresAt: null,
-			ndaNotifiedAt: null,
-			ndaLinkOpenedAt: null,
-			ndaSignedAt: null,
-			ndaDeliveryFailedAt: null,
-			yousignLastError: null,
-			yousignLastErrorAt: null,
-		},
-		...withUser,
-	});
-}
-
-export async function persistNdaDraftRequestId(enrollmentId: string, requestId: string) {
-	return getPrisma().enrollment.update({
-		where: { id: enrollmentId },
-		data: { yousignRequestId: requestId },
 		...withUser,
 	});
 }
@@ -305,7 +258,7 @@ export async function canResendNda(
 	if (!isAwaitingNda(enrollment)) {
 		return { ok: false, reason: 'Le contrat de confidentialité n’est pas en attente de signature.' };
 	}
-	if (!enrollment.yousignRequestId) {
+	if (!resolveExternalRequestId(enrollment)) {
 		return { ok: false, reason: 'Aucune demande Yousign associée.' };
 	}
 
@@ -350,11 +303,13 @@ export async function markNdaResent(enrollment: Enrollment) {
 }
 
 export async function resolveNdaSignUrl(enrollment: Enrollment): Promise<string | null> {
-	if (!enrollment.yousignRequestId || !enrollment.yousignSignerId) return null;
+	const requestId = resolveExternalRequestId(enrollment);
+	const signerId = resolveExternalSignerId(enrollment);
+	if (!requestId || !signerId) return null;
 	try {
 		return await getSignaturePort().getSignSurface({
-			requestId: enrollment.yousignRequestId,
-			signerId: enrollment.yousignSignerId,
+			requestId,
+			signerId,
 		});
 	} catch {
 		return null;
@@ -363,26 +318,4 @@ export async function resolveNdaSignUrl(enrollment: Enrollment): Promise<string 
 
 function startOfUtcDay(d: Date) {
 	return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-/** Clear Yousign ids without calling provider cancel (recreate NDA). */
-export async function clearNdaFields(enrollmentId: string) {
-	return getPrisma().enrollment.update({
-		where: { id: enrollmentId },
-		data: {
-			yousignRequestId: null,
-			yousignSignerId: null,
-			yousignStatus: null,
-			yousignSignerStatus: null,
-			signatureLinkExpiresAt: null,
-			ndaNotifiedAt: null,
-			ndaLinkOpenedAt: null,
-			ndaSignedAt: null,
-			ndaDeliveryFailedAt: null,
-			yousignLastError: null,
-			yousignLastErrorAt: null,
-			contractStatus: 'pending',
-		},
-		...withUser,
-	});
 }

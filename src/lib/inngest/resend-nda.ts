@@ -6,6 +6,7 @@ import {
 } from '../services/enrollment';
 import { alertFinalFailure, formatErrorDetail, withJobLifecycleAlerts } from '../services/slack';
 import { getSignatureAdapter } from '../signature/factory';
+import { resolveExternalRequestId } from '../signature/nda-request';
 import { inngest } from './client';
 
 /** Command: resend Yousign NDA (admin resend_nda / api nda/resend). */
@@ -46,10 +47,11 @@ export const resendNda = inngest.createFunction(
 
 				await step.run('reactivate-and-mark', async () => {
 					const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
-					if (!enrollment.yousignRequestId) {
+					const requestId = resolveExternalRequestId(enrollment);
+					if (!requestId) {
 						throw new Error('no_yousign_request');
 					}
-					await getSignatureAdapter().reactivateNda(enrollment.yousignRequestId);
+					await getSignatureAdapter().reactivateNda(requestId);
 					await markNdaResent(enrollment);
 				});
 

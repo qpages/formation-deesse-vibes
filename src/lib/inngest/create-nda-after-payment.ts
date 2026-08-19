@@ -14,6 +14,7 @@ import {
 } from '../services/slack';
 import { getSignaturePort } from '../signature/factory';
 import { isNdaFullyProvisioned } from '../signature/helpers';
+import { resolveExternalRequestId } from '../signature/nda-request';
 import { inngest } from './client';
 
 /** Command: créer / activer NDA après paiement (aussi admin recreate/retrigger). */
@@ -64,8 +65,9 @@ export const createNdaAfterPayment = inngest.createFunction(
 				}
 
 				const signature = getSignaturePort();
+				const existingRequestId = resolveExternalRequestId(enrollment);
 				const requestId =
-					(!isRecreate && enrollment.yousignRequestId) ||
+					(!isRecreate && existingRequestId) ||
 					(await step.run('create-yousign-draft', async () => {
 						const draft = await signature.provisionNda({
 							step: 'draft',
@@ -77,7 +79,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 						return draft.requestId;
 					}));
 
-				if (isRecreate || !enrollment.yousignRequestId) {
+				if (isRecreate || !existingRequestId) {
 					await step.run('persist-yousign-draft-id', async () => {
 						await persistNdaDraftRequestId(enrollment.id, requestId);
 					});

@@ -3,7 +3,7 @@ import { getPrisma } from '../prisma';
 
 export type EnrollmentWithUser = Enrollment & { user: User };
 
-export const withUser = { include: { user: true } } as const;
+export const withUser = { include: { user: true, ndaRequest: true } } as const;
 
 export async function findEnrollmentByEmail(email: string) {
 	return getPrisma().enrollment.findFirst({
@@ -55,10 +55,7 @@ export async function findEnrollmentByScheduleOrSubscription(
 }
 
 export async function findEnrollmentByYousignRequestId(requestId: string) {
-	return getPrisma().enrollment.findUnique({
-		where: { yousignRequestId: requestId },
-		...withUser,
-	});
+	return findEnrollmentByExternalRequestId('yousign', requestId);
 }
 
 /** Resolve enrollment from Yousign request id, falling back to external_id (= enrollment id). */
@@ -66,9 +63,41 @@ export async function findEnrollmentByYousignRequestOrExternalId(
 	requestId: string,
 	externalId?: string,
 ) {
-	return getPrisma().enrollment.findFirst({
+	return findEnrollmentByExternalRequestOrEnrollmentId('yousign', requestId, externalId);
+}
+
+export async function findEnrollmentByExternalRequestId(
+	provider: 'yousign',
+	requestId: string,
+) {
+	const prisma = getPrisma();
+
+	const viaNda = await prisma.enrollment.findFirst({
+		where: { ndaRequest: { provider, externalRequestId: requestId } },
+		...withUser,
+	});
+	if (viaNda) return viaNda;
+
+	return prisma.enrollment.findUnique({
+		where: { yousignRequestId: requestId },
+		...withUser,
+	});
+}
+
+export async function findEnrollmentByExternalRequestOrEnrollmentId(
+	provider: 'yousign',
+	requestId: string,
+	externalId?: string,
+) {
+	const prisma = getPrisma();
+
+	return prisma.enrollment.findFirst({
 		where: {
-			OR: [{ yousignRequestId: requestId }, ...(externalId ? [{ id: externalId }] : [])],
+			OR: [
+				{ ndaRequest: { provider, externalRequestId: requestId } },
+				{ yousignRequestId: requestId },
+				...(externalId ? [{ id: externalId }] : []),
+			],
 		},
 		...withUser,
 	});

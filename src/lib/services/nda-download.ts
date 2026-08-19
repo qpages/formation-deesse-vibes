@@ -1,5 +1,6 @@
 import { json } from '../http';
 import { getSignaturePort } from '../signature/factory';
+import { resolveExternalRequestId } from '../signature/nda-request';
 import { findEnrollmentById } from './enrollment';
 
 export type SignedNdaFailureReason =
@@ -37,12 +38,13 @@ export async function getSignedNdaPdf(enrollmentId: string): Promise<SignedNdaRe
 	if (enrollment.contractStatus !== 'signed') {
 		return { ok: false, reason: 'not_signed' };
 	}
-	if (!enrollment.yousignRequestId) {
+	const requestId = resolveExternalRequestId(enrollment);
+	if (!requestId) {
 		return { ok: false, reason: 'no_yousign_request' };
 	}
 
 	try {
-		const file = await getSignaturePort().downloadSignedPdf(enrollment.yousignRequestId);
+		const file = await getSignaturePort().downloadSignedPdf(requestId);
 		return {
 			ok: true,
 			bytes: file.bytes,
