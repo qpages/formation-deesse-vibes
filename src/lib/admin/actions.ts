@@ -9,6 +9,7 @@ import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
+	resolveNdaProvider,
 } from '../signature/nda-request';
 
 export const adminActionZones = ['metier', 'actions'] as const;
@@ -178,7 +179,11 @@ type VisibilityInput = Pick<
 	| 'yousignSignerId'
 	| 'stripeCheckoutSessionId'
 > & {
-	ndaRequest?: { externalRequestId: string; externalSignerId: string | null } | null;
+	ndaRequest?: {
+		provider: 'yousign' | 'docuseal';
+		externalRequestId: string;
+		externalSignerId: string | null;
+	} | null;
 };
 
 /** Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.). */
@@ -189,9 +194,18 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 
 	switch (action) {
 		case 'resend_nda':
-			return isAwaitingNda(e) && Boolean(requestId);
+			return (
+				isAwaitingNda(e) &&
+				Boolean(requestId) &&
+				resolveNdaProvider(e) !== 'docuseal'
+			);
 		case 'copy_nda_link':
-			return e.contractStatus === 'sent' && Boolean(requestId) && Boolean(signerId);
+			return (
+				e.contractStatus === 'sent' &&
+				Boolean(requestId) &&
+				Boolean(signerId) &&
+				resolveNdaProvider(e) !== 'docuseal'
+			);
 		case 'recreate_nda':
 			return paidEnough && e.contractStatus !== 'signed';
 		case 'retrigger_teachizy':

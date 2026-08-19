@@ -68,7 +68,7 @@ export function toSignedNdaResponse(result: SignedNdaResult): Response {
 		});
 	}
 
-	return new Response(result.bytes, {
+	return new Response(Buffer.from(result.bytes), {
 		status: 200,
 		headers: {
 			'Content-Type': result.contentType,

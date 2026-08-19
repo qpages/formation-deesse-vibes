@@ -1,3 +1,4 @@
+import type { NdaRequest } from '../../generated/prisma/client';
 import type { AdminEnrollmentDetail } from './enrollments';
 import type { AdminPaymentSummary } from './payments';
 import { formatMoney } from '../payment-plans';
@@ -129,7 +130,7 @@ type SignatureDiagnosticInput = Pick<
 > & {
 	yousignRequestId?: string | null;
 	yousignSignerId?: string | null;
-	ndaRequest?: AdminEnrollmentDetail['ndaRequest'];
+	ndaRequest?: Pick<NdaRequest, 'provider' | 'externalRequestId' | 'externalSignerId'> | null;
 };
 
 /**
