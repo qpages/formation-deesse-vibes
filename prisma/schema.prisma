@@ -94,10 +94,12 @@ enum SubscriptionStatus {
 enum Provider {
   stripe
   yousign
+  docuseal
 }
 
 enum SignatureProvider {
   yousign
+  docuseal
 }
 
 enum SignKind {
