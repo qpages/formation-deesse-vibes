@@ -59,6 +59,9 @@ export type AppEvents = {
 	'yousign/signature.done': {
 		data: { enrollmentId: string; yousignEventId: string; requestId: string };
 	};
+	'nda/signature.completed': {
+		data: { enrollmentId: string; providerEventId: string; requestId: string };
+	};
 	'provider/stripe-event.received': {
 		data: { providerEventId: string };
 	};

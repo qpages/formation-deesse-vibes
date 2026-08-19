@@ -18,7 +18,11 @@ export const grantTeachizyAccess = inngest.createFunction(
 	{
 		id: 'grant-teachizy-access',
 		retries: 2,
-		triggers: [{ event: 'yousign/signature.done' }, { event: 'enrollment/access.grant' }],
+		triggers: [
+			{ event: 'yousign/signature.done' },
+			{ event: 'nda/signature.completed' },
+			{ event: 'enrollment/access.grant' },
+		],
 		onFailure: async ({ event, error }) => {
 			const original = event.data as { event?: { data?: { enrollmentId?: string } } };
 			await alertFinalFailure({
@@ -44,7 +48,10 @@ export const grantTeachizyAccess = inngest.createFunction(
 					return { skipped: true, reason: 'already_invited' };
 				}
 
-				if (event.name === 'yousign/signature.done') {
+				const isSignatureCompleted =
+					event.name === 'yousign/signature.done' || event.name === 'nda/signature.completed';
+
+				if (isSignatureCompleted) {
 					await step.run('mark-contract-signed', async () => {
 						await updateEnrollmentYousignMirror(enrollment.id, {
 							yousignStatus: 'done',
