@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import type { YousignWebhookPayload } from '../../../lib/services/yousign-events';
 import { acknowledgeProviderEvent } from '../../../lib/webhooks/acknowledge-provider-event';
-import { getSignatureWebhookAdapter } from '../../../lib/signature/factory';
+import { yousignAdapter } from '../../../lib/signature/adapters/yousign';
 
 /**
  * Template Method webhook Yousign: verify → record → enqueue → 200.
@@ -11,7 +11,7 @@ export const POST: APIRoute = async ({ request }) => {
 	const signature =
 		request.headers.get('x-yousign-signature-256') ?? request.headers.get('x-yousign-signature');
 
-	if (!getSignatureWebhookAdapter().verify(rawBody, signature)) {
+	if (!yousignAdapter.verify(rawBody, signature)) {
 		return new Response('Invalid signature', { status: 400 });
 	}
 

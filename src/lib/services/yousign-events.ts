@@ -2,7 +2,7 @@ import type { YousignRequestStatus } from '../../generated/prisma/client';
 import { decryptPayload } from '../crypto';
 import { ensureTeachizyAfterSignature } from '../signature/after-signature';
 import { eventOccurredAt } from '../signature/event-time';
-import { getSignatureWebhookAdapter } from '../signature/factory';
+import { yousignAdapter } from '../signature/adapters/yousign';
 import type { SyncNdaStatusResult } from '../signature/types';
 import { syncNdaStatus, syncYousignStatus } from '../signature/sync-nda';
 import { contractStatusFromYousignRequest, yousignStatusFromEvent } from '../status';
@@ -126,7 +126,7 @@ export async function handleYousignProviderEvent(input: {
 	}
 
 	if (eventName === 'signature_request.done') {
-		const completed = getSignatureWebhookAdapter().mapCompletedEvent(payload);
+		const completed = yousignAdapter.mapCompletedEvent(payload);
 		if (!completed) throw new Error('signature_request.done sans request id');
 
 		const enrollment = await findEnrollmentByYousignRequestOrExternalId(
