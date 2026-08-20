@@ -1,20 +1,11 @@
-import { findEnrollmentById } from '../../services/enrollment';
+import { findEnrollmentById } from '../../enrollment';
 import { formatErrorDetail, notifyOps } from '../../services/slack';
 import { ensureTeachizyAfterSignature } from '../after-signature';
-import { persistDocusealSyncMirror, recordNdaError } from '../persist';
+import { formatNdaSignedTitle } from '../format-nda-signed-title';
+import { persistNdaSyncMirror, recordNdaError } from '../persist';
 import { resolveExternalRequestId } from '../nda-request';
 import type { SyncNdaStatusResult } from '../types';
 import type { DocusealSubmission } from './docuseal';
-
-function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date()) {
-	const name = `${firstName} ${lastName}`.trim() || 'Un acheteur';
-	const when = at.toLocaleString('fr-FR', {
-		dateStyle: 'long',
-		timeStyle: 'short',
-		timeZone: 'Europe/Paris',
-	});
-	return `${name} a signé le contrat de confidentialité le ${when}`;
-}
 
 export async function syncDocusealNda(
 	enrollmentId: string,
@@ -50,7 +41,7 @@ export async function syncDocusealNda(
 	const becameSigned = rawStatus === 'completed' && enrollment.contractStatus !== 'signed';
 	const completedAt = remote.completed_at ? new Date(remote.completed_at) : new Date();
 
-	await persistDocusealSyncMirror(enrollmentId, {
+	await persistNdaSyncMirror(enrollmentId, {
 		providerStatus: remote.status,
 		...(rawStatus === 'completed'
 			? {
@@ -84,7 +75,6 @@ export async function syncDocusealNda(
 					enrollmentId,
 					`sync-docuseal:${enrollmentId}`,
 					requestId,
-					{ provider: 'docuseal' },
 				)
 			: { status: 'skipped' as const };
 

@@ -148,6 +148,8 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 </div>
 
 <script>
+	import { lockButton } from '../../../lib/client/lock-button';
+
 	document.getElementById('status-refresh')?.addEventListener('click', (event) => {
 		event.preventDefault();
 		window.location.hash = 'acces';
@@ -156,12 +158,11 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 
 	const confirmBtn = document.getElementById('nda-confirm-signed') as HTMLButtonElement | null;
 	const confirmFeedback = document.getElementById('nda-confirm-feedback');
-	const confirmLabel = confirmBtn?.textContent ?? 'J’ai signé le contrat de confidentialité';
 
 	confirmBtn?.addEventListener('click', async () => {
-		if (!confirmBtn || confirmBtn.disabled) return;
-		confirmBtn.disabled = true;
-		confirmBtn.textContent = 'Vérification…';
+		if (!confirmBtn) return;
+		const lock = lockButton(confirmBtn, { busyLabel: 'Vérification…' });
+		if (!lock.locked) return;
 		if (confirmFeedback) confirmFeedback.textContent = '';
 		try {
 			const res = await fetch('/api/enrollment/nda-sync', {
@@ -192,8 +193,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 					'Impossible de vérifier la signature pour le moment. Réessaie dans quelques secondes.';
 			}
 		}
-		confirmBtn.disabled = false;
-		confirmBtn.textContent = confirmLabel;
+		lock.unlock();
 	});
 
 	const panel = document.getElementById('status-panel');

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { e2eMockProviders } from '../../e2e-providers';
 import { FORMATION, getEnv, requireEnv } from '../../env';
+import { resolveSignatureConfig } from '../config';
 import { eventOccurredAt } from '../event-time';
 import type {
 	ProvisionNdaActivateResult,
@@ -206,6 +207,11 @@ function mapCompletedEvent(payload: unknown): SignatureCompletedEvent | null {
 }
 
 async function provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResult> {
+	const { mode } = resolveSignatureConfig();
+	if (mode !== 'redirect') {
+		throw new Error('Yousign requires SIGNATURE_MODE=redirect');
+	}
+
 	if (input.step === 'draft') {
 		return createNdaDraft(input);
 	}

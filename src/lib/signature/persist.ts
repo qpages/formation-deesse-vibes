@@ -1,10 +1,6 @@
-import type {
-	ContractStatus,
-	YousignRequestStatus,
-	YousignSignerStatus,
-} from '../../generated/prisma/client';
-import { getEnv } from '../env';
+import type { ContractStatus } from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
+import { resolveSignatureConfig } from './config';
 
 const ERROR_MAX_LEN = 1000;
 
@@ -12,64 +8,36 @@ function truncateError(message: string): string {
 	return message.slice(0, ERROR_MAX_LEN);
 }
 
-function isDocusealProvider(): boolean {
-	return getEnv().SIGNATURE_PROVIDER === 'docuseal';
-}
-
 const withUserAndNda = { include: { user: true, ndaRequest: true } } as const;
 
 export async function persistNdaDraftRequestId(enrollmentId: string, requestId: string) {
+	const { provider, signKind } = resolveSignatureConfig();
 	const prisma = getPrisma();
+
 	return prisma.$transaction(async (tx) => {
-		if (isDocusealProvider()) {
-			await tx.ndaRequest.upsert({
-				where: { enrollmentId },
-				create: {
-					enrollmentId,
-					provider: 'docuseal',
-					externalRequestId: requestId,
-					signKind: 'embed',
-				},
-				update: {
-					provider: 'docuseal',
-					externalRequestId: requestId,
-					externalSignerId: null,
-					signKind: 'embed',
-					providerStatus: null,
-					lastError: null,
-					lastErrorAt: null,
-				},
-			});
-			return tx.enrollment.findUniqueOrThrow({
-				where: { id: enrollmentId },
-				...withUserAndNda,
-			});
-		}
-
-		const enrollment = await tx.enrollment.update({
-			where: { id: enrollmentId },
-			data: { yousignRequestId: requestId },
-			include: { user: true, ndaRequest: true },
-		});
-
 		await tx.ndaRequest.upsert({
 			where: { enrollmentId },
 			create: {
 				enrollmentId,
-				provider: 'yousign',
+				provider,
 				externalRequestId: requestId,
-				signKind: 'redirect',
+				signKind,
 			},
 			update: {
+				provider,
 				externalRequestId: requestId,
 				externalSignerId: null,
+				signKind,
 				providerStatus: null,
 				lastError: null,
 				lastErrorAt: null,
 			},
 		});
 
-		return enrollment;
+		return tx.enrollment.findUniqueOrThrow({
+			where: { id: enrollmentId },
+			...withUserAndNda,
+		});
 	});
 }
 
@@ -77,62 +45,21 @@ export async function persistNdaProvisioned(
 	enrollmentId: string,
 	nda: { requestId: string; signerId: string; signatureLink?: string },
 ) {
-	const prisma = getPrisma();
+	const { provider, signKind } = resolveSignatureConfig();
 	const metadata =
-		isDocusealProvider() && nda.signatureLink ? { embed_src: nda.signatureLink } : undefined;
+		signKind === 'embed' && nda.signatureLink ? { embed_src: nda.signatureLink } : undefined;
+	const prisma = getPrisma();
 
 	return prisma.$transaction(async (tx) => {
-		if (isDocusealProvider()) {
-			const enrollment = await tx.enrollment.update({
-				where: { id: enrollmentId },
-				data: {
-					contractStatus: 'sent',
-					ndaNotifiedAt: null,
-					ndaLinkOpenedAt: null,
-					ndaSignedAt: null,
-					ndaDeliveryFailedAt: null,
-				},
-				include: { user: true, ndaRequest: true },
-			});
-
-			await tx.ndaRequest.upsert({
-				where: { enrollmentId },
-				create: {
-					enrollmentId,
-					provider: 'docuseal',
-					externalRequestId: nda.requestId,
-					externalSignerId: nda.signerId,
-					signKind: 'embed',
-					metadata,
-				},
-				update: {
-					externalRequestId: nda.requestId,
-					externalSignerId: nda.signerId,
-					signKind: 'embed',
-					metadata,
-					lastError: null,
-					lastErrorAt: null,
-				},
-			});
-
-			return enrollment;
-		}
-
 		const enrollment = await tx.enrollment.update({
 			where: { id: enrollmentId },
 			data: {
-				yousignRequestId: nda.requestId,
-				yousignSignerId: nda.signerId,
-				yousignStatus: 'ongoing',
 				contractStatus: 'sent',
-				yousignSignerStatus: null,
 				signatureLinkExpiresAt: null,
 				ndaNotifiedAt: null,
 				ndaLinkOpenedAt: null,
 				ndaSignedAt: null,
 				ndaDeliveryFailedAt: null,
-				yousignLastError: null,
-				yousignLastErrorAt: null,
 			},
 			include: { user: true, ndaRequest: true },
 		});
@@ -141,14 +68,18 @@ export async function persistNdaProvisioned(
 			where: { enrollmentId },
 			create: {
 				enrollmentId,
-				provider: 'yousign',
+				provider,
 				externalRequestId: nda.requestId,
 				externalSignerId: nda.signerId,
-				signKind: 'redirect',
+				signKind,
+				metadata,
 			},
 			update: {
+				provider,
 				externalRequestId: nda.requestId,
 				externalSignerId: nda.signerId,
+				signKind,
+				metadata,
 				lastError: null,
 				lastErrorAt: null,
 			},
@@ -167,17 +98,11 @@ export async function clearNdaFields(enrollmentId: string) {
 		return tx.enrollment.update({
 			where: { id: enrollmentId },
 			data: {
-				yousignRequestId: null,
-				yousignSignerId: null,
-				yousignStatus: null,
-				yousignSignerStatus: null,
 				signatureLinkExpiresAt: null,
 				ndaNotifiedAt: null,
 				ndaLinkOpenedAt: null,
 				ndaSignedAt: null,
 				ndaDeliveryFailedAt: null,
-				yousignLastError: null,
-				yousignLastErrorAt: null,
 				contractStatus: 'pending',
 			},
 			...withUserAndNda,
@@ -191,16 +116,8 @@ export async function recordNdaError(enrollmentId: string, message: string) {
 		const prisma = getPrisma();
 		const truncated = truncateError(message);
 		const at = new Date();
-		const data = {
-			yousignLastError: truncated,
-			yousignLastErrorAt: at,
-		};
 
 		await prisma.$transaction(async (tx) => {
-			await tx.enrollment.update({
-				where: { id: enrollmentId },
-				data,
-			});
 			await tx.enrollment.updateMany({
 				where: { id: enrollmentId, contractStatus: 'pending' },
 				data: { contractStatus: 'error' },
@@ -215,81 +132,18 @@ export async function recordNdaError(enrollmentId: string, message: string) {
 	}
 }
 
-/** @deprecated Préférer recordNdaError */
-export const recordYousignError = recordNdaError;
-
-/** Dual-write sync mirror: enrollment yousign* + nda_requests providerStatus / lastError. */
+/** Sync mirror: enrollment contract/timestamps + nda_requests providerStatus / lastError. */
 export async function persistNdaSyncMirror(
 	enrollmentId: string,
 	data: {
-		yousignStatus?: YousignRequestStatus;
 		contractStatus?: ContractStatus;
 		providerStatus?: string | null;
-		yousignSignerId?: string | null;
-		yousignSignerStatus?: YousignSignerStatus | null;
+		externalSignerId?: string | null;
 		signatureLinkExpiresAt?: Date | null;
 		ndaNotifiedAt?: Date | null;
+		ndaLinkOpenedAt?: Date | null;
 		ndaSignedAt?: Date | null;
-		yousignLastError?: string | null;
-		yousignLastErrorAt?: Date | null;
-	},
-) {
-	const prisma = getPrisma();
-	return prisma.$transaction(async (tx) => {
-		const enrollment = await tx.enrollment.update({
-			where: { id: enrollmentId },
-			data: {
-				...(data.yousignStatus !== undefined ? { yousignStatus: data.yousignStatus } : {}),
-				...(data.contractStatus ? { contractStatus: data.contractStatus } : {}),
-				...(data.yousignSignerId !== undefined ? { yousignSignerId: data.yousignSignerId } : {}),
-				...(data.yousignSignerStatus !== undefined
-					? { yousignSignerStatus: data.yousignSignerStatus }
-					: {}),
-				...(data.signatureLinkExpiresAt !== undefined
-					? { signatureLinkExpiresAt: data.signatureLinkExpiresAt }
-					: {}),
-				...(data.ndaNotifiedAt !== undefined ? { ndaNotifiedAt: data.ndaNotifiedAt } : {}),
-				...(data.ndaSignedAt !== undefined ? { ndaSignedAt: data.ndaSignedAt } : {}),
-				...(data.yousignLastError !== undefined ? { yousignLastError: data.yousignLastError } : {}),
-				...(data.yousignLastErrorAt !== undefined
-					? { yousignLastErrorAt: data.yousignLastErrorAt }
-					: {}),
-			},
-			include: { user: true, ndaRequest: true },
-		});
-
-		const ndaUpdate: {
-			providerStatus?: string | null;
-			lastError?: string | null;
-			lastErrorAt?: Date | null;
-		} = {};
-		if (data.providerStatus !== undefined) ndaUpdate.providerStatus = data.providerStatus;
-		if (data.yousignLastError === null) {
-			ndaUpdate.lastError = null;
-			ndaUpdate.lastErrorAt = null;
-		} else if (data.yousignLastError !== undefined) {
-			ndaUpdate.lastError = truncateError(data.yousignLastError);
-			ndaUpdate.lastErrorAt = data.yousignLastErrorAt ?? new Date();
-		}
-
-		if (Object.keys(ndaUpdate).length > 0) {
-			await tx.ndaRequest.updateMany({
-				where: { enrollmentId },
-				data: ndaUpdate,
-			});
-		}
-
-		return enrollment;
-	});
-}
-
-/** Sync mirror DocuSeal : contractStatus + nda_requests, sans yousign*. */
-export async function persistDocusealSyncMirror(
-	enrollmentId: string,
-	data: {
-		contractStatus?: ContractStatus;
-		providerStatus?: string | null;
-		ndaSignedAt?: Date | null;
+		ndaDeliveryFailedAt?: Date | null;
 		lastError?: string | null;
 		lastErrorAt?: Date | null;
 	},
@@ -300,17 +154,27 @@ export async function persistDocusealSyncMirror(
 			where: { id: enrollmentId },
 			data: {
 				...(data.contractStatus ? { contractStatus: data.contractStatus } : {}),
+				...(data.signatureLinkExpiresAt !== undefined
+					? { signatureLinkExpiresAt: data.signatureLinkExpiresAt }
+					: {}),
+				...(data.ndaNotifiedAt !== undefined ? { ndaNotifiedAt: data.ndaNotifiedAt } : {}),
+				...(data.ndaLinkOpenedAt !== undefined ? { ndaLinkOpenedAt: data.ndaLinkOpenedAt } : {}),
 				...(data.ndaSignedAt !== undefined ? { ndaSignedAt: data.ndaSignedAt } : {}),
+				...(data.ndaDeliveryFailedAt !== undefined
+					? { ndaDeliveryFailedAt: data.ndaDeliveryFailedAt }
+					: {}),
 			},
 			include: { user: true, ndaRequest: true },
 		});
 
 		const ndaUpdate: {
 			providerStatus?: string | null;
+			externalSignerId?: string | null;
 			lastError?: string | null;
 			lastErrorAt?: Date | null;
 		} = {};
 		if (data.providerStatus !== undefined) ndaUpdate.providerStatus = data.providerStatus;
+		if (data.externalSignerId !== undefined) ndaUpdate.externalSignerId = data.externalSignerId;
 		if (data.lastError === null) {
 			ndaUpdate.lastError = null;
 			ndaUpdate.lastErrorAt = null;

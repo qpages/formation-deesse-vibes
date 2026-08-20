@@ -12,7 +12,10 @@ import type {
 import { getPrisma } from '../prisma';
 import { paginate, type Pagination } from '../pagination';
 import { stripeDashboardUrl } from '../stripe';
-import { yousignAppUrl } from '../signature/helpers';
+import {
+	resolveNdaProvider,
+	signatureProviderAppUrl,
+} from '../signature/helpers';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
@@ -39,13 +42,14 @@ export type AdminListFilters = {
 
 export type AdminEnrollmentRow = Enrollment & {
 	user: User;
+	ndaRequest: NdaRequest | null;
 	email: string;
 	externalRequestId: string | null;
 	externalSignerId: string | null;
 	pipeline: ReturnType<typeof adminPipelineBadges>;
 	paymentSummary: AdminPaymentSummary;
 	stripeUrl: string | null;
-	yousignUrl: string | null;
+	signatureUrl: string | null;
 	displayName: string;
 	visibleActions: AdminActionKey[];
 };
@@ -124,12 +128,15 @@ export function toAdminEnrollmentRow(
 	row: Enrollment & { user: User; ndaRequest?: NdaRequest | null },
 	payments: Payment[],
 ): AdminEnrollmentRow {
+	const { user, ndaRequest, ...enrollment } = row;
 	const paymentSummary = buildAdminPaymentSummary(row, payments);
 	const externalRequestId = resolveExternalRequestId(row);
 	const externalSignerId = resolveExternalSignerId(row);
 
 	return {
-		...row,
+		...enrollment,
+		user,
+		ndaRequest: ndaRequest ?? null,
 		email: row.user.email,
 		externalRequestId,
 		externalSignerId,
@@ -137,8 +144,8 @@ export function toAdminEnrollmentRow(
 			collectionStatus: row.collectionStatus,
 			contractStatus: row.contractStatus,
 			accessStatus: row.accessStatus,
-			yousignStatus: row.yousignStatus,
-			yousignLastError: row.yousignLastError,
+			ndaLastError: row.ndaRequest?.lastError,
+			ndaProviderStatus: row.ndaRequest?.providerStatus,
 		}),
 		paymentSummary,
 		stripeUrl: stripeDashboardUrl({
@@ -147,7 +154,7 @@ export function toAdminEnrollmentRow(
 			subscriptionId: row.stripeSubscriptionId,
 			scheduleId: row.stripeScheduleId,
 		}),
-		yousignUrl: yousignAppUrl(externalRequestId),
+		signatureUrl: signatureProviderAppUrl(resolveNdaProvider(row), externalRequestId),
 		displayName: `${row.user.firstName} ${row.user.lastName}`,
 		visibleActions: visibleActions(row),
 	};

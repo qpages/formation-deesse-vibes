@@ -5,8 +5,8 @@ const { findEnrollmentById, syncNdaStatus } = vi.hoisted(() => ({
 	syncNdaStatus: vi.fn(),
 }));
 
-vi.mock('./enrollment', () => ({ findEnrollmentById }));
-vi.mock('../signature/sync-nda', () => ({ syncNdaStatus }));
+vi.mock('../enrollment/queries', () => ({ findEnrollmentById }));
+vi.mock('./sync-nda', () => ({ syncNdaStatus }));
 
 import { confirmLearnerNdaSignature } from './nda-sync';
 
@@ -76,13 +76,13 @@ describe('confirmLearnerNdaSignature', () => {
 		expect(syncNdaStatus).not.toHaveBeenCalled();
 	});
 
-	it('sans demande Yousign → no_yousign_request', async () => {
+	it('sans demande NDA → no_nda_request', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
 		syncNdaStatus.mockResolvedValue({ ok: false, reason: 'no_nda_request' });
 
 		await expect(confirmLearnerNdaSignature('enr_1')).resolves.toEqual({
 			ok: false,
-			reason: 'no_yousign_request',
+			reason: 'no_nda_request',
 		});
 	});
 

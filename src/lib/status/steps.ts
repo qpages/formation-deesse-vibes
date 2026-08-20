@@ -1,14 +1,13 @@
-import type { YousignRequestStatus } from '../../generated/prisma/client';
 import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
+import type { SignSurface } from '../signature/types';
 import {
 	ACCESS_STATUS_LABELS,
 	COLLECTION_STATUS_LABELS,
 	CONTRACT_STATUS_LABELS,
 	YOUSIGN_STATUS_LABELS,
 } from './labels';
-import type { SignSurface } from '../signature/types';
 import type { BadgeTone, OrthogonalStatuses, PrimaryAction, StepKey, StepState } from './types';
-import { YOUSIGN_FAILURE } from './yousign';
+import { mapYousignApiStatus, YOUSIGN_FAILURE } from './yousign';
 
 export const TEACHIZY_ACADEMY_URL = 'https://jsmatriceacademy.teachizy.fr';
 
@@ -77,8 +76,8 @@ export function stepLabel(state: StepState): string {
 /** Colonnes admin : Paiement / Signature / Accès depuis les 3 enums. */
 export function adminPipelineBadges(
 	input: OrthogonalStatuses & {
-		yousignStatus?: YousignRequestStatus | null;
-		yousignLastError?: string | null;
+		ndaProviderStatus?: string | null;
+		ndaLastError?: string | null;
 	},
 ): {
 	paiement: { label: string; tone: BadgeTone };
@@ -86,6 +85,9 @@ export function adminPipelineBadges(
 	acces: { label: string; tone: BadgeTone };
 } {
 	const steps = stepStates(input);
+	const mappedProviderStatus = input.ndaProviderStatus
+		? mapYousignApiStatus(input.ndaProviderStatus)
+		: null;
 
 	if (input.collectionStatus === 'refunded' || input.accessStatus === 'revoked') {
 		return {
@@ -94,8 +96,8 @@ export function adminPipelineBadges(
 				tone: 'neutral',
 			},
 			signature: {
-				label: input.yousignStatus
-					? YOUSIGN_STATUS_LABELS[input.yousignStatus]
+				label: mappedProviderStatus
+					? YOUSIGN_STATUS_LABELS[mappedProviderStatus]
 					: CONTRACT_STATUS_LABELS[input.contractStatus],
 				tone: 'neutral',
 			},
@@ -111,16 +113,16 @@ export function adminPipelineBadges(
 		tone: stepTone(steps.nda),
 	};
 
-	if (input.yousignStatus && YOUSIGN_FAILURE.has(input.yousignStatus)) {
+	if (mappedProviderStatus && YOUSIGN_FAILURE.has(mappedProviderStatus)) {
 		signature = {
-			label: YOUSIGN_STATUS_LABELS[input.yousignStatus],
+			label: YOUSIGN_STATUS_LABELS[mappedProviderStatus],
 			tone: 'action',
 		};
-	} else if (input.yousignStatus === 'done' || input.contractStatus === 'signed') {
+	} else if (mappedProviderStatus === 'done' || input.contractStatus === 'signed') {
 		signature = { label: 'Signé', tone: 'success' };
-	} else if (input.yousignStatus === 'ongoing' || input.contractStatus === 'sent') {
+	} else if (mappedProviderStatus === 'ongoing' || input.contractStatus === 'sent') {
 		signature = { label: 'En attente', tone: 'action' };
-	} else if (input.yousignLastError && input.contractStatus === 'pending') {
+	} else if (input.ndaLastError && input.contractStatus === 'pending') {
 		signature = { label: 'Erreur', tone: 'action' };
 	} else if (steps.nda === 'en_cours') {
 		signature = { label: 'En cours', tone: 'progress' };

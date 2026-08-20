@@ -20,6 +20,7 @@ const serverSchema = z.object({
 	YOUSIGN_API_BASE: z.string().url().default('https://api-sandbox.yousign.app/v3'),
 	YOUSIGN_SIGNER_LABEL: z.string().default('signer'),
 	SIGNATURE_PROVIDER: z.enum(['yousign', 'docuseal']).default('yousign'),
+	SIGNATURE_MODE: z.enum(['embed', 'redirect']).optional(),
 	DOCUSEAL_API_KEY: z.string().optional(),
 	DOCUSEAL_WEBHOOK_SECRET: z.string().optional(),
 	DOCUSEAL_TEMPLATE_ID: z.string().optional(),
@@ -50,7 +51,17 @@ const serverSchema = z.object({
 			.regex(/^\d+$/, 'PUBLIC_WHATSAPP_NUMBER must be digits only (e.g. 33612345678)')
 			.optional(),
 	),
-});
+})
+	.superRefine((data, ctx) => {
+		if (data.SIGNATURE_PROVIDER === 'yousign' && data.SIGNATURE_MODE === 'embed') {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['SIGNATURE_MODE'],
+				message:
+					'SIGNATURE_MODE=embed is not supported with SIGNATURE_PROVIDER=yousign. Use redirect (default) or omit SIGNATURE_MODE.',
+			});
+		}
+	});
 
 export type ServerEnv = z.infer<typeof serverSchema>;
 
@@ -90,6 +101,7 @@ export function getEnv(): ServerEnv {
 		YOUSIGN_API_BASE: import.meta.env.YOUSIGN_API_BASE ?? process.env.YOUSIGN_API_BASE,
 		YOUSIGN_SIGNER_LABEL: import.meta.env.YOUSIGN_SIGNER_LABEL ?? process.env.YOUSIGN_SIGNER_LABEL,
 		SIGNATURE_PROVIDER: import.meta.env.SIGNATURE_PROVIDER ?? process.env.SIGNATURE_PROVIDER,
+		SIGNATURE_MODE: import.meta.env.SIGNATURE_MODE ?? process.env.SIGNATURE_MODE,
 		DOCUSEAL_API_KEY: import.meta.env.DOCUSEAL_API_KEY ?? process.env.DOCUSEAL_API_KEY,
 		DOCUSEAL_WEBHOOK_SECRET:
 			import.meta.env.DOCUSEAL_WEBHOOK_SECRET ?? process.env.DOCUSEAL_WEBHOOK_SECRET,

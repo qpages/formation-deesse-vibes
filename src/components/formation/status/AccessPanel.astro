@@ -1,6 +1,6 @@
 ---
-import type { EnrollmentWithUser } from '../../../lib/services/enrollment';
-import type { PaidInvoiceLink } from '../../../lib/services/payments';
+import type { EnrollmentWithUser } from '../../../lib/enrollment';
+import type { PaidInvoiceLink } from '../../../lib/payments';
 import { getEnv } from '../../../lib/env';
 import { resolveExternalRequestId } from '../../../lib/signature/nda-request';
 import type { SignSurface } from '../../../lib/signature/types';
@@ -240,18 +240,6 @@ const canDownloadNda =
 		});
 	});
 
-	const clearBtn = document.getElementById('clear-session');
-	clearBtn?.addEventListener('click', async () => {
-		clearBtn.setAttribute('disabled', 'true');
-		try {
-			const response = await fetch('/api/session/clear', { method: 'POST' });
-			if (!response.ok) throw new Error('Session impossible à réinitialiser');
-			window.location.assign('/');
-		} catch {
-			clearBtn.removeAttribute('disabled');
-		}
-	});
-
 	function showPageToasts(attempt = 0) {
 		if (typeof window.toast !== 'function') {
 			if (attempt < 20) window.setTimeout(() => showPageToasts(attempt + 1), 25);
@@ -279,4 +267,22 @@ const canDownloadNda =
 		const next = `${url.pathname}${url.search}${url.hash}`;
 		window.history.replaceState({}, '', next);
 	}
+</script>
+
+<script>
+	import { lockButton } from '../../../lib/client/lock-button';
+
+	const clearBtn = document.getElementById('clear-session') as HTMLButtonElement | null;
+	clearBtn?.addEventListener('click', async () => {
+		if (!clearBtn) return;
+		const lock = lockButton(clearBtn);
+		if (!lock.locked) return;
+		try {
+			const response = await fetch('/api/session/clear', { method: 'POST' });
+			if (!response.ok) throw new Error('Session impossible à réinitialiser');
+			window.location.assign('/');
+		} catch {
+			lock.unlock();
+		}
+	});
 </script>

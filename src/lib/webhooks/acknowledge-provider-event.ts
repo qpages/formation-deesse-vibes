@@ -1,7 +1,7 @@
 import type { Provider } from '../../generated/prisma/client';
 import { json } from '../http';
 import { sendInngestSafe } from '../inngest/client';
-import { recordProviderEvent } from '../services/provider-events';
+import { recordProviderEvent } from '../enrollment/provider-events';
 
 const EVENT_NAME = {
 	stripe: 'provider/stripe-event.received',

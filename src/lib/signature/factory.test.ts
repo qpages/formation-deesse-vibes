@@ -14,12 +14,7 @@ vi.mock('./adapters/docuseal', () => ({
 
 import { docusealAdapter } from './adapters/docuseal';
 import { yousignAdapter } from './adapters/yousign';
-import {
-	getSignatureAdapter,
-	getSignatureOps,
-	getSignaturePort,
-	getSignatureWebhookAdapter,
-} from './factory';
+import { getSignatureOps, getSignaturePort, getSignatureWebhookAdapter } from './factory';
 
 describe('signature factory', () => {
 	it('SIGNATURE_PROVIDER=yousign → yousignAdapter', () => {
@@ -28,7 +23,6 @@ describe('signature factory', () => {
 		expect(getSignaturePort()).toBe(yousignAdapter);
 		expect(getSignatureWebhookAdapter()).toBe(yousignAdapter);
 		expect(getSignatureOps('yousign')).toBe(yousignAdapter);
-		expect(getSignatureAdapter()).toBe(yousignAdapter);
 	});
 
 	it('SIGNATURE_PROVIDER=docuseal → docusealAdapter', () => {
@@ -37,6 +31,5 @@ describe('signature factory', () => {
 		expect(getSignaturePort()).toBe(docusealAdapter);
 		expect(getSignatureWebhookAdapter()).toBe(docusealAdapter);
 		expect(getSignatureOps('docuseal')).toBe(docusealAdapter);
-		expect(() => getSignatureAdapter()).toThrow(/SIGNATURE_PROVIDER=yousign/);
 	});
 });

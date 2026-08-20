@@ -1,15 +1,11 @@
-import type { YousignRequestStatus } from '../../generated/prisma/client';
 import { decryptPayload } from '../crypto';
 import { ensureTeachizyAfterSignature } from '../signature/after-signature';
 import { eventOccurredAt } from '../signature/event-time';
+import { formatNdaSignedTitle } from '../signature/format-nda-signed-title';
 import { yousignAdapter } from '../signature/adapters/yousign';
-import type { SyncNdaStatusResult } from '../signature/types';
-import { syncNdaStatus, syncYousignStatus } from '../signature/sync-nda';
+import { persistNdaSyncMirror } from '../signature/persist';
+import { findEnrollmentByExternalRequestOrEnrollmentId } from '../enrollment';
 import { contractStatusFromYousignRequest, yousignStatusFromEvent } from '../status';
-import {
-	findEnrollmentByYousignRequestOrExternalId,
-	updateEnrollmentYousignMirror,
-} from './enrollment';
 import { notifyOps } from './slack';
 
 const MONITOR_EVENTS = new Set([
@@ -46,14 +42,6 @@ export type YousignWebhookPayload = {
 	};
 };
 
-/** @deprecated Préférer SyncNdaStatusResult — yousignStatus alias de providerStatus pour YouSign. */
-export type SyncYousignStatusResult =
-	| (Extract<SyncNdaStatusResult, { ok: true }> & { yousignStatus: YousignRequestStatus })
-	| Extract<SyncNdaStatusResult, { ok: false }>
-	| { ok: false; reason: 'no_yousign_request'; detail?: string };
-
-export { ensureTeachizyAfterSignature, syncNdaStatus, syncYousignStatus };
-
 function extractRequestIds(payload: YousignWebhookPayload) {
 	const requestId =
 		payload.data?.signature_request?.id ?? payload.data?.signer?.signature_request_id;
@@ -68,16 +56,6 @@ function extractReason(payload: YousignWebhookPayload) {
 		payload.data?.signer?.decline_reason ??
 		payload.data?.signer?.error_reason
 	);
-}
-
-function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date()) {
-	const name = `${firstName} ${lastName}`.trim() || 'Un acheteur';
-	const when = at.toLocaleString('fr-FR', {
-		dateStyle: 'long',
-		timeStyle: 'short',
-		timeZone: 'Europe/Paris',
-	});
-	return `${name} a signé le contrat de confidentialité le ${when}`;
 }
 
 export function isHandledYousignEventType(eventType: string) {
@@ -108,16 +86,20 @@ export async function handleYousignProviderEvent(input: {
 		const { requestId, externalId } = extractRequestIds(payload);
 		if (!requestId) return { ignored: true };
 
-		const enrollment = await findEnrollmentByYousignRequestOrExternalId(requestId, externalId);
+		const enrollment = await findEnrollmentByExternalRequestOrEnrollmentId(
+			'yousign',
+			requestId,
+			externalId,
+		);
 		if (!enrollment) return { ignored: true };
 
 		if (eventName === 'signer.notified') {
-			await updateEnrollmentYousignMirror(enrollment.id, {
-				yousignSignerStatus: 'notified',
+			await persistNdaSyncMirror(enrollment.id, {
 				ndaNotifiedAt: enrollment.ndaNotifiedAt ?? at,
+				providerStatus: 'ongoing',
 			});
 		} else {
-			await updateEnrollmentYousignMirror(enrollment.id, {
+			await persistNdaSyncMirror(enrollment.id, {
 				ndaLinkOpenedAt: enrollment.ndaLinkOpenedAt ?? at,
 			});
 		}
@@ -129,7 +111,8 @@ export async function handleYousignProviderEvent(input: {
 		const completed = yousignAdapter.mapCompletedEvent(payload);
 		if (!completed) throw new Error('signature_request.done sans request id');
 
-		const enrollment = await findEnrollmentByYousignRequestOrExternalId(
+		const enrollment = await findEnrollmentByExternalRequestOrEnrollmentId(
+			'yousign',
 			completed.requestId,
 			completed.externalId,
 		);
@@ -140,10 +123,9 @@ export async function handleYousignProviderEvent(input: {
 		const becameSigned = enrollment.contractStatus !== 'signed';
 		const at = completed.occurredAt;
 
-		await updateEnrollmentYousignMirror(enrollment.id, {
-			yousignStatus: 'done',
+		await persistNdaSyncMirror(enrollment.id, {
 			contractStatus: 'signed',
-			yousignSignerStatus: 'signed',
+			providerStatus: 'done',
 			ndaSignedAt: enrollment.ndaSignedAt ?? at,
 		});
 
@@ -174,7 +156,7 @@ export async function handleYousignProviderEvent(input: {
 	if (MONITOR_EVENTS.has(eventName)) {
 		const { requestId, externalId } = extractRequestIds(payload);
 		const enrollment = requestId
-			? await findEnrollmentByYousignRequestOrExternalId(requestId, externalId)
+			? await findEnrollmentByExternalRequestOrEnrollmentId('yousign', requestId, externalId)
 			: null;
 		const reason = extractReason(payload);
 		const yousignStatus = yousignStatusFromEvent(eventName);
@@ -184,33 +166,28 @@ export async function handleYousignProviderEvent(input: {
 			const errorMessage = [`Yousign ${eventName}`, reason ? `raison=${reason}` : null]
 				.filter(Boolean)
 				.join(' | ');
-			await updateEnrollmentYousignMirror(enrollment.id, {
-				yousignStatus,
+			await persistNdaSyncMirror(enrollment.id, {
+				providerStatus: yousignStatus,
 				...(contractStatus && yousignStatus !== 'ongoing' ? { contractStatus } : {}),
-				yousignLastError: errorMessage,
-				yousignLastErrorAt: at,
+				lastError: errorMessage,
+				lastErrorAt: at,
 				...(eventName === 'signer.notification_delivery_failed'
-					? {
-							yousignSignerStatus: 'error' as const,
-							ndaDeliveryFailedAt: enrollment.ndaDeliveryFailedAt ?? at,
-						}
+					? { ndaDeliveryFailedAt: enrollment.ndaDeliveryFailedAt ?? at }
 					: {}),
-				...(eventName === 'signer.declined' ? { yousignSignerStatus: 'declined' as const } : {}),
-				...(eventName === 'signer.error' ? { yousignSignerStatus: 'error' as const } : {}),
 			});
 		}
 
 		const actionHint =
 			eventName === 'signer.notification_delivery_failed'
-				? 'Action admin: vérifier e-mail acheteur / Renvoyer le lien Yousign'
+				? 'Action admin: vérifier e-mail acheteur / Renvoyer le lien de signature'
 				: eventName === 'signature_request.deleted'
-					? 'Action admin: Recréer un lien Yousign ou rembourser'
-					: 'Action admin: Renvoyer le lien Yousign (si expiré) ou Recréer un lien Yousign / rembourser';
+					? 'Action admin: Recréer un lien de signature ou rembourser'
+					: 'Action admin: Renvoyer le lien (si expiré) ou Recréer un lien / rembourser';
 
 		await notifyOps({
 			kind: 'nda.monitor',
 			severity: eventName.includes('error') || eventName.includes('deleted') ? 'critical' : 'warn',
-			title: `Yousign ${eventName}`,
+			title: `Signature ${eventName}`,
 			enrollmentId: enrollment?.id,
 			email: enrollment?.user.email,
 			detail: [

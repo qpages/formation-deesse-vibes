@@ -5,14 +5,25 @@ import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
 	resolveNdaRequestIds,
+	resolveSignKind,
 } from './nda-request';
 
+describe('resolveSignKind', () => {
+	it('lit signKind depuis ndaRequest', () => {
+		expect(resolveSignKind({ ndaRequest: { signKind: 'embed' } })).toBe('embed');
+		expect(resolveSignKind({ ndaRequest: { signKind: 'redirect' } })).toBe('redirect');
+	});
+
+	it('défaut redirect si absent', () => {
+		expect(resolveSignKind({})).toBe('redirect');
+		expect(resolveSignKind({ ndaRequest: null })).toBe('redirect');
+	});
+});
+
 describe('resolveNdaRequestIds', () => {
-	it('prefers nda_requests over enrollment yousign* columns', () => {
+	it('reads from nda_requests', () => {
 		expect(
 			resolveNdaRequestIds({
-				yousignRequestId: 'legacy_req',
-				yousignSignerId: 'legacy_signer',
 				ndaRequest: {
 					provider: 'yousign',
 					externalRequestId: 'nda_req',
@@ -25,28 +36,15 @@ describe('resolveNdaRequestIds', () => {
 		});
 	});
 
-	it('falls back to yousign* when ndaRequest is absent', () => {
-		expect(
-			resolveNdaRequestIds({
-				yousignRequestId: 'req_1',
-				yousignSignerId: 'signer_1',
-			}),
-		).toEqual({
-			externalRequestId: 'req_1',
-			externalSignerId: 'signer_1',
-		});
-	});
-
-	it('returns null when no ids are stored', () => {
+	it('returns null when ndaRequest is absent', () => {
 		expect(resolveNdaRequestIds({})).toBeNull();
 	});
 });
 
 describe('resolveExternalRequestId', () => {
-	it('reads from ndaRequest first', () => {
+	it('reads from ndaRequest', () => {
 		expect(
 			resolveExternalRequestId({
-				yousignRequestId: 'old',
 				ndaRequest: { externalRequestId: 'new', externalSignerId: null, provider: 'yousign' },
 			}),
 		).toBe('new');
@@ -54,10 +52,9 @@ describe('resolveExternalRequestId', () => {
 });
 
 describe('resolveExternalSignerId', () => {
-	it('reads from ndaRequest first', () => {
+	it('reads from ndaRequest', () => {
 		expect(
 			resolveExternalSignerId({
-				yousignSignerId: 'old',
 				ndaRequest: { externalRequestId: 'req', externalSignerId: 'new', provider: 'yousign' },
 			}),
 		).toBe('new');
@@ -76,8 +73,7 @@ describe('isNdaFullyProvisioned', () => {
 	it('false when only request id is present', () => {
 		expect(
 			isNdaFullyProvisioned({
-				yousignRequestId: 'req',
-				yousignSignerId: null,
+				ndaRequest: { externalRequestId: 'req', externalSignerId: null, provider: 'yousign' },
 			}),
 		).toBe(false);
 	});

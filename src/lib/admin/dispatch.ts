@@ -1,7 +1,7 @@
-import type { Enrollment } from '../../generated/prisma/client';
+import type { EnrollmentWithUser } from '../enrollment';
 import { sendInngestSafe } from '../inngest/client';
-import { canResendNda, findEnrollmentById } from '../services/enrollment';
-import { syncPaymentFromStripe } from '../services/payments';
+import { canResendNda, findEnrollmentById } from '../enrollment';
+import { syncPaymentFromStripe } from '../payments';
 import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncTeachizyAccess } from '../services/teachizy-access';
 import { syncNdaStatus } from '../signature/sync-nda';
@@ -9,7 +9,7 @@ import { getSignaturePort } from '../signature/factory';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
-	resolveNdaProvider,
+	resolveSignKind,
 } from '../signature/nda-request';
 import type { SignSurface } from '../signature/types';
 import { ADMIN_ACTIONS, adminActionExecution, type AdminActionKey } from './actions';
@@ -18,7 +18,7 @@ export type AdminDispatchResult =
 	| { ok: true; message?: string; toast?: 'success' | 'info'; copyUrl?: string }
 	| { ok: false; error: string; status?: number };
 
-type Handler = (enrollment: Enrollment) => Promise<AdminDispatchResult>;
+type Handler = (enrollment: EnrollmentWithUser) => Promise<AdminDispatchResult>;
 
 /** Message unique quand la file Inngest est indisponible (dev sans `inngest:dev`). */
 const QUEUE_DOWN = 'File de traitement indisponible — réessayez plus tard.';
@@ -29,11 +29,10 @@ const ADMIN_NOTIFY_SEVERITY: Partial<Record<AdminActionKey, OpsSeverity>> = {
 	sync_teachizy: 'info',
 	sync_payment: 'info',
 	sync_nda: 'info',
-	sync_yousign: 'info',
 	recreate_nda: 'warn',
 };
 
-async function runSyncNda(enrollment: Enrollment): Promise<AdminDispatchResult> {
+async function runSyncNda(enrollment: EnrollmentWithUser): Promise<AdminDispatchResult> {
 	const result = await syncNdaStatus(enrollment.id);
 	if (!result.ok) {
 		const messages: Record<string, string> = {
@@ -91,10 +90,6 @@ const handlers = {
 	},
 
 	async sync_nda(enrollment) {
-		return runSyncNda(enrollment);
-	},
-
-	async sync_yousign(enrollment) {
 		return runSyncNda(enrollment);
 	},
 
@@ -188,7 +183,7 @@ const handlers = {
 	// --- Actions « read » : lecture pure, aucun effet persistant. -----------------
 
 	async copy_nda_link(enrollment) {
-		if (resolveNdaProvider(enrollment) === 'docuseal') {
+		if (resolveSignKind(enrollment) === 'embed') {
 			return {
 				ok: false,
 				error: 'Signature intégrée (embed) — pas de lien à copier.',
@@ -201,7 +196,7 @@ const handlers = {
 		if (!requestId || !signerId) {
 			return {
 				ok: false,
-				error: 'Demande ou signataire Yousign manquant.',
+				error: 'Demande ou signataire de signature manquant.',
 				status: 400,
 			};
 		}
@@ -226,7 +221,7 @@ const handlers = {
 
 async function notifyAdminAction(
 	action: AdminActionKey,
-	enrollment: Enrollment,
+	enrollment: EnrollmentWithUser,
 	result: Extract<AdminDispatchResult, { ok: true }>,
 ) {
 	const severity = ADMIN_NOTIFY_SEVERITY[action];
@@ -252,7 +247,7 @@ async function notifyAdminAction(
 
 export async function dispatchAdminAction(
 	action: AdminActionKey,
-	enrollment: Enrollment,
+	enrollment: EnrollmentWithUser,
 ): Promise<AdminDispatchResult> {
 	const result = await handlers[action](enrollment);
 	if (result.ok) {

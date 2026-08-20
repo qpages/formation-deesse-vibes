@@ -1,37 +1,13 @@
 import { decryptPayload } from '../crypto';
 import { docusealAdapter } from '../signature/adapters/docuseal';
+import type { DocusealWebhookPayload } from '../signature/adapters/docuseal-types';
 import { ensureTeachizyAfterSignature } from '../signature/after-signature';
-import { findEnrollmentByExternalRequestOrEnrollmentId } from './enrollment-queries';
-import { updateEnrollmentYousignMirror } from './enrollment';
+import { formatNdaSignedTitle } from '../signature/format-nda-signed-title';
+import { persistNdaSyncMirror } from '../signature/persist';
+import { findEnrollmentByExternalRequestOrEnrollmentId } from '../enrollment/queries';
 import { notifyOps } from './slack';
 
-export type DocusealWebhookPayload = {
-	event_type?: string;
-	timestamp?: string;
-	data?: {
-		id?: number;
-		submission_id?: number;
-		external_id?: string | null;
-		completed_at?: string | null;
-		submitters?: Array<{ external_id?: string | null }>;
-		submission?: {
-			id?: number;
-			external_id?: string | null;
-			status?: string;
-			completed_at?: string | null;
-		};
-	};
-};
-
-function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date()) {
-	const name = `${firstName} ${lastName}`.trim() || 'Un acheteur';
-	const when = at.toLocaleString('fr-FR', {
-		dateStyle: 'long',
-		timeStyle: 'short',
-		timeZone: 'Europe/Paris',
-	});
-	return `${name} a signé le contrat de confidentialité le ${when}`;
-}
+export type { DocusealWebhookPayload } from '../signature/adapters/docuseal-types';
 
 export function isHandledDocusealEventType(eventType: string) {
 	return eventType === 'form.completed' || eventType === 'submission.completed';
@@ -47,7 +23,7 @@ export function synthesizeDocusealProviderEventId(payload: DocusealWebhookPayloa
 		payload.data?.completed_at ??
 		payload.data?.submission?.completed_at ??
 		payload.timestamp ??
-		'unknown';
+		'none';
 	return `${eventType}:${entityId}:${completedAt}`;
 }
 
@@ -66,7 +42,7 @@ export async function handleDocusealProviderEvent(input: {
 	const payload = JSON.parse(decryptPayload(input.payloadCipherText)) as DocusealWebhookPayload;
 	const completed = docusealAdapter.mapCompletedEvent(payload);
 	if (!completed) {
-		return { ignored: true };
+		throw new Error('DocuSeal webhook sans request id');
 	}
 
 	const enrollment = await findEnrollmentByExternalRequestOrEnrollmentId(
@@ -81,8 +57,9 @@ export async function handleDocusealProviderEvent(input: {
 	const becameSigned = enrollment.contractStatus !== 'signed';
 	const at = completed.occurredAt;
 
-	await updateEnrollmentYousignMirror(enrollment.id, {
+	await persistNdaSyncMirror(enrollment.id, {
 		contractStatus: 'signed',
+		providerStatus: 'completed',
 		ndaSignedAt: enrollment.ndaSignedAt ?? at,
 	});
 
@@ -100,7 +77,6 @@ export async function handleDocusealProviderEvent(input: {
 		enrollment.id,
 		input.providerEventId,
 		completed.requestId,
-		{ provider: 'docuseal' },
 	);
 	if (followUp.status === 'failed') {
 		throw new Error(`Enqueue Teachizy échoué: ${followUp.error}`);

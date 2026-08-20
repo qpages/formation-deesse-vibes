@@ -6,7 +6,7 @@ import {
 } from '../../../lib/auth/session';
 import { json } from '../../../lib/http';
 import { RATE_LIMITS, clientIp, enforceRateLimit, rateLimitKey } from '../../../lib/rate-limit';
-import { getSignedNdaPdf, toSignedNdaResponse } from '../../../lib/services/nda-download';
+import { getSignedNdaPdf, toSignedNdaResponse } from '../../../lib/signature/nda-download';
 
 export const prerender = false;
 
@@ -29,7 +29,7 @@ export const GET: APIRoute = async ({ request, clientAddress }) => {
 		if (limited) return limited;
 
 		const result = await getSignedNdaPdf(enrollmentId);
-		if (!result.ok && result.reason === 'yousign_error') {
+		if (!result.ok && result.reason === 'provider_error') {
 			console.error('[enrollment/nda]', result.detail);
 		}
 		return toSignedNdaResponse(result);

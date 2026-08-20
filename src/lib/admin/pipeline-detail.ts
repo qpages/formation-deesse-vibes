@@ -1,4 +1,3 @@
-import type { NdaRequest } from '../../generated/prisma/client';
 import type { AdminEnrollmentDetail } from './enrollments';
 import type { AdminPaymentSummary } from './payments';
 import { formatMoney } from '../payment-plans';
@@ -29,7 +28,7 @@ export type EnrollmentHeadline = {
 
 type BottleneckInput = Pick<
 	AdminEnrollmentDetail,
-	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'yousignLastError'
+	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'ndaRequest'
 >;
 
 /** Première étape qui bloque paiement → signature → accès. null = dossier fluide. */
@@ -76,7 +75,7 @@ export function enrollmentHeadline(detail: BottleneckInput): EnrollmentHeadline 
 	}
 
 	if (bottleneck === 'signature') {
-		if (detail.contractStatus === 'pending' && detail.yousignLastError) {
+		if (detail.contractStatus === 'pending' && detail.ndaRequest?.lastError) {
 			return { label: 'Signature en erreur', tone: 'action' };
 		}
 
@@ -115,7 +114,7 @@ export type SignatureDiagnosticLevel = 'error' | 'warn' | 'info';
 
 export type SignatureDiagnostic = {
 	level: SignatureDiagnosticLevel;
-	/** Fait brut : soit l'erreur Yousign verbatim, soit l'état constaté. */
+	/** Fait brut : soit l'erreur provider verbatim, soit l'état constaté. */
 	title: string;
 	/** Une seule action concrète, quand elle apporte de l'info. Optionnel. */
 	action?: string;
@@ -125,26 +124,22 @@ type SignatureDiagnosticInput = Pick<
 	AdminEnrollmentDetail,
 	| 'collectionStatus'
 	| 'contractStatus'
-	| 'yousignLastError'
 	| 'ndaDeliveryFailedAt'
-> & {
-	yousignRequestId?: string | null;
-	yousignSignerId?: string | null;
-	ndaRequest?: Pick<NdaRequest, 'provider' | 'externalRequestId' | 'externalSignerId'> | null;
-};
+	| 'ndaRequest'
+>;
 
 /**
  * Diagnostic signature = faits, pas de narratif.
- * Priorité absolue à l'erreur Yousign brute si on l'a captée ; sinon on nomme
- * l'état constaté et l'action qui ira chercher le vrai motif côté Yousign.
+ * Priorité absolue à l'erreur provider brute si on l'a captée ; sinon on nomme
+ * l'état constaté et l'action qui ira chercher le vrai motif côté provider.
  * `null` = rien à signaler (signé, ou signature pas encore due car impayé).
  */
 export function signatureDiagnostic(detail: SignatureDiagnosticInput): SignatureDiagnostic | null {
 	if (detail.contractStatus === 'signed') return null;
 
-	// 1. Erreur réelle remontée par un job / webhook / sync Yousign → affichée verbatim.
-	if (detail.yousignLastError) {
-		return { level: 'error', title: `Yousign : ${detail.yousignLastError}` };
+	// 1. Erreur réelle remontée par un job / webhook / sync → affichée verbatim.
+	if (detail.ndaRequest?.lastError) {
+		return { level: 'error', title: `Signature : ${detail.ndaRequest.lastError}` };
 	}
 
 	const paid =
@@ -162,17 +157,17 @@ export function signatureDiagnostic(detail: SignatureDiagnosticInput): Signature
 	if (!requestId) {
 		return {
 			level: 'warn',
-			title: 'Aucune demande Yousign créée.',
-			action: '« Recréer un lien Yousign » pour lancer la création.',
+			title: 'Aucune demande de signature créée.',
+			action: '« Recréer un lien de signature » pour lancer la création.',
 		};
 	}
 
 	if (!signerId && detail.contractStatus === 'pending') {
 		return {
 			level: 'warn',
-			title: 'Demande Yousign présente mais sans signataire, et aucune erreur enregistrée.',
+			title: 'Demande de signature présente mais sans signataire, et aucune erreur enregistrée.',
 			action:
-				'« Sync statut Yousign » interroge Yousign en direct et affiche le statut/motif réel ici.',
+				'« Sync NDA » interroge le provider en direct et affiche le statut/motif réel ici.',
 		};
 	}
 
@@ -206,8 +201,8 @@ function buildSignatureHint(detail: AdminEnrollmentDetail): string {
 		return 'Bloqué — paiement requis';
 	}
 
-	if (detail.yousignLastError) {
-		return 'Échec Yousign · recréer le lien';
+	if (detail.ndaRequest?.lastError) {
+		return 'Échec signature · recréer le lien';
 	}
 
 	if (detail.contractStatus === 'signed') {
@@ -222,7 +217,7 @@ function buildSignatureHint(detail: AdminEnrollmentDetail): string {
 		if (detail.ndaLinkOpenedAt) {
 			return 'Lien ouvert · pas encore signé';
 		}
-		if (detail.ndaNotifiedAt || detail.yousignSignerStatus === 'notified') {
+		if (detail.ndaNotifiedAt || detail.ndaRequest?.providerStatus === 'notified') {
 			const expires = formatShortDate(detail.signatureLinkExpiresAt);
 			return expires ? `E-mail envoyé · expire le ${expires}` : 'E-mail envoyé';
 		}
@@ -230,7 +225,7 @@ function buildSignatureHint(detail: AdminEnrollmentDetail): string {
 	}
 
 	if (resolveExternalRequestId(detail)) {
-		return `Yousign · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
+		return `Signature · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
 	}
 
 	return 'NDA pas encore créé';

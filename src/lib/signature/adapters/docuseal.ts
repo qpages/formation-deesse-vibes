@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { e2eMockProviders } from '../../e2e-providers';
 import { getEnv, requireEnv } from '../../env';
+import { resolveSignatureConfig } from '../config';
 import type {
 	ProvisionNdaActivateResult,
 	ProvisionNdaDraftResult,
@@ -15,12 +16,14 @@ import type {
 	SignSurfaceInput,
 } from '../types';
 import { syncDocusealNda } from './docuseal-sync';
+import type { DocusealWebhookPayload } from './docuseal-types';
 
 export type DocusealSubmitter = {
 	id: number;
 	submission_id: number;
 	email: string;
 	embed_src?: string;
+	slug?: string;
 	status?: string;
 	completed_at?: string | null;
 };
@@ -33,24 +36,6 @@ export type DocusealSubmission = {
 	documents?: Array<{ name: string; url: string }>;
 	submitters?: DocusealSubmitter[];
 	completed_at?: string | null;
-};
-
-type DocusealWebhookPayload = {
-	event_type?: string;
-	timestamp?: string;
-	data?: {
-		id?: number;
-		submission_id?: number;
-		external_id?: string | null;
-		completed_at?: string | null;
-		submitters?: Array<{ external_id?: string | null }>;
-		submission?: {
-			id?: number;
-			external_id?: string | null;
-			status?: string;
-			completed_at?: string | null;
-		};
-	};
 };
 
 function docusealAuthHeader(): { 'X-Auth-Token': string } {
@@ -97,23 +82,30 @@ function templateId(): number {
 	return id;
 }
 
+function submitterSigningUrl(submitter: DocusealSubmitter): string | undefined {
+	return submitter.embed_src;
+}
+
 async function createSubmission(input: {
 	enrollmentId: string;
 	email: string;
 	firstName: string;
 	lastName: string;
 }): Promise<ProvisionNdaActivateResult> {
+	const { mode } = resolveSignatureConfig();
+	const sendEmail = mode === 'redirect';
+
 	const submitters = await docusealFetch<DocusealSubmitter[]>('/submissions', {
 		method: 'POST',
 		body: JSON.stringify({
 			template_id: templateId(),
-			send_email: false,
+			send_email: sendEmail,
 			external_id: input.enrollmentId,
 			submitters: [
 				{
 					email: input.email,
 					name: `${input.firstName} ${input.lastName}`.trim(),
-					send_email: false,
+					send_email: sendEmail,
 					external_id: input.enrollmentId,
 				},
 			],
@@ -128,7 +120,7 @@ async function createSubmission(input: {
 	return {
 		requestId: String(submitter.submission_id),
 		signerId: String(submitter.id),
-		signatureLink: submitter.embed_src,
+		signatureLink: submitterSigningUrl(submitter),
 	};
 }
 
@@ -211,21 +203,25 @@ async function provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResul
 	return {
 		requestId: String(submission.id),
 		signerId: String(submitter.id),
-		signatureLink: submitter.embed_src,
+		signatureLink: submitterSigningUrl(submitter),
 	};
 }
 
 async function getSignSurface(input: SignSurfaceInput): Promise<SignSurface | null> {
-	if (!input.email) return null;
-
 	const submission = await getSubmission(input.requestId);
 	const submitter =
 		submission.submitters?.find((s) => String(s.id) === input.signerId) ??
 		submission.submitters?.[0];
-	const src = submitter?.embed_src;
-	if (!src) return null;
+	const url = submitter ? submitterSigningUrl(submitter) : undefined;
+	if (!url) return null;
 
-	return { kind: 'embed', src, email: input.email };
+	const { mode } = resolveSignatureConfig();
+	if (mode === 'redirect') {
+		return { kind: 'redirect', url };
+	}
+
+	if (!input.email) return null;
+	return { kind: 'embed', src: url, email: input.email };
 }
 
 async function downloadSignedPdf(requestId: string): Promise<SignedDocument> {

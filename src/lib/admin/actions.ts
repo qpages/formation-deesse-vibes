@@ -9,7 +9,7 @@ import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
-	resolveNdaProvider,
+	resolveSignKind,
 } from '../signature/nda-request';
 
 export const adminActionZones = ['metier', 'actions'] as const;
@@ -31,7 +31,6 @@ export const adminActionKeys = [
 	'sync_teachizy',
 	'sync_payment',
 	'sync_nda',
-	'sync_yousign',
 	'recreate_nda',
 	'copy_nda_link',
 ] as const;
@@ -61,7 +60,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Signature',
 		title: 'Copier le lien de signature',
 		description:
-			'Récupérer le lien Yousign actuel de {name} et le copier dans le presse-papiers (fetch live, non stocké).',
+			'Récupérer le lien de signature actuel de {name} et le copier dans le presse-papiers (fetch live, non stocké).',
 		confirm: 'Copier le lien',
 	},
 	{
@@ -109,36 +108,25 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		confirm: 'Synchroniser',
 	},
 	{
-		action: 'sync_yousign',
-		label: 'Sync statut Yousign',
-		zone: 'actions',
-		execution: 'sync',
-		eyebrow: 'Action',
-		title: 'Synchroniser Yousign',
-		description:
-			'Alias de « Sync NDA » — même comportement. Conservé pour compatibilité API.',
-		confirm: 'Synchroniser',
-	},
-	{
 		action: 'resend_nda',
-		label: 'Renvoyer le lien Yousign',
+		label: 'Renvoyer le lien de signature',
 		zone: 'actions',
 		execution: 'flow',
 		eyebrow: 'Action',
-		title: 'Renvoyer le lien Yousign',
+		title: 'Renvoyer le lien de signature',
 		description:
-			'Renvoyer à {name} le même lien de signature Yousign (réactivation). L’ancien lien reste valide.',
+			'Renvoyer à {name} le même lien de signature (réactivation). L’ancien lien reste valide.',
 		confirm: 'Renvoyer le lien',
 	},
 	{
 		action: 'recreate_nda',
-		label: 'Recréer un lien Yousign',
+		label: 'Recréer un lien de signature',
 		zone: 'actions',
 		execution: 'flow',
 		eyebrow: 'Action',
-		title: 'Recréer un lien Yousign',
+		title: 'Recréer un lien de signature',
 		description:
-			'Créer une nouvelle demande Yousign pour {name}. L’ancien lien ne sera plus valide.',
+			'Créer une nouvelle demande de signature pour {name}. L’ancien lien ne sera plus valide.',
 		confirm: 'Recréer le lien',
 	},
 ];
@@ -172,17 +160,13 @@ export function adminActionMetaForClient(): AdminActionMetaClient {
 
 type VisibilityInput = Pick<
 	Enrollment,
-	| 'collectionStatus'
-	| 'contractStatus'
-	| 'accessStatus'
-	| 'yousignRequestId'
-	| 'yousignSignerId'
-	| 'stripeCheckoutSessionId'
+	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'stripeCheckoutSessionId'
 > & {
 	ndaRequest?: {
 		provider: 'yousign' | 'docuseal';
 		externalRequestId: string;
 		externalSignerId: string | null;
+		signKind?: 'embed' | 'redirect';
 	} | null;
 };
 
@@ -194,17 +178,13 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 
 	switch (action) {
 		case 'resend_nda':
-			return (
-				isAwaitingNda(e) &&
-				Boolean(requestId) &&
-				resolveNdaProvider(e) !== 'docuseal'
-			);
+			return isAwaitingNda(e) && Boolean(requestId) && resolveSignKind(e) === 'redirect';
 		case 'copy_nda_link':
 			return (
 				e.contractStatus === 'sent' &&
 				Boolean(requestId) &&
 				Boolean(signerId) &&
-				resolveNdaProvider(e) !== 'docuseal'
+				resolveSignKind(e) === 'redirect'
 			);
 		case 'recreate_nda':
 			return paidEnough && e.contractStatus !== 'signed';
@@ -215,7 +195,6 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 		case 'sync_payment':
 			return Boolean(e.stripeCheckoutSessionId);
 		case 'sync_nda':
-		case 'sync_yousign':
 			return Boolean(requestId);
 		default:
 			return false;

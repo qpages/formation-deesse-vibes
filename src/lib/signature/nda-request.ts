@@ -1,4 +1,4 @@
-import type { NdaRequest } from '../../generated/prisma/client';
+import type { NdaRequest, SignKind } from '../../generated/prisma/client';
 
 export type NdaRequestLookup = {
 	externalRequestId: string;
@@ -6,33 +6,21 @@ export type NdaRequestLookup = {
 };
 
 type EnrollmentNdaFields = {
-	yousignRequestId?: string | null;
-	yousignSignerId?: string | null;
 	ndaRequest?: Pick<NdaRequest, 'provider' | 'externalRequestId' | 'externalSignerId'> | null;
 };
 
 export type NdaSignatureProvider = 'yousign' | 'docuseal';
 
-/** Dual-read provider: nda_requests first, fallback yousign. */
 export function resolveNdaProvider(enrollment: EnrollmentNdaFields): NdaSignatureProvider {
 	return (enrollment.ndaRequest?.provider ?? 'yousign') as NdaSignatureProvider;
 }
 
-/** Dual-read: nda_requests first, fallback enrollment yousign* columns. */
 export function resolveNdaRequestIds(enrollment: EnrollmentNdaFields): NdaRequestLookup | null {
-	if (enrollment.ndaRequest) {
-		return {
-			externalRequestId: enrollment.ndaRequest.externalRequestId,
-			externalSignerId: enrollment.ndaRequest.externalSignerId,
-		};
-	}
-	if (enrollment.yousignRequestId) {
-		return {
-			externalRequestId: enrollment.yousignRequestId,
-			externalSignerId: enrollment.yousignSignerId ?? null,
-		};
-	}
-	return null;
+	if (!enrollment.ndaRequest) return null;
+	return {
+		externalRequestId: enrollment.ndaRequest.externalRequestId,
+		externalSignerId: enrollment.ndaRequest.externalSignerId,
+	};
 }
 
 export function resolveExternalRequestId(enrollment: EnrollmentNdaFields): string | null {
@@ -41,6 +29,15 @@ export function resolveExternalRequestId(enrollment: EnrollmentNdaFields): strin
 
 export function resolveExternalSignerId(enrollment: EnrollmentNdaFields): string | null {
 	return resolveNdaRequestIds(enrollment)?.externalSignerId ?? null;
+}
+
+type EnrollmentSignKindFields = {
+	ndaRequest?: Pick<NdaRequest, 'signKind'> | null;
+};
+
+/** signKind persisté sur nda_requests ; défaut redirect. */
+export function resolveSignKind(enrollment: EnrollmentSignKindFields): SignKind {
+	return enrollment.ndaRequest?.signKind ?? 'redirect';
 }
 
 /** NDA pleinement provisionné (brouillon activé + IDs persistés). */

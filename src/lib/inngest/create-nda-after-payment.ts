@@ -1,11 +1,11 @@
 import { isPaidEnough } from '../enrollment-gates';
+import { findEnrollmentByIdOrThrow } from '../enrollment';
 import {
 	clearNdaFields,
-	findEnrollmentByIdOrThrow,
 	persistNdaDraftRequestId,
 	persistNdaProvisioned,
-	recordYousignError,
-} from '../services/enrollment';
+	recordNdaError,
+} from '../signature/persist';
 import {
 	alertFinalFailure,
 	formatErrorDetail,
@@ -28,10 +28,10 @@ export const createNdaAfterPayment = inngest.createFunction(
 			const enrollmentId = original.event?.data?.enrollmentId;
 			const detail = formatErrorDetail(error);
 			if (enrollmentId) {
-				await recordYousignError(enrollmentId, `Création NDA — ${detail}`);
+				await recordNdaError(enrollmentId, `Création NDA — ${detail}`);
 			}
 			await alertFinalFailure({
-				title: 'Échec définitif création NDA Yousign',
+				title: 'Échec définitif création NDA',
 				enrollmentId,
 				error: detail,
 			});
@@ -43,7 +43,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 
 		return withJobLifecycleAlerts({
 			attempt,
-			jobLabel: 'Création NDA Yousign',
+			jobLabel: 'Création NDA',
 			enrollmentId,
 			run: async () => {
 				const enrollment = await step.run('load-enrollment', async () => {
@@ -68,7 +68,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 				const existingRequestId = resolveExternalRequestId(enrollment);
 				const requestId =
 					(!isRecreate && existingRequestId) ||
-					(await step.run('create-yousign-draft', async () => {
+					(await step.run('create-nda-draft', async () => {
 						const draft = await signature.provisionNda({
 							step: 'draft',
 							enrollmentId: enrollment.id,
@@ -80,15 +80,15 @@ export const createNdaAfterPayment = inngest.createFunction(
 					}));
 
 				if (isRecreate || !existingRequestId) {
-					await step.run('persist-yousign-draft-id', async () => {
+					await step.run('persist-nda-draft-id', async () => {
 						await persistNdaDraftRequestId(enrollment.id, requestId);
 					});
 				}
 
-				const nda = await step.run('activate-yousign-request', async () => {
+				const nda = await step.run('activate-nda', async () => {
 					const activated = await signature.provisionNda({ step: 'activate', requestId });
 					if (!('signerId' in activated)) {
-						throw new Error('Yousign: activation sans signataire');
+						throw new Error('Signature: activation sans signataire');
 					}
 					return activated;
 				});

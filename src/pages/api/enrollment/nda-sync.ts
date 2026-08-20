@@ -6,21 +6,21 @@ import {
 } from '../../../lib/auth/session';
 import { json } from '../../../lib/http';
 import { RATE_LIMITS, clientIp, enforceRateLimit, rateLimitKey } from '../../../lib/rate-limit';
-import { confirmLearnerNdaSignature } from '../../../lib/services/nda-sync';
+import { confirmLearnerNdaSignature } from '../../../lib/signature/nda-sync';
 
 export const prerender = false;
 
 const ERROR_STATUS: Record<
-	'enrollment_not_found' | 'not_awaiting' | 'no_yousign_request' | 'yousign_error',
+	'enrollment_not_found' | 'not_awaiting' | 'no_nda_request' | 'provider_error',
 	{ status: number; message: string }
 > = {
 	enrollment_not_found: { status: 404, message: 'Inscription introuvable.' },
 	not_awaiting: { status: 409, message: 'Le contrat n’est pas en attente de signature.' },
-	no_yousign_request: {
+	no_nda_request: {
 		status: 400,
 		message: 'Aucune demande de signature associée. Contactez un administrateur.',
 	},
-	yousign_error: {
+	provider_error: {
 		status: 502,
 		message: 'Impossible de vérifier la signature pour le moment. Réessaie dans quelques secondes.',
 	},

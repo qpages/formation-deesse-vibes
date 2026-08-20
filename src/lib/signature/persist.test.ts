@@ -12,7 +12,7 @@ vi.mock('../prisma', () => ({ getPrisma }));
 import {
 	findEnrollmentByExternalRequestId,
 	findEnrollmentByExternalRequestOrEnrollmentId,
-} from '../services/enrollment-queries';
+} from '../enrollment/queries';
 import {
 	clearNdaFields,
 	persistNdaDraftRequestId,
@@ -29,8 +29,7 @@ beforeEach(() => {
 describe('findEnrollmentByExternalRequestId', () => {
 	it('returns enrollment resolved via nda_requests', async () => {
 		const findFirst = vi.fn().mockResolvedValue(enrollment);
-		const findUnique = vi.fn();
-		getPrisma.mockReturnValue({ enrollment: { findFirst, findUnique } });
+		getPrisma.mockReturnValue({ enrollment: { findFirst } });
 
 		await expect(findEnrollmentByExternalRequestId('yousign', 'req_nda')).resolves.toBe(enrollment);
 
@@ -38,27 +37,18 @@ describe('findEnrollmentByExternalRequestId', () => {
 			where: { ndaRequest: { provider: 'yousign', externalRequestId: 'req_nda' } },
 			include: { user: true, ndaRequest: true },
 		});
-		expect(findUnique).not.toHaveBeenCalled();
 	});
 
-	it('falls back to enrollment.yousignRequestId', async () => {
+	it('returns null when nda_requests has no match', async () => {
 		const findFirst = vi.fn().mockResolvedValue(null);
-		const findUnique = vi.fn().mockResolvedValue(enrollment);
-		getPrisma.mockReturnValue({ enrollment: { findFirst, findUnique } });
+		getPrisma.mockReturnValue({ enrollment: { findFirst } });
 
-		await expect(findEnrollmentByExternalRequestId('yousign', 'req_legacy')).resolves.toBe(
-			enrollment,
-		);
-
-		expect(findUnique).toHaveBeenCalledWith({
-			where: { yousignRequestId: 'req_legacy' },
-			include: { user: true, ndaRequest: true },
-		});
+		await expect(findEnrollmentByExternalRequestId('yousign', 'req_missing')).resolves.toBeNull();
 	});
 });
 
 describe('findEnrollmentByExternalRequestOrEnrollmentId', () => {
-	it('queries nda_requests, yousignRequestId and enrollment id', async () => {
+	it('queries nda_requests and enrollment id', async () => {
 		const findFirst = vi.fn().mockResolvedValue(enrollment);
 		getPrisma.mockReturnValue({ enrollment: { findFirst } });
 
@@ -70,7 +60,6 @@ describe('findEnrollmentByExternalRequestOrEnrollmentId', () => {
 			where: {
 				OR: [
 					{ ndaRequest: { provider: 'yousign', externalRequestId: 'req_1' } },
-					{ yousignRequestId: 'req_1' },
 					{ id: 'enr_1' },
 				],
 			},
@@ -98,17 +87,13 @@ function mockTransaction() {
 	return { upsert, update, findUniqueOrThrow, deleteMany, ndaUpdateMany, enrollmentUpdateMany };
 }
 
-describe('YouSign persist dual-write', () => {
-	it('persistNdaDraftRequestId écrit yousignRequestId + nda_requests', async () => {
+describe('NDA persist (nda_requests only)', () => {
+	it('persistNdaDraftRequestId écrit nda_requests', async () => {
 		const { upsert, update } = mockTransaction();
 
 		await persistNdaDraftRequestId('enr_1', 'req_draft');
 
-		expect(update).toHaveBeenCalledWith({
-			where: { id: 'enr_1' },
-			data: { yousignRequestId: 'req_draft' },
-			include: { user: true, ndaRequest: true },
-		});
+		expect(update).not.toHaveBeenCalled();
 		expect(upsert).toHaveBeenCalledWith(
 			expect.objectContaining({
 				where: { enrollmentId: 'enr_1' },
@@ -121,7 +106,7 @@ describe('YouSign persist dual-write', () => {
 		);
 	});
 
-	it('persistNdaProvisioned dual-write enrollment yousign* + nda_requests', async () => {
+	it('persistNdaProvisioned écrit enrollment contractStatus + nda_requests', async () => {
 		const { upsert, update } = mockTransaction();
 
 		await persistNdaProvisioned('enr_1', {
@@ -134,9 +119,6 @@ describe('YouSign persist dual-write', () => {
 			expect.objectContaining({
 				where: { id: 'enr_1' },
 				data: expect.objectContaining({
-					yousignRequestId: 'req_1',
-					yousignSignerId: 'sig_1',
-					yousignStatus: 'ongoing',
 					contractStatus: 'sent',
 				}),
 			}),
@@ -152,7 +134,7 @@ describe('YouSign persist dual-write', () => {
 		);
 	});
 
-	it('clearNdaFields supprime nda_requests et remet yousign* à null', async () => {
+	it('clearNdaFields supprime nda_requests et remet contractStatus à pending', async () => {
 		const { deleteMany, update } = mockTransaction();
 
 		await clearNdaFields('enr_1');
@@ -162,26 +144,20 @@ describe('YouSign persist dual-write', () => {
 			expect.objectContaining({
 				where: { id: 'enr_1' },
 				data: expect.objectContaining({
-					yousignRequestId: null,
-					yousignSignerId: null,
-					yousignStatus: null,
 					contractStatus: 'pending',
 				}),
 			}),
 		);
 	});
 
-	it('recordNdaError dual-write yousignLastError + nda_requests.lastError', async () => {
-		const { update, ndaUpdateMany } = mockTransaction();
+	it('recordNdaError écrit nda_requests.lastError + contractStatus error', async () => {
+		const { ndaUpdateMany, enrollmentUpdateMany } = mockTransaction();
 
 		await recordNdaError('enr_1', 'provision failed');
 
-		expect(update).toHaveBeenCalledWith({
-			where: { id: 'enr_1' },
-			data: expect.objectContaining({
-				yousignLastError: 'provision failed',
-				yousignLastErrorAt: expect.any(Date),
-			}),
+		expect(enrollmentUpdateMany).toHaveBeenCalledWith({
+			where: { id: 'enr_1', contractStatus: 'pending' },
+			data: { contractStatus: 'error' },
 		});
 		expect(ndaUpdateMany).toHaveBeenCalledWith({
 			where: { enrollmentId: 'enr_1' },

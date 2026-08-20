@@ -5,8 +5,8 @@ const { findEnrollmentById, downloadSignedPdf } = vi.hoisted(() => ({
 	downloadSignedPdf: vi.fn(),
 }));
 
-vi.mock('./enrollment', () => ({ findEnrollmentById }));
-vi.mock('../signature/factory', () => ({
+vi.mock('../enrollment/queries', () => ({ findEnrollmentById }));
+vi.mock('./factory', () => ({
 	getSignaturePort: () => ({ downloadSignedPdf }),
 }));
 
@@ -17,7 +17,7 @@ function enrollment(overrides: Record<string, unknown> = {}) {
 		id: 'enr_1',
 		collectionStatus: 'paid',
 		contractStatus: 'signed',
-		yousignRequestId: 'req_1',
+		ndaRequest: { externalRequestId: 'req_1', externalSignerId: 'sig_1', provider: 'yousign' },
 		...overrides,
 	};
 }
@@ -47,12 +47,12 @@ describe('getSignedNdaPdf', () => {
 		expect(downloadSignedPdf).not.toHaveBeenCalled();
 	});
 
-	it('signé sans demande Yousign → no_yousign_request', async () => {
-		findEnrollmentById.mockResolvedValue(enrollment({ yousignRequestId: null }));
+	it('signé sans demande NDA → no_nda_request', async () => {
+		findEnrollmentById.mockResolvedValue(enrollment({ ndaRequest: null }));
 
 		await expect(getSignedNdaPdf('enr_1')).resolves.toEqual({
 			ok: false,
-			reason: 'no_yousign_request',
+			reason: 'no_nda_request',
 		});
 		expect(downloadSignedPdf).not.toHaveBeenCalled();
 	});
@@ -89,13 +89,13 @@ describe('getSignedNdaPdf', () => {
 		});
 	});
 
-	it('erreur Yousign → yousign_error', async () => {
+	it('erreur provider → provider_error', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
 		downloadSignedPdf.mockRejectedValue(new Error('Yousign 400: not done'));
 
 		await expect(getSignedNdaPdf('enr_1')).resolves.toEqual({
 			ok: false,
-			reason: 'yousign_error',
+			reason: 'provider_error',
 			detail: 'Yousign 400: not done',
 		});
 	});

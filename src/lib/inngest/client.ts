@@ -56,9 +56,6 @@ export type AppEvents = {
 	'stripe/payment.confirmed': {
 		data: { enrollmentId: string; stripeEventId: string };
 	};
-	'yousign/signature.done': {
-		data: { enrollmentId: string; yousignEventId: string; requestId: string };
-	};
 	'nda/signature.completed': {
 		data: { enrollmentId: string; providerEventId: string; requestId: string };
 	};

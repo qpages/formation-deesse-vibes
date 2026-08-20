@@ -6,8 +6,8 @@ const { findEnrollmentById, applyAccessPolicy, sendInngestSafe } = vi.hoisted(()
 	sendInngestSafe: vi.fn(),
 }));
 
-vi.mock('../services/enrollment', () => ({ findEnrollmentById }));
-vi.mock('../services/access', () => ({ applyAccessPolicy }));
+vi.mock('../enrollment', () => ({ findEnrollmentById }));
+vi.mock('../enrollment/access', () => ({ applyAccessPolicy }));
 vi.mock('../inngest/client', () => ({ sendInngestSafe }));
 
 import { ensureTeachizyAfterSignature } from './after-signature';
@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 describe('ensureTeachizyAfterSignature', () => {
-	it('dual-emit nda/signature.completed et yousign/signature.done', async () => {
+	it('émet nda/signature.completed', async () => {
 		findEnrollmentById.mockResolvedValue({
 			id: 'enr_1',
 			contractStatus: 'signed',
@@ -29,16 +29,7 @@ describe('ensureTeachizyAfterSignature', () => {
 
 		await ensureTeachizyAfterSignature('enr_1', 'evt_src', 'req_1');
 
-		expect(sendInngestSafe).toHaveBeenCalledTimes(2);
-		expect(sendInngestSafe).toHaveBeenCalledWith({
-			id: 'teachizy-after-signature:yousign:enr_1',
-			name: 'yousign/signature.done',
-			data: {
-				enrollmentId: 'enr_1',
-				yousignEventId: 'evt_src',
-				requestId: 'req_1',
-			},
-		});
+		expect(sendInngestSafe).toHaveBeenCalledTimes(1);
 		expect(sendInngestSafe).toHaveBeenCalledWith({
 			id: 'teachizy-after-signature:nda:enr_1',
 			name: 'nda/signature.completed',
@@ -62,27 +53,5 @@ describe('ensureTeachizyAfterSignature', () => {
 
 		expect(result).toEqual({ status: 'skipped' });
 		expect(sendInngestSafe).not.toHaveBeenCalled();
-	});
-
-	it('docuseal: émet uniquement nda/signature.completed', async () => {
-		findEnrollmentById.mockResolvedValue({
-			id: 'enr_1',
-			contractStatus: 'signed',
-			teachizyInvitedAt: null,
-			accessStatus: 'pending',
-		});
-
-		await ensureTeachizyAfterSignature('enr_1', 'evt_src', 'req_1', { provider: 'docuseal' });
-
-		expect(sendInngestSafe).toHaveBeenCalledTimes(1);
-		expect(sendInngestSafe).toHaveBeenCalledWith({
-			id: 'teachizy-after-signature:nda:enr_1',
-			name: 'nda/signature.completed',
-			data: {
-				enrollmentId: 'enr_1',
-				providerEventId: 'evt_src',
-				requestId: 'req_1',
-			},
-		});
 	});
 });

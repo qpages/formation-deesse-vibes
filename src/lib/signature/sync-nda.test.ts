@@ -8,10 +8,10 @@ const { findEnrollmentById, persistNdaSyncMirror, ensureTeachizyAfterSignature }
 	}),
 );
 
-vi.mock('../services/enrollment', () => ({ findEnrollmentById }));
+vi.mock('../enrollment', () => ({ findEnrollmentById }));
 vi.mock('./persist', () => ({
 	persistNdaSyncMirror,
-	recordYousignError: vi.fn(),
+	recordNdaError: vi.fn(),
 }));
 vi.mock('../services/slack', () => ({
 	formatErrorDetail: vi.fn(),
@@ -39,8 +39,8 @@ beforeEach(() => {
 	ensureTeachizyAfterSignature.mockResolvedValue({ status: 'skipped' });
 });
 
-describe('syncYousignNda dual-write', () => {
-	it('persiste providerStatus + yousign* via persistNdaSyncMirror', async () => {
+describe('syncYousignNda', () => {
+	it('persiste providerStatus via persistNdaSyncMirror', async () => {
 		const remoteFns = {
 			getSignatureRequest: vi.fn().mockResolvedValue({
 				status: 'ongoing',
@@ -62,10 +62,8 @@ describe('syncYousignNda dual-write', () => {
 		expect(persistNdaSyncMirror).toHaveBeenCalledWith(
 			'enr_1',
 			expect.objectContaining({
-				yousignStatus: 'ongoing',
 				providerStatus: 'ongoing',
-				yousignSignerId: 'sig_1',
-				yousignSignerStatus: 'notified',
+				externalSignerId: 'sig_1',
 			}),
 		);
 	});

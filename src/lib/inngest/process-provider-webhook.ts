@@ -3,7 +3,7 @@ import {
 	markProviderEventFailed,
 	markProviderEventIgnored,
 	markProviderEventProcessed,
-} from '../services/provider-events';
+} from '../enrollment/provider-events';
 import { alertFinalFailure, formatErrorDetail, withJobLifecycleAlerts } from '../services/slack';
 import { inngest, type AppEvents } from './client';
 

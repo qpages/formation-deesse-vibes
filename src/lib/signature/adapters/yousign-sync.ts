@@ -1,25 +1,15 @@
-import type { YousignRequestStatus } from '../../../generated/prisma/client';
 import {
 	contractStatusFromYousignRequest,
 	mapYousignApiStatus,
 	mapYousignSignerApiStatus,
 } from '../../status';
-import { findEnrollmentById } from '../../services/enrollment';
+import { findEnrollmentById } from '../../enrollment';
 import { formatErrorDetail, notifyOps } from '../../services/slack';
-import { persistNdaSyncMirror, recordYousignError } from '../persist';
+import { formatNdaSignedTitle } from '../format-nda-signed-title';
+import { persistNdaSyncMirror, recordNdaError } from '../persist';
 import { resolveExternalRequestId, resolveExternalSignerId } from '../nda-request';
 import type { SyncNdaStatusResult } from '../types';
 import type { YousignSignatureRequest, YousignSigner } from './yousign';
-
-function formatNdaSignedTitle(firstName: string, lastName: string, at = new Date()) {
-	const name = `${firstName} ${lastName}`.trim() || 'Un acheteur';
-	const when = at.toLocaleString('fr-FR', {
-		dateStyle: 'long',
-		timeStyle: 'short',
-		timeZone: 'Europe/Paris',
-	});
-	return `${name} a signé le contrat de confidentialité le ${when}`;
-}
 
 export async function syncYousignNda(
 	enrollmentId: string,
@@ -41,14 +31,14 @@ export async function syncYousignNda(
 	const rawStatus = remote.status?.toLowerCase() ?? '';
 
 	if (rawStatus === 'draft') {
-		const message = `demande en statut « draft » (jamais activée) — aucun signataire, aucun e-mail. « Recréer un lien Yousign » pour la (re)générer.`;
-		await recordYousignError(enrollment.id, message);
+		const message = `demande en statut « draft » (jamais activée) — aucun signataire, aucun e-mail. « Recréer un lien de signature » pour la (re)générer.`;
+		await recordNdaError(enrollment.id, message);
 		return { ok: false, reason: 'draft_not_activated', detail: remote.status };
 	}
 
 	const yousignStatus = mapYousignApiStatus(remote.status);
 	if (!yousignStatus) {
-		await recordYousignError(enrollment.id, `statut API inconnu « ${remote.status} » (non mappé).`);
+		await recordNdaError(enrollment.id, `statut API inconnu « ${remote.status} » (non mappé).`);
 		return { ok: false, reason: 'unmapped_status', detail: remote.status };
 	}
 
@@ -56,46 +46,43 @@ export async function syncYousignNda(
 	const becameSigned = yousignStatus === 'done' && enrollment.contractStatus !== 'signed';
 
 	const signerId = resolveExternalSignerId(enrollment) ?? remote.signers?.[0]?.id ?? null;
-	const signerMirror: {
-		yousignSignerId?: string | null;
-		yousignSignerStatus?: ReturnType<typeof mapYousignSignerApiStatus>;
+	const mirror: {
+		externalSignerId?: string | null;
 		signatureLinkExpiresAt?: Date | null;
 		ndaSignedAt?: Date | null;
 		ndaNotifiedAt?: Date | null;
-		yousignLastError?: string | null;
-		yousignLastErrorAt?: Date | null;
+		lastError?: string | null;
+		lastErrorAt?: Date | null;
 	} = {};
 
 	if (signerId) {
-		signerMirror.yousignSignerId = signerId;
+		mirror.externalSignerId = signerId;
 		try {
 			const signer = await remoteFns.getSigner(requestId, signerId);
 			const signerStatus = mapYousignSignerApiStatus(signer.status);
-			if (signerStatus) signerMirror.yousignSignerStatus = signerStatus;
-			signerMirror.signatureLinkExpiresAt = signer.signature_link_expiration_date
+			mirror.signatureLinkExpiresAt = signer.signature_link_expiration_date
 				? new Date(signer.signature_link_expiration_date)
 				: null;
 			if (signer.signed_at) {
-				signerMirror.ndaSignedAt = new Date(signer.signed_at);
+				mirror.ndaSignedAt = new Date(signer.signed_at);
 			}
 			if (signerStatus === 'notified' && !enrollment.ndaNotifiedAt) {
-				signerMirror.ndaNotifiedAt = new Date();
+				mirror.ndaNotifiedAt = new Date();
 			}
-			signerMirror.yousignLastError = null;
-			signerMirror.yousignLastErrorAt = null;
+			mirror.lastError = null;
+			mirror.lastErrorAt = null;
 		} catch (error) {
 			const detail = formatErrorDetail(error);
 			console.warn('[syncYousignNda] getSigner failed', error);
-			signerMirror.yousignLastError = `lecture signataire échouée — ${detail}`;
-			signerMirror.yousignLastErrorAt = new Date();
+			mirror.lastError = `lecture signataire échouée — ${detail}`;
+			mirror.lastErrorAt = new Date();
 		}
 	}
 
 	await persistNdaSyncMirror(enrollmentId, {
-		yousignStatus,
 		providerStatus: remote.status,
 		...(contractStatus ? { contractStatus } : {}),
-		...signerMirror,
+		...mirror,
 	});
 
 	if (becameSigned) {

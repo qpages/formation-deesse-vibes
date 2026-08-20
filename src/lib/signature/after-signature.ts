@@ -1,20 +1,15 @@
 import { sendInngestSafe, type EnqueueResult } from '../inngest/client';
-import { applyAccessPolicy } from '../services/access';
-import { findEnrollmentById } from '../services/enrollment';
-import type { NdaSignatureProvider } from './nda-request';
-import { resolveNdaProvider } from './nda-request';
+import { applyAccessPolicy } from '../enrollment/access';
+import { findEnrollmentById } from '../enrollment';
 
 /**
  * Post-condition unique : NDA signé → politique d’accès + enqueue invite Teachizy.
  * Idempotent (event id + job skip si déjà invité). Webhook et sync admin partagent ça.
- *
- * Dual-emit : `nda/signature.completed` (provider-agnostique) + `yousign/signature.done` (rétro-compat YouSign).
  */
 export async function ensureTeachizyAfterSignature(
 	enrollmentId: string,
 	sourceId: string,
 	requestId: string,
-	options?: { provider?: NdaSignatureProvider },
 ): Promise<EnqueueResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) return { status: 'skipped' };
@@ -25,22 +20,7 @@ export async function ensureTeachizyAfterSignature(
 
 	await applyAccessPolicy(enrollmentId);
 
-	const provider = options?.provider ?? resolveNdaProvider(enrollment);
-
-	let legacy: EnqueueResult = { status: 'skipped' };
-	if (provider === 'yousign') {
-		legacy = await sendInngestSafe({
-			id: `teachizy-after-signature:yousign:${enrollmentId}`,
-			name: 'yousign/signature.done',
-			data: {
-				enrollmentId,
-				yousignEventId: sourceId,
-				requestId,
-			},
-		});
-	}
-
-	const neutral = await sendInngestSafe({
+	return sendInngestSafe({
 		id: `teachizy-after-signature:nda:${enrollmentId}`,
 		name: 'nda/signature.completed',
 		data: {
@@ -49,8 +29,4 @@ export async function ensureTeachizyAfterSignature(
 			requestId,
 		},
 	});
-
-	if (legacy.status === 'failed') return legacy;
-	if (neutral.status === 'failed') return neutral;
-	return { status: 'enqueued' };
 }

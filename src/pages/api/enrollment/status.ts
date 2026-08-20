@@ -5,7 +5,7 @@ import {
 	verifyEnrollmentSessionToken,
 } from '../../../lib/auth/session';
 import { json } from '../../../lib/http';
-import { findEnrollmentById } from '../../../lib/services/enrollment';
+import { findEnrollmentById } from '../../../lib/enrollment';
 
 export const GET: APIRoute = async ({ request }) => {
 	const token = parseCookie(request.headers.get('cookie'), TRACKING_COOKIE);

@@ -1,10 +1,10 @@
+import { findEnrollmentById } from '../enrollment/queries';
 import { json } from '../http';
-import { getSignaturePort } from '../signature/factory';
-import { resolveExternalRequestId } from '../signature/nda-request';
-import { findEnrollmentById } from './enrollment';
+import { getSignaturePort } from './factory';
+import { resolveExternalRequestId } from './nda-request';
 
 export type SignedNdaFailureReason =
-	'enrollment_not_found' | 'not_signed' | 'no_yousign_request' | 'yousign_error';
+	'enrollment_not_found' | 'not_signed' | 'no_nda_request' | 'provider_error';
 
 export type SignedNdaResult =
 	| { ok: true; bytes: Uint8Array; contentType: string; filename: string }
@@ -13,11 +13,11 @@ export type SignedNdaResult =
 const ERROR_STATUS: Record<SignedNdaFailureReason, { status: number; message: string }> = {
 	enrollment_not_found: { status: 404, message: 'Inscription introuvable.' },
 	not_signed: { status: 409, message: 'Le contrat n’est pas encore signé.' },
-	no_yousign_request: {
+	no_nda_request: {
 		status: 400,
 		message: 'Aucune demande de signature associée. Contactez un administrateur.',
 	},
-	yousign_error: {
+	provider_error: {
 		status: 502,
 		message:
 			'Impossible de télécharger le contrat pour le moment. Réessayez dans quelques secondes.',
@@ -40,7 +40,7 @@ export async function getSignedNdaPdf(enrollmentId: string): Promise<SignedNdaRe
 	}
 	const requestId = resolveExternalRequestId(enrollment);
 	if (!requestId) {
-		return { ok: false, reason: 'no_yousign_request' };
+		return { ok: false, reason: 'no_nda_request' };
 	}
 
 	try {
@@ -54,7 +54,7 @@ export async function getSignedNdaPdf(enrollmentId: string): Promise<SignedNdaRe
 	} catch (error) {
 		return {
 			ok: false,
-			reason: 'yousign_error',
+			reason: 'provider_error',
 			detail: error instanceof Error ? error.message : 'unknown',
 		};
 	}

@@ -1,8 +1,26 @@
-import type {
-	ContractStatus,
-	YousignRequestStatus,
-	YousignSignerStatus,
-} from '../../generated/prisma/client';
+import type { ContractStatus } from '../../generated/prisma/client';
+
+/** Statuts API Yousign (Signature Request) — miroir runtime, plus de colonnes Prisma. */
+export type YousignRequestStatus =
+	| 'ongoing'
+	| 'done'
+	| 'expired'
+	| 'declined'
+	| 'canceled'
+	| 'rejected'
+	| 'error';
+
+/** Statuts API Yousign (Signer). */
+export type YousignSignerStatus =
+	| 'initiated'
+	| 'notified'
+	| 'verified'
+	| 'consent_given'
+	| 'processing'
+	| 'declined'
+	| 'signed'
+	| 'aborted'
+	| 'error';
 
 export const YOUSIGN_FAILURE: ReadonlySet<YousignRequestStatus> = new Set([
 	'expired',

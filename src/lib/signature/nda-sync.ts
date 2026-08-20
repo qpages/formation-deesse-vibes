@@ -1,13 +1,13 @@
 import { isAwaitingNda } from '../enrollment-gates';
-import { syncNdaStatus } from '../signature/sync-nda';
-import { findEnrollmentById } from './enrollment';
+import { findEnrollmentById } from '../enrollment/queries';
+import { syncNdaStatus } from './sync-nda';
 
 export type ConfirmLearnerNdaSignatureResult =
 	| { ok: true; signed: true }
 	| { ok: true; signed: false }
 	| {
 			ok: false;
-			reason: 'enrollment_not_found' | 'not_awaiting' | 'no_yousign_request' | 'yousign_error';
+			reason: 'enrollment_not_found' | 'not_awaiting' | 'no_nda_request' | 'provider_error';
 			detail?: string;
 	  };
 
@@ -33,10 +33,11 @@ export async function confirmLearnerNdaSignature(
 
 	const result = await syncNdaStatus(enrollmentId);
 	if (!result.ok) {
-		if (result.reason === 'no_nda_request') {
-			return { ok: false, reason: 'no_yousign_request' };
-		}
-		return { ok: false, reason: 'yousign_error', detail: result.reason };
+		return {
+			ok: false,
+			reason: result.reason === 'no_nda_request' ? 'no_nda_request' : 'provider_error',
+			...(result.detail ? { detail: result.detail } : {}),
+		};
 	}
 
 	return { ok: true, signed: result.providerStatus === 'done' };
