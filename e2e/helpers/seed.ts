@@ -3,6 +3,7 @@ import { SignJWT } from 'jose';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { config } from 'dotenv';
 import { PrismaClient } from '../../src/generated/prisma/client';
+import { resolveSignatureConfig } from '../../src/lib/signature/config';
 
 config();
 
@@ -37,6 +38,46 @@ export function uniqueEmail(prefix = 'e2e') {
 	return `${prefix}.${Date.now()}.${Math.random().toString(16).slice(2)}@example.test`;
 }
 
+type SignatureProvider = 'docuseal' | 'yousign';
+type SignKind = 'embed' | 'redirect';
+
+function defaultSignatureProvider(): SignatureProvider {
+	const provider = process.env.SIGNATURE_PROVIDER ?? 'docuseal';
+	return provider === 'yousign' ? 'yousign' : 'docuseal';
+}
+
+function defaultSignKind(provider: SignatureProvider): SignKind {
+	return resolveSignatureConfig({
+		SIGNATURE_PROVIDER: provider,
+		SIGNATURE_MODE:
+			process.env.SIGNATURE_MODE === 'embed' || process.env.SIGNATURE_MODE === 'redirect'
+				? process.env.SIGNATURE_MODE
+				: undefined,
+	}).signKind;
+}
+
+export async function seedNdaRequest(
+	enrollmentId: string,
+	input?: {
+		provider?: SignatureProvider;
+		signKind?: SignKind;
+		externalRequestId?: string;
+	},
+) {
+	const provider = input?.provider ?? defaultSignatureProvider();
+	const signKind = input?.signKind ?? defaultSignKind(provider);
+	const externalRequestId = input?.externalRequestId ?? crypto.randomUUID();
+
+	return getPrisma().ndaRequest.create({
+		data: {
+			enrollmentId,
+			provider,
+			externalRequestId,
+			signKind,
+		},
+	});
+}
+
 export async function seedEnrollment(input: {
 	email: string;
 	firstName?: string;
@@ -45,7 +86,7 @@ export async function seedEnrollment(input: {
 	contractStatus?: 'pending' | 'sent' | 'signed';
 	accessStatus?: 'not_eligible' | 'pending' | 'active';
 	stripeCheckoutSessionId?: string | null;
-	yousignRequestId?: string | null;
+	externalRequestId?: string | null;
 }) {
 	const db = getPrisma();
 	const user = await db.user.create({
@@ -56,7 +97,7 @@ export async function seedEnrollment(input: {
 		},
 	});
 
-	return db.enrollment.create({
+	const enrollment = await db.enrollment.create({
 		data: {
 			userId: user.id,
 			collectionStatus: input.collectionStatus ?? 'pending',
@@ -67,7 +108,6 @@ export async function seedEnrollment(input: {
 			totalAmountCents: 184_900,
 			amountCents: 184_900,
 			stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? undefined,
-			yousignRequestId: input.yousignRequestId ?? undefined,
 			consentCgvAt: new Date(),
 			consentNdaAt: new Date(),
 			consentPrivacyAt: new Date(),
@@ -75,6 +115,14 @@ export async function seedEnrollment(input: {
 		},
 		include: { user: true },
 	});
+
+	if (input.externalRequestId) {
+		await seedNdaRequest(enrollment.id, {
+			externalRequestId: input.externalRequestId,
+		});
+	}
+
+	return enrollment;
 }
 
 export async function seedMagicLink(enrollmentId: string, token: string, used = false) {
