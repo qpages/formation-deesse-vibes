@@ -1,0 +1,55 @@
+---
+import type { LearnerPaymentSchedule } from '../../../lib/payments/learner-schedule';
+
+interface Props {
+	schedule: LearnerPaymentSchedule;
+}
+
+const { schedule } = Astro.props;
+const showNumbers = schedule.installments.length > 1;
+---
+
+<div>
+	<p class="text-ink/40 mb-3 text-[10px] tracking-[0.12em] uppercase">Factures</p>
+	<p class="text-ink mb-4 text-sm">{schedule.planLabel}</p>
+	<ul class="space-y-3">
+		{
+			schedule.installments.map((installment) => (
+				<li class="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2">
+					<p class="text-ink min-w-0 text-sm">
+						{showNumbers ? (
+							<span class="text-ink/45 mr-2 tabular-nums">{installment.installmentNumber}.</span>
+						) : null}
+						<span class="font-medium tabular-nums">{installment.amountLabel}</span>{' '}
+						<span class="text-ink-soft">{installment.dateLabel}</span>
+						{installment.isEstimated ? (
+							<span class="text-ink/35 ml-1 text-xs">(estimée)</span>
+						) : null}
+					</p>
+					<div class="flex shrink-0 items-center gap-x-6 text-sm">
+						{installment.viewUrl ? (
+							<a
+								href={installment.viewUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
+							>
+								Voir
+							</a>
+						) : null}
+						{installment.downloadUrl ? (
+							<a
+								href={installment.downloadUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
+							>
+								Télécharger
+							</a>
+						) : null}
+					</div>
+				</li>
+			))
+		}
+	</ul>
+</div>

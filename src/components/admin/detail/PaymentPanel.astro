@@ -26,6 +26,15 @@ const nextDue = summary.nextInstallmentDueAt
 	: null;
 const showNextDue =
 	Boolean(nextDue) && summary.trackingState !== 'termine' && summary.trackingState !== 'rembourse';
+const subscriptionEnd = summary.subscriptionEndsAt
+	? new Date(summary.subscriptionEndsAt).toLocaleDateString('fr-FR')
+	: null;
+const showSubscriptionEnd =
+	Boolean(subscriptionEnd) &&
+	summary.trackingState !== 'termine' &&
+	summary.trackingState !== 'rembourse' &&
+	summary.installmentsTotal != null &&
+	summary.installmentsTotal > 1;
 
 const statusTone = {
 	paid: 'success',
@@ -114,6 +123,9 @@ const summaryClass = [
 		<span class="text-ink/25 mx-1.5">·</span>
 		<span class="text-ink-soft">{installmentSummary}</span>
 		{showNextDue ? <span class="text-ink-soft"> · prochain {nextDue}</span> : null}
+		{showSubscriptionEnd ? (
+			<span class="text-ink-soft"> · fin abo {subscriptionEnd}</span>
+		) : null}
 	</p>
 
 	{

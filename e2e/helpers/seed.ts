@@ -3,7 +3,6 @@ import { SignJWT } from 'jose';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { config } from 'dotenv';
 import { PrismaClient } from '../../src/generated/prisma/client';
-import { resolveSignatureConfig } from '../../src/lib/signature/config';
 
 config();
 
@@ -47,13 +46,9 @@ function defaultSignatureProvider(): SignatureProvider {
 }
 
 function defaultSignKind(provider: SignatureProvider): SignKind {
-	return resolveSignatureConfig({
-		SIGNATURE_PROVIDER: provider,
-		SIGNATURE_MODE:
-			process.env.SIGNATURE_MODE === 'embed' || process.env.SIGNATURE_MODE === 'redirect'
-				? process.env.SIGNATURE_MODE
-				: undefined,
-	}).signKind;
+	const mode = process.env.SIGNATURE_MODE;
+	if (mode === 'embed' || mode === 'redirect') return mode;
+	return provider === 'docuseal' ? 'embed' : 'redirect';
 }
 
 export async function seedNdaRequest(
@@ -62,6 +57,8 @@ export async function seedNdaRequest(
 		provider?: SignatureProvider;
 		signKind?: SignKind;
 		externalRequestId?: string;
+		externalSignerId?: string;
+		metadata?: { embed_src?: string };
 	},
 ) {
 	const provider = input?.provider ?? defaultSignatureProvider();
@@ -73,7 +70,9 @@ export async function seedNdaRequest(
 			enrollmentId,
 			provider,
 			externalRequestId,
+			externalSignerId: input?.externalSignerId ?? crypto.randomUUID(),
 			signKind,
+			metadata: input?.metadata ?? undefined,
 		},
 	});
 }
@@ -86,7 +85,15 @@ export async function seedEnrollment(input: {
 	contractStatus?: 'pending' | 'sent' | 'signed';
 	accessStatus?: 'not_eligible' | 'pending' | 'active';
 	stripeCheckoutSessionId?: string | null;
+	/** @deprecated préférer nda */
 	externalRequestId?: string | null;
+	nda?: {
+		provider?: SignatureProvider;
+		signKind?: SignKind;
+		externalRequestId?: string;
+		externalSignerId?: string;
+		metadata?: { embed_src?: string };
+	};
 }) {
 	const db = getPrisma();
 	const user = await db.user.create({
@@ -116,9 +123,13 @@ export async function seedEnrollment(input: {
 		include: { user: true },
 	});
 
-	if (input.externalRequestId) {
+	if (input.nda ?? input.externalRequestId) {
 		await seedNdaRequest(enrollment.id, {
-			externalRequestId: input.externalRequestId,
+			externalRequestId: input.nda?.externalRequestId ?? input.externalRequestId ?? undefined,
+			provider: input.nda?.provider,
+			signKind: input.nda?.signKind,
+			externalSignerId: input.nda?.externalSignerId,
+			metadata: input.nda?.metadata,
 		});
 	}
 

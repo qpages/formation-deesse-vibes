@@ -1,5 +1,6 @@
 ---
 import { getEnv } from '../../../lib/env';
+import Button from '../../ui/Button.astro';
 
 interface Props {
 	src: string;
@@ -8,23 +9,166 @@ interface Props {
 
 const { src, email } = Astro.props;
 const apiBase = getEnv().DOCUSEAL_API_BASE;
-const cdnBase = apiBase.includes('.eu') ? 'https://cdn.docuseal.eu' : 'https://cdn.docuseal.com';
+const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https://cdn.docuseal.eu';
 ---
 
-<div class="space-y-3">
-	<docuseal-form id="nda-docuseal-form" data-src={src} data-email={email}></docuseal-form>
-	<p class="text-ink-soft text-sm">
-		Signez directement ci-dessus. Cette page se met à jour automatiquement après signature.
-	</p>
+<div class="space-y-3" id="nda-docuseal-embed">
+	<div id="nda-docuseal-form-area">
+		<docuseal-form
+			id="nda-docuseal-form"
+			data-src={src}
+			data-email={email}
+			data-with-send-copy-button="false"
+			data-with-download-button="false"
+		></docuseal-form>
+	</div>
+
+	<div id="nda-docuseal-actions" class="space-y-3">
+		<p id="nda-docuseal-message" class="text-ink-soft text-sm">
+			Signez directement ci-dessus. Cette page se met à jour automatiquement après signature.
+		</p>
+		<Button
+			id="nda-docuseal-refresh"
+			type="button"
+			size="md"
+			variant="secondary"
+			class="w-full whitespace-nowrap sm:w-auto"
+		>
+			Actualiser
+		</Button>
+		<p id="nda-docuseal-refresh-hint" class="text-ink-soft text-xs">
+			En cas de retard, utilisez Actualiser pour forcer la vérification.
+		</p>
+		<p id="nda-docuseal-refresh-feedback" class="text-ink-soft text-sm" aria-live="polite" />
+	</div>
 </div>
 
 <script is:inline src={`${cdnBase}/js/form.js`}></script>
 <script>
+	import { lockButton } from '../../../lib/client/lock-button';
+	import {
+		reloadAfterNdaSigned,
+		syncNdaSignature as postNdaSync,
+	} from '../../../lib/client/nda-sync';
+
+	const formArea = document.getElementById('nda-docuseal-form-area');
 	const form = document.getElementById('nda-docuseal-form');
+	const message = document.getElementById('nda-docuseal-message');
+	const refreshBtn = document.getElementById('nda-docuseal-refresh') as HTMLButtonElement | null;
+	const refreshFeedback = document.getElementById('nda-docuseal-refresh-feedback');
+
+	const SUBMITTED_MARKERS = [
+		'déjà été soumis',
+		'already been submitted',
+		'already submitted',
+		'form has already been submitted',
+	];
+
+	const PENDING_MESSAGE = 'Signature détectée. Mise à jour en cours…';
+	const FALLBACK_MESSAGE =
+		'Signature détectée. Si la page ne se met pas à jour sous quelques secondes, cliquez sur Actualiser.';
+
+	let pendingSync = false;
+	let autoSyncAttempted = false;
+
+	function isCompletedDetail(detail: unknown): boolean {
+		if (!detail || typeof detail !== 'object') return false;
+		const data = detail as Record<string, unknown>;
+		const submission =
+			data.submission && typeof data.submission === 'object'
+				? (data.submission as Record<string, unknown>)
+				: null;
+		const status = String(data.status ?? submission?.status ?? '')
+			.toLowerCase()
+			.trim();
+		if (status === 'completed') return true;
+		return Boolean(data.completed_at ?? submission?.completed_at);
+	}
+
+	function textIndicatesSubmitted(root: ParentNode): boolean {
+		const text = (root as HTMLElement).textContent?.toLowerCase() ?? '';
+		return SUBMITTED_MARKERS.some((marker) => text.includes(marker));
+	}
+
+	function showPendingSync() {
+		if (pendingSync) return;
+		pendingSync = true;
+		formArea?.classList.add('hidden');
+		if (message) message.textContent = PENDING_MESSAGE;
+	}
+
+	async function syncNdaSignature(): Promise<boolean> {
+		const result = await postNdaSync();
+		if (result.signed) {
+			reloadAfterNdaSigned();
+			return true;
+		}
+		if (refreshFeedback) refreshFeedback.textContent = result.message;
+		return false;
+	}
+
+	async function attemptAutoSyncOnce() {
+		if (autoSyncAttempted) return;
+		autoSyncAttempted = true;
+		try {
+			const synced = await syncNdaSignature();
+			if (!synced && message) message.textContent = FALLBACK_MESSAGE;
+		} catch {
+			if (message) message.textContent = FALLBACK_MESSAGE;
+		}
+	}
+
+	function onSignatureDetected() {
+		showPendingSync();
+		void attemptAutoSyncOnce();
+	}
+
+	function observeSubmittedState() {
+		if (!form) return;
+
+		const check = () => {
+			if (pendingSync) return;
+			if (textIndicatesSubmitted(form)) {
+				onSignatureDetected();
+				observer.disconnect();
+			}
+		};
+
+		const observer = new MutationObserver(check);
+		observer.observe(form, { childList: true, subtree: true, characterData: true });
+		check();
+
+		window.setTimeout(() => observer.disconnect(), 30_000);
+	}
+
+	form?.addEventListener('load', (event) => {
+		if (isCompletedDetail((event as CustomEvent).detail)) {
+			onSignatureDetected();
+		}
+	});
+
 	form?.addEventListener('completed', () => {
+		onSignatureDetected();
 		if (typeof window.toast === 'function') {
 			window.toast('Signature envoyée. Mise à jour en cours…', 'success');
 		}
-		window.setTimeout(() => window.location.reload(), 1500);
 	});
+
+	refreshBtn?.addEventListener('click', async () => {
+		if (!refreshBtn) return;
+		const lock = lockButton(refreshBtn, { busyLabel: 'Actualisation…' });
+		if (!lock.locked) return;
+		if (refreshFeedback) refreshFeedback.textContent = '';
+		try {
+			await syncNdaSignature();
+		} catch {
+			if (refreshFeedback) {
+				refreshFeedback.textContent =
+					'Impossible de vérifier la signature pour le moment. Réessayez dans quelques secondes.';
+			}
+		}
+		lock.unlock();
+	});
+
+	observeSubmittedState();
 </script>

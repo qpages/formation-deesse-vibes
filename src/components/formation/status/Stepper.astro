@@ -1,13 +1,14 @@
 ---
+import { resolveSignatureStepCopy } from '../../../lib/signature/helpers';
+
+const ndaStep = resolveSignatureStepCopy();
+
 const items: Array<{ title: string; text: string; logo?: string }> = [
 	{
 		title: 'Vous payez en ligne sur Stripe',
 		text: 'Règlement sécurisé en une ou plusieurs fois via la plateforme de paiement Stripe.',
 	},
-	{
-		title: 'Vous signez le contrat de confidentialité par e-mail',
-		text: 'Signature électronique via le lien Yousign qui sera envoyé dès confirmation du paiement.',
-	},
+	ndaStep,
 	{
 		title: 'Vous recevez vos accès Teachizy',
 		text: 'L’invitation Teachizy avec vos identifiants vous est envoyée dès que la signature est confirmée.',
@@ -39,7 +40,7 @@ const items: Array<{ title: string; text: string; logo?: string }> = [
 								</span>
 							) : null}
 						</h3>
-						<p class="stepper__text">{item.text}</p>
+						<p class="stepper__text" set:html={item.text} />
 					</div>
 				</li>
 			);
@@ -107,6 +108,21 @@ const items: Array<{ title: string; text: string; logo?: string }> = [
 		color: var(--color-ink-soft);
 	}
 
+	.stepper__text :global(.stepper__provider-mark) {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		white-space: nowrap;
+	}
+
+	.stepper__text :global(.stepper__provider-logo) {
+		width: 0.875rem;
+		height: 0.875rem;
+		flex-shrink: 0;
+		border-radius: 0.25rem;
+		object-fit: contain;
+	}
+
 	@media (min-width: 640px) {
 		.stepper {
 			grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -139,6 +155,11 @@ const items: Array<{ title: string; text: string; logo?: string }> = [
 		.stepper__text {
 			margin-top: 0.35rem;
 			font-size: 0.9375rem;
+		}
+
+		.stepper__text :global(.stepper__provider-logo) {
+			width: 0.9375rem;
+			height: 0.9375rem;
 		}
 	}
 </style>

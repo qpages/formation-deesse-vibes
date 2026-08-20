@@ -1,5 +1,6 @@
 ---
 import type { Enrollment } from '../../../generated/prisma/client';
+import { resolveSignatureStatusCopy } from '../../../lib/signature/helpers';
 import type { SignSurface } from '../../../lib/signature/types';
 import { isPaidEnough } from '../../../lib/enrollment-gates';
 import {
@@ -20,6 +21,7 @@ interface Props {
 }
 
 const { enrollment, ndaSignSurface = null } = Astro.props;
+const signatureStatusCopy = resolveSignatureStatusCopy();
 const orthogonal = {
 	collectionStatus: enrollment.collectionStatus,
 	contractStatus: enrollment.contractStatus,
@@ -45,11 +47,8 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	data-poll-interval={ENROLLMENT_POLL_INTERVAL_MS}
 	data-poll-max={ENROLLMENT_POLL_MAX_MS}
 >
-	{showSignSurface && ndaSignSurface?.kind === 'embed' && (
-		<p class="text-ink-soft">Votre contrat est prêt à signer ci-dessous.</p>
-	)}
-	{showSignSurface && ndaSignSurface?.kind === 'redirect' && (
-		<p class="text-ink-soft">Le lien de signature est prêt.</p>
+	{showSignSurface && (
+		<p class="text-ink-soft">{signatureStatusCopy.signSurfaceReady}</p>
 	)}
 
 	{
@@ -63,24 +62,19 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		isPaidEnough(enrollment.collectionStatus) &&
 			enrollment.contractStatus === 'pending' &&
 			!showSignSurface && (
-				<p class="text-ink-soft">
-					Votre paiement est bien confirmé. Le lien de signature apparaît ici dès qu’il est prêt.
-				</p>
+				<p class="text-ink-soft">{signatureStatusCopy.signSurfaceWaiting}</p>
 			)
 	}
 	{
 		enrollment.contractStatus === 'sent' && !showSignSurface && (
-			<p class="text-ink-soft">
-				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page ou
-				contactez un administrateur.
-			</p>
+			<p class="text-ink-soft">{signatureStatusCopy.signSurfaceUnavailable}</p>
 		)
 	}
 	{
 		!showSignSurface && action.kind === 'open_platform' ? (
-			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
+			<div class="max-w-prose space-y-4">
 				{message && (
-					<div class="max-w-prose space-y-1.5">
+					<div class="space-y-1.5">
 						<p class="text-ink-soft text-lg leading-snug font-normal sm:text-xl">{message[0]}</p>
 						{message[1] && (
 							<p class="text-ink-soft text-sm leading-relaxed sm:text-[0.9375rem]">{message[1]}</p>
@@ -91,9 +85,9 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 					href={action.href}
 					size="md"
 					variant="primary"
-					class="shrink-0 self-start sm:self-center"
 					target="_blank"
 					rel="noopener noreferrer"
+					class="w-full whitespace-nowrap sm:w-auto"
 				>
 					{action.label}
 				</Button>
@@ -111,7 +105,13 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 
 	{
 		!showSignSurface && action.kind === 'refresh' && (
-			<Button href="/#acces" size="md" variant="primary" id="status-refresh">
+			<Button
+				href="/#acces"
+				size="md"
+				variant="primary"
+				id="status-refresh"
+				class="w-full whitespace-nowrap sm:w-auto"
+			>
 				{action.label}
 			</Button>
 		)
@@ -132,13 +132,19 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	{
 		enrollment.contractStatus === 'sent' &&
 			!closed &&
-			ndaSignSurface?.kind !== 'embed' && (
+			ndaSignSurface?.kind === 'redirect' && (
 				<div class="space-y-3">
 					<p class="text-ink-soft text-sm">
 						Après signature, cette page se met à jour automatiquement. Si ce n’est pas le cas, cliquez
 						ci-dessous.
 					</p>
-					<Button id="nda-confirm-signed" type="button" size="md" variant="secondary">
+					<Button
+						id="nda-confirm-signed"
+						type="button"
+						size="md"
+						variant="secondary"
+						class="w-full whitespace-nowrap sm:w-auto"
+					>
 						J’ai signé le contrat de confidentialité
 					</Button>
 					<p id="nda-confirm-feedback" class="text-ink-soft text-sm" aria-live="polite" />
@@ -149,6 +155,7 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 
 <script>
 	import { lockButton } from '../../../lib/client/lock-button';
+	import { reloadAfterNdaSigned, syncNdaSignature } from '../../../lib/client/nda-sync';
 
 	document.getElementById('status-refresh')?.addEventListener('click', (event) => {
 		event.preventDefault();
@@ -165,28 +172,12 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 		if (!lock.locked) return;
 		if (confirmFeedback) confirmFeedback.textContent = '';
 		try {
-			const res = await fetch('/api/enrollment/nda-sync', {
-				method: 'POST',
-				headers: { Accept: 'application/json' },
-				credentials: 'same-origin',
-			});
-			const data = (await res.json().catch(() => ({}))) as {
-				ok?: boolean;
-				signed?: boolean;
-				error?: string;
-				message?: string;
-			};
-			if (res.ok && data.signed) {
-				window.location.hash = 'acces';
-				window.location.reload();
+			const result = await syncNdaSignature();
+			if (result.signed) {
+				reloadAfterNdaSigned();
 				return;
 			}
-			if (confirmFeedback) {
-				confirmFeedback.textContent =
-					data.message ??
-					data.error ??
-					'La signature n’est pas encore enregistrée. Réessaie dans quelques secondes.';
-			}
+			if (confirmFeedback) confirmFeedback.textContent = result.message;
 		} catch {
 			if (confirmFeedback) {
 				confirmFeedback.textContent =

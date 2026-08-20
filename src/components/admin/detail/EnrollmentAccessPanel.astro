@@ -7,6 +7,7 @@ import {
 	formatLearnerDate,
 	formatLearnerDuration,
 	learnerStatusLabel,
+	learnerStatusTone,
 	type AdminTeachizyLearnerResult,
 } from '../../../lib/admin/teachizy-learners';
 
@@ -34,9 +35,8 @@ if (detail.contractStatus !== 'signed') {
 	hint = 'Coupé — réinvitez si paiement OK';
 }
 
-const rows = learner
+const detailRows = learner
 	? [
-			{ label: 'Statut formation', value: learnerStatusLabel(learner.trainingStatus) },
 			{
 				label: 'Compte',
 				value:
@@ -47,10 +47,6 @@ const rows = learner
 							: '—',
 			},
 			{ label: 'Formation', value: learner.trainingName ?? '—' },
-			{
-				label: 'Progression',
-				value: `${learner.progressionPercent} % · ${learner.itemsCompleted}/${learner.itemsTotal} leçons`,
-			},
 			{ label: 'Temps passé', value: formatLearnerDuration(learner.durationSeconds) },
 			{
 				label: 'Quiz',
@@ -59,8 +55,6 @@ const rows = learner
 			{ label: 'Inscrit le', value: formatLearnerDate(learner.enrolledAt) },
 			{ label: 'Commencé le', value: formatLearnerDate(learner.startedAt) },
 			{ label: 'Terminé le', value: formatLearnerDate(learner.completedAt) },
-			{ label: 'Dernière activité', value: formatLearnerDate(learner.lastActivityAt) },
-			{ label: 'Dernière connexion', value: formatLearnerDate(learner.lastLoginAt) },
 			{ label: 'Expiration', value: formatLearnerDate(learner.expirationAt) },
 			{ label: 'Bloqué le', value: formatLearnerDate(learner.blockedAt) },
 		]
@@ -96,37 +90,93 @@ const rows = learner
 	</div>
 	{hint ? <p class="text-ink-soft mt-2 text-sm">{hint}</p> : null}
 
+	{
+		teachizy.error ? (
+			<p class="text-blush-deep mt-3 text-sm">{teachizy.error}</p>
+		) : !teachizy.configured ? (
+			<p class="text-ink-soft mt-3 text-sm">Teachizy n’est pas configuré.</p>
+		) : !learner ? (
+			<p class="text-ink-soft mt-3 text-sm">Pas encore d’apprenant Teachizy pour cet e-mail.</p>
+		) : (
+			<dl class="mt-3 grid w-full gap-x-6 gap-y-2 sm:grid-cols-2">
+				<div class="flex min-w-0 gap-2 text-sm">
+					<dt class="text-ink/45 shrink-0">Statut</dt>
+					<dd class="text-ink min-w-0">
+						<div class="flex flex-wrap items-center gap-1.5">
+							{learner.trainingStatus === 'not_started' ? (
+								learnerStatusLabel(learner.trainingStatus)
+							) : (
+								<StatusBadge tone={learnerStatusTone(learner.trainingStatus)}>
+									{learnerStatusLabel(learner.trainingStatus)}
+								</StatusBadge>
+							)}
+							{learner.accountStatus === 'DISABLED' && (
+								<StatusBadge tone="action">Désactivé</StatusBadge>
+							)}
+						</div>
+					</dd>
+				</div>
+				<div class="flex min-w-0 gap-2 text-sm">
+					<dt class="text-ink/45 shrink-0">Progression</dt>
+					<dd class="text-ink min-w-0">
+						<div class="flex items-baseline gap-2">
+							<span class="tabular-nums">{learner.progressionPercent} %</span>
+							<span class="text-ink/45 text-[11px]">
+								{learner.itemsCompleted}/{learner.itemsTotal}
+							</span>
+						</div>
+						<div class="bg-ink/10 mt-1.5 h-0.5 w-full max-w-32" aria-hidden="true">
+							<div
+								class="bg-ink/55 h-0.5"
+								style={`width: ${Math.min(100, learner.progressionPercent)}%`}
+							/>
+						</div>
+						{learner.durationSeconds > 0 ? (
+							<p class="text-ink/45 mt-1 text-[11px]">
+								{formatLearnerDuration(learner.durationSeconds)}
+							</p>
+						) : null}
+					</dd>
+				</div>
+				<div class="flex min-w-0 gap-2 text-sm">
+					<dt class="text-ink/45 shrink-0">Activité</dt>
+					<dd class="text-ink min-w-0 tabular-nums">{formatLearnerDate(learner.lastActivityAt)}</dd>
+				</div>
+				<div class="flex min-w-0 gap-2 text-sm">
+					<dt class="text-ink/45 shrink-0">Connexion</dt>
+					<dd class="text-ink min-w-0 tabular-nums">{formatLearnerDate(learner.lastLoginAt)}</dd>
+				</div>
+			</dl>
+		)
+	}
+
 	<div class="mt-4 flex flex-wrap items-center gap-x-4">
-		<details class="peer group">
-			<summary
-				class:list={['cursor-pointer list-none', linkClass, '[&::-webkit-details-marker]:hidden']}
-			>
-				<span class="group-open:hidden">Voir le détail</span>
-				<span class="hidden group-open:inline">Masquer le détail</span>
-			</summary>
-		</details>
+		{
+			learner ? (
+				<details class="peer group">
+					<summary
+						class:list={['cursor-pointer list-none', linkClass, '[&::-webkit-details-marker]:hidden']}
+					>
+						<span class="group-open:hidden">Voir le détail</span>
+						<span class="hidden group-open:inline">Masquer le détail</span>
+					</summary>
+				</details>
+			) : null
+		}
 		<a href={TEACHIZY_ACADEMY_URL} target="_blank" rel="noopener noreferrer" class={linkClass}>
 			Académie ↗
 		</a>
-		<div class="mt-3 hidden w-full basis-full peer-open:block">
-			{
-				teachizy.error ? (
-					<p class="text-blush-deep text-sm">{teachizy.error}</p>
-				) : !teachizy.configured ? (
-					<p class="text-ink-soft text-sm">Teachizy n’est pas configuré.</p>
-				) : !learner ? (
-					<p class="text-ink-soft text-sm">Pas encore d’apprenant Teachizy pour cet e-mail.</p>
-				) : (
-					<dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-						{rows.map((row) => (
-							<div class="flex min-w-0 gap-2 text-sm">
-								<dt class="text-ink/45 shrink-0">{row.label}</dt>
-								<dd class="text-ink min-w-0">{row.value}</dd>
-							</div>
-						))}
-					</dl>
-				)
-			}
-		</div>
+		{
+			learner ? (
+				<dl class="mt-3 hidden w-full basis-full gap-x-6 gap-y-2 peer-open:grid sm:grid-cols-2">
+					{detailRows.map((row) => (
+						<div class="flex min-w-0 gap-2 text-sm">
+							<dt class="text-ink/45 shrink-0">{row.label}</dt>
+							<dd class="text-ink min-w-0">{row.value}</dd>
+						</div>
+					))}
+				</dl>
+			) : null
+		}
 	</div>
 </section>

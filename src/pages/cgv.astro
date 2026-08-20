@@ -4,12 +4,18 @@ import Container from '../components/ui/Container.astro';
 import Section from '../components/ui/Section.astro';
 import BackLink from '../components/ui/BackLink.astro';
 import { getEnv } from '../lib/env';
+import {
+	resolveSignatureCgvEnrollmentStep,
+	resolveSignaturePrivacyDisclosure,
+} from '../lib/signature/helpers';
 
 const env = getEnv();
 const contactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL ?? 'contact@deesse-vibes.com';
 const siteUrl = env.PUBLIC_SITE_URL ?? 'https://formation-deesse-vibes.vercel.app/';
 const siteHost = new URL(siteUrl).host;
 const updatedAt = '19 août 2026';
+const signaturePrivacy = resolveSignaturePrivacyDisclosure();
+const signatureCgvStep = resolveSignatureCgvEnrollmentStep();
 ---
 
 <MarketingLayout
@@ -121,10 +127,7 @@ const updatedAt = '19 août 2026';
 						confidentialité, engagement de signature du contrat de confidentialité) ;
 					</li>
 					<li>Paiement en ligne sur Stripe ;</li>
-					<li>
-						Signature électronique du contrat de confidentialité via Yousign (lien envoyé par
-						e-mail) ;
-					</li>
+					<li>{signatureCgvStep}</li>
 					<li>Création de votre accès Teachizy et envoi de vos identifiants de connexion.</li>
 				</ol>
 				<p>
@@ -251,7 +254,7 @@ const updatedAt = '19 août 2026';
 				</p>
 				<p>Le vendeur ne saurait être tenue responsable :</p>
 				<ul class="list-disc space-y-1 pl-5">
-					<li>des indisponibilités temporaires du site, de Stripe, de Yousign ou de Teachizy ;</li>
+					<li>des indisponibilités temporaires du site, de Stripe, de {signaturePrivacy.providerName} ou de Teachizy ;</li>
 					<li>
 						des dysfonctionnements imputables à votre équipement ou à votre connexion internet ;
 					</li>

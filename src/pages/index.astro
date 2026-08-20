@@ -40,7 +40,7 @@ const flash = view?.flash ?? null;
 const checkoutCancel = view?.checkoutCancel ?? false;
 const showTracking = view?.showTracking ?? false;
 const ndaSignSurface = view?.ndaSignSurface ?? null;
-const invoiceLinks = view?.invoiceLinks ?? [];
+const paymentSchedule = view?.paymentSchedule ?? null;
 const magicLinkFailed = view?.magicLinkFailed ?? false;
 
 const accessTitle = showTracking
@@ -89,7 +89,7 @@ const heroCta = showTracking
 						showFunnel={!showTracking}
 						enrollment={enrollment}
 						ndaSignSurface={ndaSignSurface}
-						invoiceLinks={invoiceLinks}
+						paymentSchedule={paymentSchedule}
 						flash={flash}
 						checkoutCancel={checkoutCancel}
 						magicLinkFailed={magicLinkFailed}

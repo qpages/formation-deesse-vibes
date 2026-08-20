@@ -229,7 +229,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		await page.goto('/');
 		await expect(page.locator('#access-tracking')).toBeVisible();
 		await expect(
-			page.getByRole('link', { name: 'Télécharger le contrat de confidentialité' }),
+			page.getByRole('link', { name: 'Télécharger le contrat' }),
 		).toBeVisible();
 	});
 

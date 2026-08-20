@@ -4,12 +4,14 @@ import Container from '../components/ui/Container.astro';
 import Section from '../components/ui/Section.astro';
 import BackLink from '../components/ui/BackLink.astro';
 import { getEnv } from '../lib/env';
+import { resolveSignaturePrivacyDisclosure } from '../lib/signature/helpers';
 
 const env = getEnv();
 const contactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL ?? 'contact@deesse-vibes.com';
 const siteUrl = env.PUBLIC_SITE_URL ?? 'https://formation-deesse-vibes.vercel.app/';
 const siteHost = new URL(siteUrl).host;
 const updatedAt = '19 août 2026';
+const signaturePrivacy = resolveSignaturePrivacyDisclosure();
 ---
 
 <MarketingLayout
@@ -133,8 +135,8 @@ const updatedAt = '19 août 2026';
 						>)
 					</li>
 					<li>
-						<strong>Yousign</strong> : signature électronique du contrat de confidentialité (<a
-							href="https://yousign.com/fr-fr/politique-de-confidentialite"
+						<strong>{signaturePrivacy.providerName}</strong> : signature électronique du contrat de confidentialité (<a
+							href={signaturePrivacy.privacyUrl}
 							target="_blank"
 							rel="noopener noreferrer"
 							class="text-ink hover:underline underline-offset-2">politique de confidentialité</a
@@ -177,7 +179,7 @@ const updatedAt = '19 août 2026';
 						<strong>Cookie de session :</strong> 30 jours maximum, ou jusqu’à votre déconnexion.
 					</li>
 					<li>
-						<strong>Contrat de confidentialité signé :</strong> conservé par Yousign selon sa propre politique ; nous
+						<strong>Contrat de confidentialité signé :</strong> conservé par {signaturePrivacy.providerName} selon sa propre politique ; nous
 						conservons uniquement les informations nécessaires pour attester de la signature.
 					</li>
 				</ul>

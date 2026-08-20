@@ -13,7 +13,6 @@ const path = Astro.url.pathname;
 const inscriptionsActive =
 	path.startsWith('/admin/inscriptions') || path.startsWith('/admin/enrollments');
 const learnersActive = path.startsWith('/admin/apprenants');
-const faqActive = path.startsWith('/admin/faq');
 
 function navLinkClass(active: boolean) {
 	return active
@@ -73,13 +72,6 @@ function navLinkClass(active: boolean) {
 								aria-current={learnersActive ? 'page' : undefined}
 							>
 								Apprenants
-							</a>
-							<a
-								href="/admin/faq"
-								class={navLinkClass(faqActive)}
-								aria-current={faqActive ? 'page' : undefined}
-							>
-								FAQ
 							</a>
 						</nav>
 					)
