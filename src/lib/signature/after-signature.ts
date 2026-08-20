@@ -8,7 +8,7 @@ import { resolveNdaProvider } from './nda-request';
  * Post-condition unique : NDA signé → politique d’accès + enqueue invite Teachizy.
  * Idempotent (event id + job skip si déjà invité). Webhook et sync admin partagent ça.
  *
- * Expand-contract Slice 3 : émet `nda/signature.completed` et conserve `yousign/signature.done` pour YouSign.
+ * Dual-emit : `nda/signature.completed` (provider-agnostique) + `yousign/signature.done` (rétro-compat YouSign).
  */
 export async function ensureTeachizyAfterSignature(
 	enrollmentId: string,

@@ -238,7 +238,7 @@ async function sync(enrollmentId: string): Promise<SyncNdaStatusResult> {
 	});
 }
 
-/** Ops hors port Slice 1 — IDs via nda_requests; port extension Slice 3. */
+/** YouSign-specific ops (sync, reactivate) — IDs résolus via nda_requests. */
 export type YouSignAdapter = SignaturePort &
 	SignatureWebhookAdapter &
 	SignatureOps & {

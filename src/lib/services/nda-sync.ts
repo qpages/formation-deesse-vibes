@@ -12,7 +12,7 @@ export type ConfirmLearnerNdaSignatureResult =
 	  };
 
 /**
- * Filet élève : lit Yousign, ne pose jamais `signed` à la main.
+ * Filet élève : lit le provider de signature, ne pose jamais `signed` à la main.
  * Idempotent si le contrat est déjà signé en DB.
  */
 export async function confirmLearnerNdaSignature(

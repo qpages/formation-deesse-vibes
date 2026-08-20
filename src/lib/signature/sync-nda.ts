@@ -26,7 +26,7 @@ type LegacySyncYousignResult =
 	  }
 	| LegacySyncYousignFailure;
 
-/** Alias Slice 3 — mappe providerStatus → yousignStatus et no_nda_request → no_yousign_request. */
+/** Alias rétro-compat — mappe providerStatus → yousignStatus et no_nda_request → no_yousign_request. */
 export async function syncYousignStatus(enrollmentId: string): Promise<LegacySyncYousignResult> {
 	const result = await syncNdaStatus(enrollmentId);
 	if (!result.ok) {

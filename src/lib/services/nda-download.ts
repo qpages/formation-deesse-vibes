@@ -29,7 +29,7 @@ function filenameFor(contentType: string): string {
 	return `contrat-confidentialite.${ext}`;
 }
 
-/** Fetch live chez Yousign — le PDF n’est pas persisté. */
+/** Fetch live chez le provider — le PDF n’est pas persisté. */
 export async function getSignedNdaPdf(enrollmentId: string): Promise<SignedNdaResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) {
