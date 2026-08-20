@@ -1,7 +1,7 @@
 import type { Enrollment, Payment } from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
 import { formatMoney } from '../payment-plans';
-import { findEnrollmentById } from '../services/enrollment';
+import { findEnrollmentById } from '../enrollment';
 import {
 	paymentPlanLabel,
 	paymentProgressLabel,
@@ -12,7 +12,7 @@ import {
 	PAYMENT_STATUS_LABELS,
 	type PaymentTrackingState,
 } from '../status';
-import { hydrateInvoiceUrls } from '../services/payments';
+import { hydrateInvoiceUrls } from '../payments';
 import { stripeDashboardUrl } from '../stripe';
 
 export type AdminPaymentRow = {
@@ -197,7 +197,7 @@ export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaym
 	return rows;
 }
 
-export { listPaidInvoiceLinks } from '../services/payments';
+export { listPaidInvoiceLinks } from '../payments';
 
 export async function listPaymentsForEnrollments(enrollmentIds: string[]) {
 	if (enrollmentIds.length === 0) return new Map<string, Payment[]>();

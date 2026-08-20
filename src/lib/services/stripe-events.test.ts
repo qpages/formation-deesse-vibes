@@ -24,7 +24,7 @@ const {
 	findEnrollmentIdByPaymentIntentId: vi.fn(),
 }));
 
-vi.mock('./payments', () => ({
+vi.mock('../payments', () => ({
 	confirmPaidCheckout,
 	ensureNdaAfterPayment,
 	markEnrollmentRefunded,
@@ -33,7 +33,7 @@ vi.mock('./payments', () => ({
 	syncSubscriptionState,
 }));
 
-vi.mock('./enrollment', () => ({
+vi.mock('../enrollment', () => ({
 	findEnrollmentByCheckoutSession: vi.fn(),
 	findEnrollmentById,
 	findEnrollmentByScheduleId: vi.fn(),

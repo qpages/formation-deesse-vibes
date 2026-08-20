@@ -13,13 +13,13 @@ import {
 	peekMagicLink,
 	resolveNdaSignSurface,
 	type EnrollmentWithUser,
-} from '../services/enrollment';
+} from '../enrollment';
 import {
 	confirmPaidCheckout,
 	ensureNdaAfterPayment,
 	listPaidInvoiceLinks,
 	retrieveCheckoutSession,
-} from '../services/payments';
+} from '../payments';
 import { notifyOps } from '../services/slack';
 import { checkoutSuccessFlash, stepStates } from '../status';
 import type { SignSurface } from '../signature/types';

@@ -6,7 +6,7 @@ const { peekMagicLink, consumeMagicLink, findEnrollmentById } = vi.hoisted(() =>
 	findEnrollmentById: vi.fn(),
 }));
 
-vi.mock('../services/enrollment', () => ({
+vi.mock('../enrollment', () => ({
 	peekMagicLink,
 	consumeMagicLink,
 	findEnrollmentById,
@@ -14,7 +14,7 @@ vi.mock('../services/enrollment', () => ({
 	resolveNdaSignSurface: vi.fn(),
 }));
 
-vi.mock('../services/payments', () => ({
+vi.mock('../payments', () => ({
 	confirmPaidCheckout: vi.fn(),
 	ensureNdaAfterPayment: vi.fn(),
 	listPaidInvoiceLinks: vi.fn(),

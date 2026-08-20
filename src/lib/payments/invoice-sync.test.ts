@@ -45,10 +45,10 @@ vi.mock('../prisma', () => ({
 	}),
 }));
 
-vi.mock('./access', () => ({ applyAccessPolicy: vi.fn() }));
-vi.mock('./slack', () => ({ notifyOps: vi.fn() }));
+vi.mock('../enrollment/access', () => ({ applyAccessPolicy: vi.fn() }));
+vi.mock('../services/slack', () => ({ notifyOps: vi.fn() }));
 vi.mock('../inngest/client', () => ({ inngest: {}, sendInngestSafe: vi.fn() }));
-vi.mock('./enrollment', () => ({
+vi.mock('../enrollment', () => ({
 	findEnrollmentById,
 	findEnrollmentByIdOrThrow,
 	findEnrollmentBySubscriptionId,
@@ -74,7 +74,8 @@ vi.mock('../stripe', () => ({
 	retrieveSubscription: vi.fn(),
 }));
 
-import { hydrateInvoiceUrls, syncStripeInvoice } from './payments';
+import { hydrateInvoiceUrls } from './invoice-links';
+import { syncStripeInvoice } from './invoice-sync';
 
 function payment(overrides: Partial<Payment> = {}): Payment {
 	return {

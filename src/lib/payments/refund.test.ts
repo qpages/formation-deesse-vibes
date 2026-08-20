@@ -13,9 +13,9 @@ const { enrollmentUpdate, getPrisma, applyAccessPolicy, notifyOps, findEnrollmen
 	});
 
 vi.mock('../prisma', () => ({ getPrisma }));
-vi.mock('./access', () => ({ applyAccessPolicy }));
-vi.mock('./slack', () => ({ notifyOps }));
-vi.mock('./enrollment', () => ({
+vi.mock('../enrollment/access', () => ({ applyAccessPolicy }));
+vi.mock('../services/slack', () => ({ notifyOps }));
+vi.mock('../enrollment', () => ({
 	findEnrollmentById,
 	findEnrollmentByIdOrThrow: vi.fn(),
 	findEnrollmentBySubscriptionId: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock('../stripe', () => ({
 	retrieveSubscription: vi.fn(),
 }));
 
-import { markEnrollmentRefunded } from './payments';
+import { markEnrollmentRefunded } from './refund';
 
 function enrollment(overrides: Record<string, unknown> = {}) {
 	return {

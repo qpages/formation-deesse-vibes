@@ -1,5 +1,5 @@
 import { getPrisma } from '../prisma';
-import { applyAccessPolicy } from '../services/access';
+import { applyAccessPolicy } from '../enrollment/access';
 import { notifyOps } from '../services/slack';
 import { inngest } from './client';
 

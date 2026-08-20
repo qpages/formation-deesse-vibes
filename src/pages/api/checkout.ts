@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { createPendingEnrollment, DuplicateEnrollmentError } from '../../lib/services/enrollment';
-import { CheckoutAlreadyPaidError, startCheckout } from '../../lib/services/payments';
+import { createPendingEnrollment, DuplicateEnrollmentError } from '../../lib/enrollment';
+import { CheckoutAlreadyPaidError, startCheckout } from '../../lib/payments';
 import { getEnv } from '../../lib/env';
 import { json } from '../../lib/http';
 import { RATE_LIMITS, clientIp, enforceRateLimit, rateLimitKey } from '../../lib/rate-limit';

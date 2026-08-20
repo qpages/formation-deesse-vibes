@@ -2,7 +2,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 import { resolveDatabaseUrl } from './database-url';
 
-const PRISMA_CLIENT_REV = 'yousignLastError';
+const PRISMA_CLIENT_REV = 'ndaRequestsOnly';
 
 const globalForPrisma = globalThis as unknown as {
 	prisma?: PrismaClient;

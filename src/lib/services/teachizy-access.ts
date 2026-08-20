@@ -6,7 +6,7 @@ import {
 	isTeachizyConfigured,
 	type TeachizyCustomer,
 } from '../teachizy';
-import { findEnrollmentById } from './enrollment';
+import { findEnrollmentById } from '../enrollment';
 
 export type TeachizyPresence =
 	| { present: true; enrolledAt: Date | null; blocked: boolean; disabled: boolean }

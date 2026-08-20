@@ -11,10 +11,10 @@ const { findUnique, updateMany, getPrisma } = vi.hoisted(() => {
 });
 
 vi.mock('../prisma', () => ({ getPrisma }));
-vi.mock('./brevo', () => ({ sendMagicLinkEmail: vi.fn() }));
+vi.mock('../services/brevo', () => ({ sendMagicLinkEmail: vi.fn() }));
 
 import { hashToken } from '../crypto';
-import { consumeMagicLink, peekMagicLink } from './enrollment';
+import { consumeMagicLink, peekMagicLink } from './magic-link';
 
 beforeEach(() => {
 	vi.clearAllMocks();

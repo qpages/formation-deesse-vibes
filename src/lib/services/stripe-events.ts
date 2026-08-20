@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
 import { decryptPayload } from '../crypto';
-import { findEnrollmentById, findEnrollmentIdByPaymentIntentId } from './enrollment';
+import { findEnrollmentById, findEnrollmentIdByPaymentIntentId } from '../enrollment';
 import {
 	confirmPaidCheckout,
 	ensureNdaAfterPayment,
@@ -8,7 +8,7 @@ import {
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
 	syncSubscriptionState,
-} from './payments';
+} from '../payments';
 
 const PAID_CHECKOUT_EVENTS = new Set([
 	'checkout.session.completed',

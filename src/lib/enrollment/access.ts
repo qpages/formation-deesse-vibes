@@ -1,9 +1,9 @@
 import type { AccessStatus } from '../../generated/prisma/client';
 import { isOverdueForAccess } from '../enrollment-gates';
-import { getPrisma } from '../prisma';
 import { inngest } from '../inngest/client';
-import { findEnrollmentForAccessPolicy } from './enrollment';
-import { notifyOps } from './slack';
+import { getPrisma } from '../prisma';
+import { notifyOps } from '../services/slack';
+import { findEnrollmentForAccessPolicy } from './queries';
 
 export type AccessDecision =
 	| { shouldHaveAccess: true; reason: 'ELIGIBLE' }
