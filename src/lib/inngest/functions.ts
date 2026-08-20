@@ -1,4 +1,4 @@
-import { purgeOldWebhookPayloads } from '../services/enrollment';
+import { purgeOldWebhookPayloads } from '../enrollment';
 import { createNdaAfterPayment } from './create-nda-after-payment';
 import { grantTeachizyAccess } from './grant-teachizy-access';
 import { inngest } from './client';
