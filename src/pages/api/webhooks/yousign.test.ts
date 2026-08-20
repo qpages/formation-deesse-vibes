@@ -5,8 +5,8 @@ const { verify } = vi.hoisted(() => ({
 	verify: vi.fn(),
 }));
 
-vi.mock('../../../lib/signature/adapters/yousign', () => ({
-	yousignAdapter: { verify },
+vi.mock('../../../lib/signature/providers', () => ({
+	resolveSignatureProvider: () => ({ verify }),
 }));
 vi.mock('../../../lib/webhooks/acknowledge-provider-event', () => ({
 	acknowledgeProviderEvent: vi.fn(),
@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 describe('POST /api/webhooks/yousign', () => {
-	it('utilise yousignAdapter.verify directement (pas factory)', async () => {
+	it('utilise resolveSignatureProvider(yousign).verify', async () => {
 		verify.mockReturnValue(false);
 
 		const response = await POST({

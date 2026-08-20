@@ -5,8 +5,8 @@ const { verify } = vi.hoisted(() => ({
 	verify: vi.fn(),
 }));
 
-vi.mock('../../../lib/signature/adapters/docuseal', () => ({
-	docusealAdapter: { verify },
+vi.mock('../../../lib/signature/providers', () => ({
+	resolveSignatureProvider: () => ({ verify }),
 }));
 vi.mock('../../../lib/webhooks/acknowledge-provider-event', () => ({
 	acknowledgeProviderEvent: vi.fn(),
@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 describe('POST /api/webhooks/docuseal', () => {
-	it('utilise docusealAdapter.verify directement (pas factory)', async () => {
+	it('utilise resolveSignatureProvider(docuseal).verify', async () => {
 		verify.mockReturnValue(false);
 
 		const response = await POST({

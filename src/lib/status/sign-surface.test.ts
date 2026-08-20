@@ -21,7 +21,7 @@ describe('primaryAction SignSurface mapping', () => {
 	it('embed → refresh (formulaire inline)', () => {
 		const surface: SignSurface = {
 			kind: 'embed',
-			src: 'https://docuseal.com/s/abc',
+			src: 'https://docuseal.eu/s/abc',
 			email: 'a@b.c',
 		};
 		expect(primaryAction(awaitingNda, surface)).toEqual({

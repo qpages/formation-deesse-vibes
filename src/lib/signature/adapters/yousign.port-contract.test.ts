@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SignaturePort, SignatureWebhookAdapter } from '../types';
+import type { SignatureProvider } from '../types';
 import { yousignAdapter } from './yousign';
 
 vi.mock('../../env', () => ({
@@ -21,8 +21,7 @@ vi.mock('../../env', () => ({
 vi.mock('../../inngest/client', () => ({ sendInngestSafe: vi.fn() }));
 vi.mock('../../e2e-providers', () => ({ e2eMockProviders: () => false }));
 
-const port: SignaturePort = yousignAdapter;
-const webhook: SignatureWebhookAdapter = yousignAdapter;
+const provider: SignatureProvider = yousignAdapter;
 
 describe('YouSign adapter port contract', () => {
 	beforeEach(() => {
@@ -34,7 +33,7 @@ describe('YouSign adapter port contract', () => {
 			new Response(JSON.stringify({ id: 'req-draft' }), { status: 200 }),
 		);
 
-		const result = await port.provisionNda({
+		const result = await provider.provisionNda({
 			step: 'draft',
 			enrollmentId: 'enr_1',
 			email: 'a@b.c',
@@ -68,7 +67,7 @@ describe('YouSign adapter port contract', () => {
 				),
 			);
 
-		const result = await port.provisionNda({ step: 'activate', requestId: 'req_1' });
+		const result = await provider.provisionNda({ step: 'activate', requestId: 'req_1' });
 
 		expect(result).toEqual({
 			requestId: 'req_1',
@@ -86,7 +85,7 @@ describe('YouSign adapter port contract', () => {
 		);
 
 		await expect(
-			port.getSignSurface({ requestId: 'req_1', signerId: 'sig_1' }),
+			provider.getSignSurface({ requestId: 'req_1', signerId: 'sig_1' }),
 		).resolves.toEqual({ kind: 'redirect', url: 'https://sign/here' });
 	});
 
@@ -94,8 +93,8 @@ describe('YouSign adapter port contract', () => {
 		const rawBody = '{"event_name":"signature_request.done"}';
 		const signature = createHmac('sha256', 'whsec_test').update(rawBody).digest('hex');
 
-		expect(webhook.verify(rawBody, signature)).toBe(true);
-		expect(webhook.verify(rawBody, 'bad')).toBe(false);
+		expect(provider.verify(rawBody, signature)).toBe(true);
+		expect(provider.verify(rawBody, 'bad')).toBe(false);
 	});
 
 	it('webhook.mapCompletedEvent extrait requestId + externalId', () => {
@@ -107,11 +106,11 @@ describe('YouSign adapter port contract', () => {
 			},
 		};
 
-		expect(webhook.mapCompletedEvent(payload)).toEqual({
+		expect(provider.mapCompletedEvent(payload)).toEqual({
 			requestId: 'req_done',
 			externalId: 'enr_1',
 			occurredAt: new Date(1_700_000_000_000),
 		});
-		expect(webhook.mapCompletedEvent({ event_name: 'signer.notified' })).toBeNull();
+		expect(provider.mapCompletedEvent({ event_name: 'signer.notified' })).toBeNull();
 	});
 });

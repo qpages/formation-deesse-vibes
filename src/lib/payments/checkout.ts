@@ -27,8 +27,8 @@ import {
 } from '../stripe';
 import { ensureNdaAfterPayment } from './nda-trigger';
 import { notifyInstallmentPaid } from './notifications';
-import { mapSubscriptionStatus } from './stripe-status';
 import { recomputeEnrollmentCollectionState, syncStripeInvoice } from './invoice-sync';
+import { syncEnrollmentSubscriptionDates } from './subscription-sync';
 import { stripeId } from './stripe-id';
 
 export class CheckoutAlreadyPaidError extends Error {
@@ -75,6 +75,29 @@ async function updateEnrollmentPaymentConfirmed(
 		},
 	});
 	return result.count > 0;
+}
+
+/**
+ * Idempotent fast-path : déjà confirmé pour cette session Checkout.
+ * Subscription : exige stripeSubscriptionId aligné (premier paiement non skippable).
+ */
+function isAlreadyConfirmedSameSession(
+	enrollment: EnrollmentWithUser,
+	session: Stripe.Checkout.Session,
+): boolean {
+	if (enrollment.collectionStatus === 'pending') return false;
+	if (!enrollment.stripeCheckoutSessionId || enrollment.stripeCheckoutSessionId !== session.id) {
+		return false;
+	}
+
+	if (session.mode === 'subscription') {
+		const subscriptionId = subscriptionIdFromSession(session);
+		if (!subscriptionId || enrollment.stripeSubscriptionId !== subscriptionId) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 /** Promo codes autorisés → amount_total peut être < prix attendu pour le plan. */
@@ -171,16 +194,15 @@ async function syncSubscriptionCheckout(
 		existingScheduleId: enrollment.stripeScheduleId,
 	});
 
-	const subscription = await retrieveSubscription(subscriptionId);
-
 	await getPrisma().enrollment.update({
 		where: { id: enrollment.id },
 		data: {
 			stripeSubscriptionId: subscriptionId,
 			stripeScheduleId: scheduleId,
-			subscriptionStatus: mapSubscriptionStatus(subscription.status),
 		},
 	});
+
+	const subscription = await retrieveSubscription(subscriptionId);
 
 	const latestInvoiceId =
 		typeof subscription.latest_invoice === 'string'
@@ -191,6 +213,8 @@ async function syncSubscriptionCheckout(
 		const invoice = await getStripe().invoices.retrieve(latestInvoiceId);
 		await syncStripeInvoice(invoice, { enrollmentId: enrollment.id });
 	}
+
+	await syncEnrollmentSubscriptionDates(enrollment.id);
 }
 
 /**
@@ -298,6 +322,16 @@ export async function confirmPaidCheckout(
 			stored: enrollment.stripeCheckoutSessionId,
 			paid: session.id,
 		});
+	}
+
+	if (isAlreadyConfirmedSameSession(enrollment, session)) {
+		const fresh = await findEnrollmentByIdOrThrow(enrollmentId);
+		return {
+			ok: true,
+			enrollmentId,
+			alreadyConfirmed: true,
+			contractStatus: fresh.contractStatus,
+		};
 	}
 
 	const paymentIntentId = paymentIntentIdFromSession(session);

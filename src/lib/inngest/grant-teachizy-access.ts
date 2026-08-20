@@ -7,6 +7,7 @@ import {
 	notifyOps,
 	withJobLifecycleAlerts,
 } from '../services/slack';
+import { isTeachizyConfigured, unblockTeachizyCustomer } from '../teachizy';
 import { inngest } from './client';
 
 /**
@@ -60,6 +61,12 @@ export const grantTeachizyAccess = inngest.createFunction(
 
 				if (fresh.contractStatus !== 'signed') {
 					return { skipped: true, reason: 'contract_not_signed' };
+				}
+
+				if (isTeachizyConfigured()) {
+					await step.run('unblock-teachizy', async () => {
+						return unblockTeachizyCustomer(fresh.user.email);
+					});
 				}
 
 				const inviteResult = await step.run('invite-teachizy', async () => {

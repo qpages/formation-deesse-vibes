@@ -1,8 +1,7 @@
 import type { AccessStatus } from '../../generated/prisma/client';
 import { isOverdueForAccess } from '../enrollment-gates';
-import { inngest } from '../inngest/client';
+import { sendInngestSafe } from '../inngest/client';
 import { getPrisma } from '../prisma';
-import { notifyOps } from '../services/slack';
 import { findEnrollmentForAccessPolicy } from './queries';
 
 export type AccessDecision =
@@ -68,8 +67,8 @@ function targetAccessStatus(decision: AccessDecision, current: AccessStatus): Ac
 }
 
 /**
- * Modifier: lit les états, décide, update accessStatus, emit grant.
- * Suspend / revoke : timestamps posés ici ; hook Teachizy API = plus tard (pas d’event stub).
+ * Modifier: lit les états, décide, update accessStatus, emit side effects via Inngest.
+ * Suspend impayé → block Teachizy + e-mail. Revoke → block définitif. Grant → unblock + invite.
  * Ne passe jamais directement à `active` sans confirmation Teachizy.
  */
 export async function applyAccessPolicy(enrollmentId: string): Promise<{
@@ -125,31 +124,27 @@ export async function applyAccessPolicy(enrollmentId: string): Promise<{
 
 	let emitted: 'grant' | 'suspend' | 'revoke' | null = null;
 	if (next === 'pending' && (previous === 'not_eligible' || previous === 'suspended')) {
-		await inngest.send({
+		await sendInngestSafe({
 			name: 'enrollment/access.grant',
 			data: { enrollmentId },
 		});
 		emitted = 'grant';
-	} else if (next === 'suspended' && previous === 'active') {
+	} else if (
+		next === 'suspended' &&
+		previous === 'active' &&
+		decision.reason === 'OVERDUE_INSTALLMENT'
+	) {
+		await sendInngestSafe({
+			name: 'enrollment/access.suspend',
+			data: { enrollmentId, reason: 'OVERDUE_INSTALLMENT' },
+		});
 		emitted = 'suspend';
-		await notifyOps({
-			kind: 'access.suspended',
-			severity: 'warn',
-			title: 'Accès Teachizy suspendu',
-			enrollmentId,
-			email: enrollment.user.email,
-			detail: `${previous} → ${next} (${decision.reason})`,
+	} else if (next === 'revoked' && previous !== 'revoked') {
+		await sendInngestSafe({
+			name: 'enrollment/access.revoke',
+			data: { enrollmentId },
 		});
-	} else if (next === 'revoked') {
 		emitted = 'revoke';
-		await notifyOps({
-			kind: 'access.revoked',
-			severity: 'critical',
-			title: 'Accès Teachizy révoqué',
-			enrollmentId,
-			email: enrollment.user.email,
-			detail: `${previous} → ${next} (${decision.reason})`,
-		});
 	}
 
 	return { decision, previous, next, emitted };

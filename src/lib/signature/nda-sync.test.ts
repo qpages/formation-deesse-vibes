@@ -8,7 +8,10 @@ const { findEnrollmentById, syncNdaStatus } = vi.hoisted(() => ({
 vi.mock('../enrollment/queries', () => ({ findEnrollmentById }));
 vi.mock('./sync-nda', () => ({ syncNdaStatus }));
 
-import { confirmLearnerNdaSignature } from './nda-sync';
+import {
+	confirmLearnerNdaSignature,
+	confirmLearnerNdaSignatureFromWebhook,
+} from './nda-sync';
 
 function enrollment(overrides: Record<string, unknown> = {}) {
 	return {
@@ -25,18 +28,21 @@ beforeEach(() => {
 });
 
 describe('confirmLearnerNdaSignature', () => {
-	it('déjà signé → signed true sans appeler Yousign', async () => {
+	it('déjà signé → signed true sans appeler le provider', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment({ contractStatus: 'signed' }));
 
 		await expect(confirmLearnerNdaSignature('enr_1')).resolves.toEqual({
 			ok: true,
 			signed: true,
+			followUp: { status: 'skipped' },
 		});
 		expect(syncNdaStatus).not.toHaveBeenCalled();
 	});
 
-	it('Yousign done → signed true', async () => {
-		findEnrollmentById.mockResolvedValue(enrollment());
+	it('provider done → signed true (DB-driven)', async () => {
+		findEnrollmentById
+			.mockResolvedValueOnce(enrollment())
+			.mockResolvedValueOnce(enrollment({ contractStatus: 'signed' }));
 		syncNdaStatus.mockResolvedValue({
 			ok: true,
 			providerStatus: 'done',
@@ -46,11 +52,29 @@ describe('confirmLearnerNdaSignature', () => {
 		await expect(confirmLearnerNdaSignature('enr_1')).resolves.toEqual({
 			ok: true,
 			signed: true,
+			followUp: { status: 'enqueued' },
 		});
 		expect(syncNdaStatus).toHaveBeenCalledWith('enr_1');
 	});
 
-	it('Yousign encore ongoing → signed false', async () => {
+	it('DocuSeal completed → signed true via relecture DB', async () => {
+		findEnrollmentById
+			.mockResolvedValueOnce(enrollment())
+			.mockResolvedValueOnce(enrollment({ contractStatus: 'signed' }));
+		syncNdaStatus.mockResolvedValue({
+			ok: true,
+			providerStatus: 'completed',
+			followUp: { status: 'enqueued' },
+		});
+
+		await expect(confirmLearnerNdaSignature('enr_1')).resolves.toEqual({
+			ok: true,
+			signed: true,
+			followUp: { status: 'enqueued' },
+		});
+	});
+
+	it('provider encore ongoing → signed false', async () => {
 		findEnrollmentById.mockResolvedValue(enrollment());
 		syncNdaStatus.mockResolvedValue({
 			ok: true,
@@ -61,6 +85,7 @@ describe('confirmLearnerNdaSignature', () => {
 		await expect(confirmLearnerNdaSignature('enr_1')).resolves.toEqual({
 			ok: true,
 			signed: false,
+			followUp: { status: 'skipped' },
 		});
 	});
 
@@ -93,5 +118,43 @@ describe('confirmLearnerNdaSignature', () => {
 			ok: false,
 			reason: 'enrollment_not_found',
 		});
+	});
+});
+
+describe('confirmLearnerNdaSignatureFromWebhook', () => {
+	it('délègue à confirmLearnerNdaSignature et retourne enrollmentId', async () => {
+		findEnrollmentById.mockResolvedValue(enrollment({ contractStatus: 'signed' }));
+
+		await expect(confirmLearnerNdaSignatureFromWebhook('enr_1')).resolves.toEqual({
+			enrollmentId: 'enr_1',
+		});
+	});
+
+	it('retry si pas encore signé côté provider', async () => {
+		findEnrollmentById.mockResolvedValue(enrollment());
+		syncNdaStatus.mockResolvedValue({
+			ok: true,
+			providerStatus: 'pending',
+			followUp: { status: 'skipped' },
+		});
+
+		await expect(confirmLearnerNdaSignatureFromWebhook('enr_1')).rejects.toThrow(
+			'Signature pas encore visible chez le provider',
+		);
+	});
+
+	it('retry si enqueue Teachizy échoué', async () => {
+		findEnrollmentById
+			.mockResolvedValueOnce(enrollment())
+			.mockResolvedValueOnce(enrollment({ contractStatus: 'signed' }));
+		syncNdaStatus.mockResolvedValue({
+			ok: true,
+			providerStatus: 'completed',
+			followUp: { status: 'failed', error: 'queue down' },
+		});
+
+		await expect(confirmLearnerNdaSignatureFromWebhook('enr_1')).rejects.toThrow(
+			'Enqueue Teachizy échoué: queue down',
+		);
 	});
 });

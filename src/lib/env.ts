@@ -24,7 +24,7 @@ const serverSchema = z.object({
 	DOCUSEAL_API_KEY: z.string().optional(),
 	DOCUSEAL_WEBHOOK_SECRET: z.string().optional(),
 	DOCUSEAL_TEMPLATE_ID: z.string().optional(),
-	DOCUSEAL_API_BASE: z.string().url().default('https://api.docuseal.com'),
+	DOCUSEAL_API_BASE: z.string().url().default('https://api.docuseal.eu'),
 	BREVO_API_KEY: z.string().optional(),
 	BREVO_FROM: z.string().default('formation@deesse-vibes.com'),
 	MAGIC_LINK_SECRET: z.string().min(32).optional(),

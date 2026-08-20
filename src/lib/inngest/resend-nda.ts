@@ -1,9 +1,8 @@
 import { canResendNda, findEnrollmentByIdOrThrow, markNdaResent } from '../enrollment';
 import { recordNdaError } from '../signature/persist';
 import { alertFinalFailure, formatErrorDetail, withJobLifecycleAlerts } from '../services/slack';
-import type { YouSignAdapter } from '../signature/adapters/yousign';
-import { getSignatureOps } from '../signature/factory';
 import { resolveExternalRequestId } from '../signature/nda-request';
+import { resolveSignatureProviderForEnrollment } from '../signature/providers';
 import { inngest } from './client';
 
 /** Command: resend NDA (admin resend_nda / api nda/resend). */
@@ -48,7 +47,11 @@ export const resendNda = inngest.createFunction(
 					if (!requestId) {
 						throw new Error('no_nda_request');
 					}
-					await (getSignatureOps('yousign') as YouSignAdapter).reactivateNda(requestId);
+					const provider = resolveSignatureProviderForEnrollment(enrollment);
+					if (!provider.reactivateNda) {
+						throw new Error('reactivateNda indisponible pour ce provider');
+					}
+					await provider.reactivateNda(requestId);
 					await markNdaResent(enrollment);
 				});
 

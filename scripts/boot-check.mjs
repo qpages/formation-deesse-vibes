@@ -156,7 +156,7 @@ async function probeStripe(env) {
 }
 
 async function probeDocuseal(env) {
-	const base = env.DOCUSEAL_API_BASE || 'https://api.docuseal.com';
+	const base = env.DOCUSEAL_API_BASE || 'https://api.docuseal.eu';
 	const templateId = env.DOCUSEAL_TEMPLATE_ID;
 	try {
 		await withTimeout('DocuSeal', PROBE_MS, async () => {

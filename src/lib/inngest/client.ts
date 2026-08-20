@@ -71,6 +71,12 @@ export type AppEvents = {
 	'enrollment/access.grant': {
 		data: { enrollmentId: string };
 	};
+	'enrollment/access.suspend': {
+		data: { enrollmentId: string; reason: 'OVERDUE_INSTALLMENT' };
+	};
+	'enrollment/access.revoke': {
+		data: { enrollmentId: string };
+	};
 	'admin/resend-nda': {
 		data: { enrollmentId: string };
 	};

@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { e2eMockProviders } from './e2e-providers';
 import { getEnv, requireEnv } from './env';
 import { getPaymentPlan, type PaymentPlanId, stripePriceIdForPlan } from './payment-plans';
+import { stripeId } from './payments/stripe-id';
 
 let stripe: Stripe | null = null;
 
@@ -266,7 +267,35 @@ export async function expireCheckoutSession(sessionId: string) {
 }
 
 export async function retrieveSubscription(subscriptionId: string) {
-	return getStripe().subscriptions.retrieve(subscriptionId);
+	return getStripe().subscriptions.retrieve(subscriptionId, { expand: ['items.data'] });
+}
+
+export async function retrieveSubscriptionSchedule(scheduleId: string) {
+	return getStripe().subscriptionSchedules.retrieve(scheduleId);
+}
+
+/** Preview de la prochaine facture (remplace invoices.retrieveUpcoming). */
+export async function createPreviewInvoice(input: {
+	subscriptionId?: string;
+	scheduleId?: string;
+}) {
+	if (e2eMockProviders()) {
+		return {
+			object: 'invoice',
+			id: 'upcoming_in_e2e',
+			amount_due: 0,
+			currency: 'eur',
+			period_end: Math.floor(Date.now() / 1000) + 30 * 86_400,
+		} as unknown as Stripe.Invoice;
+	}
+	// Stripe: schedule and subscription are mutually exclusive on createPreview.
+	if (input.scheduleId) {
+		return getStripe().invoices.createPreview({ schedule: input.scheduleId });
+	}
+	if (input.subscriptionId) {
+		return getStripe().invoices.createPreview({ subscription: input.subscriptionId });
+	}
+	throw new Error('createPreviewInvoice requires subscriptionId or scheduleId');
 }
 
 export async function listSubscriptionInvoices(subscriptionId: string) {
@@ -275,11 +304,6 @@ export async function listSubscriptionInvoices(subscriptionId: string) {
 
 export async function retrieveInvoice(invoiceId: string) {
 	return getStripe().invoices.retrieve(invoiceId, { expand: ['payments'] });
-}
-
-function stripeRefId(ref: string | { id: string } | null | undefined): string | undefined {
-	if (!ref) return undefined;
-	return typeof ref === 'string' ? ref : ref.id;
 }
 
 type InvoiceWithPaymentIntent = Stripe.Invoice & {
@@ -295,7 +319,7 @@ type PaymentIntentWithInvoice = Stripe.PaymentIntent & {
  * (API Stripe récente, typique des invoices d’abonnement).
  */
 export function paymentIntentIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
-	const legacy = stripeRefId((invoice as InvoiceWithPaymentIntent).payment_intent);
+	const legacy = stripeId((invoice as InvoiceWithPaymentIntent).payment_intent);
 	if (legacy) return legacy;
 
 	const payments = invoice.payments?.data ?? [];
@@ -304,11 +328,11 @@ export function paymentIntentIdFromInvoice(invoice: Stripe.Invoice): string | un
 		payments.find((row) => row.status === 'paid') ??
 		payments.find((row) => row.is_default) ??
 		payments[0];
-	return stripeRefId(preferred?.payment?.payment_intent);
+	return stripeId(preferred?.payment?.payment_intent);
 }
 
 function invoiceIdFromPaymentIntent(paymentIntent: Stripe.PaymentIntent): string | undefined {
-	return stripeRefId((paymentIntent as PaymentIntentWithInvoice).invoice);
+	return stripeId((paymentIntent as PaymentIntentWithInvoice).invoice);
 }
 
 /** Facture liée à un PaymentIntent (champ PI, sinon liste customer). */
@@ -322,7 +346,7 @@ export async function findInvoiceByPaymentIntent(
 	const invoiceId = invoiceIdFromPaymentIntent(paymentIntent);
 	if (invoiceId) return retrieveInvoice(invoiceId);
 
-	const customer = customerId ?? stripeRefId(paymentIntent.customer);
+	const customer = customerId ?? stripeId(paymentIntent.customer);
 	if (!customer) return null;
 
 	const listed = await getStripe().invoices.list({ customer, limit: 20 });
@@ -340,19 +364,19 @@ export async function findInvoiceForPaidCheckout(
 ): Promise<Stripe.Invoice | null> {
 	if (e2eMockProviders()) return null;
 
-	const fromPayload = stripeRefId(session.invoice);
+	const fromPayload = stripeId(session.invoice);
 	if (fromPayload) return retrieveInvoice(fromPayload);
 
 	try {
 		const fresh = await getStripe().checkout.sessions.retrieve(session.id);
-		const fromFresh = stripeRefId(fresh.invoice);
+		const fromFresh = stripeId(fresh.invoice);
 		if (fromFresh) return retrieveInvoice(fromFresh);
 	} catch (error) {
 		console.warn('[stripe] retrieve session for invoice', session.id, error);
 	}
 
-	const paymentIntentId = stripeRefId(session.payment_intent);
-	const customerId = stripeRefId(session.customer);
+	const paymentIntentId = stripeId(session.payment_intent);
+	const customerId = stripeId(session.customer);
 	if (paymentIntentId) {
 		return findInvoiceByPaymentIntent(paymentIntentId, customerId);
 	}

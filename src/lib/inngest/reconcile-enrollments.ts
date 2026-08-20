@@ -1,5 +1,5 @@
+import { reconcileEnrollment } from '../enrollment/reconcile';
 import { getPrisma } from '../prisma';
-import { applyAccessPolicy } from '../enrollment/access';
 import { notifyOps } from '../services/slack';
 import { inngest } from './client';
 
@@ -17,7 +17,9 @@ export const reconcileEnrollments = inngest.createFunction(
 				: undefined;
 
 		if (enrollmentId) {
-			await step.run('reconcile-one', () => applyAccessPolicy(enrollmentId));
+			await step.run('reconcile-one', () =>
+				reconcileEnrollment(enrollmentId, 'cron.access_policy', 'access_only'),
+			);
 			return { ok: true, count: 1 };
 		}
 
@@ -41,7 +43,9 @@ export const reconcileEnrollments = inngest.createFunction(
 		});
 
 		for (const id of ids) {
-			await step.run(`reconcile-${id}`, () => applyAccessPolicy(id));
+			await step.run(`reconcile-${id}`, () =>
+				reconcileEnrollment(id, 'cron.access_policy', 'access_only'),
+			);
 		}
 
 		if (ids.length > 0) {

@@ -15,6 +15,7 @@ import {
 	paymentIntentIdFromInvoice,
 	retrieveInvoice,
 } from '../stripe';
+import { resolveNextInstallmentDueAt } from './subscription-dates';
 import {
 	notifyCollectionStatusChange,
 	notifyInstallmentPaid,
@@ -92,7 +93,10 @@ async function resolveInstallmentNumber(
  * Recalcule agrégats Payment + collectionStatus (source de vérité = lignes Payment).
  * Règles : refunded/canceled explicites → past_due si failed/open → paid → current → pending.
  */
-export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
+export async function recomputeEnrollmentCollectionState(
+	enrollmentId: string,
+	opts: { previewDueAt?: Date | null } = {},
+) {
 	const prisma = getPrisma();
 	const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
 	const payments = await prisma.payment.findMany({
@@ -106,10 +110,14 @@ export async function recomputeEnrollmentCollectionState(enrollmentId: string) {
 	const installmentsPaid = paid.length;
 	const installmentsTotal = enrollment.installmentsTotal ?? 1;
 
-	const nextDue = failedOrOpen
-		.map((p) => p.dueAt)
-		.filter(Boolean)
-		.sort((a, b) => a!.getTime() - b!.getTime())[0];
+	const nextDue = resolveNextInstallmentDueAt({
+		openOrFailedDueAts: failedOrOpen.map((p) => p.dueAt),
+		previewDueAt: opts.previewDueAt ?? null,
+		currentPeriodEnd: enrollment.currentPeriodEnd,
+		installmentsPaid,
+		installmentsTotal,
+		collectionStatus: enrollment.collectionStatus,
+	});
 
 	const firstPaidAt =
 		paid

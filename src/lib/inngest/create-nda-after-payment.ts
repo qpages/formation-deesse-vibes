@@ -12,7 +12,7 @@ import {
 	notifyOps,
 	withJobLifecycleAlerts,
 } from '../services/slack';
-import { getSignaturePort } from '../signature/factory';
+import { resolveDefaultSignatureProvider } from '../signature/providers';
 import { isNdaFullyProvisioned } from '../signature/helpers';
 import { resolveExternalRequestId } from '../signature/nda-request';
 import { inngest } from './client';
@@ -64,7 +64,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 					});
 				}
 
-				const signature = getSignaturePort();
+				const signature = resolveDefaultSignatureProvider();
 				const existingRequestId = resolveExternalRequestId(enrollment);
 				const requestId =
 					(!isRecreate && existingRequestId) ||

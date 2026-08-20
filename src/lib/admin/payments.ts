@@ -13,6 +13,10 @@ import {
 	type PaymentTrackingState,
 } from '../status';
 import { hydrateInvoiceUrls } from '../payments';
+import {
+	computeInstallmentProjection,
+	expandInstallmentRows,
+} from '../payments/installment-schedule';
 import { stripeDashboardUrl } from '../stripe';
 
 export type AdminPaymentRow = {
@@ -47,6 +51,9 @@ export type AdminPaymentSummary = {
 	trackingLabel: string;
 	trackingTone: ReturnType<typeof paymentTrackingTone>;
 	nextInstallmentDueAt: string | null;
+	currentPeriodEnd: string | null;
+	subscriptionEndsAt: string | null;
+	stripeScheduleEndBehavior: string | null;
 	subscriptionStatus: Enrollment['subscriptionStatus'];
 	collectedAmountCents: number;
 	totalAmountCents: number | null;
@@ -106,6 +113,9 @@ export function buildAdminPaymentSummary(
 		trackingLabel: paymentTrackingLabel(trackingState),
 		trackingTone: paymentTrackingTone(trackingState),
 		nextInstallmentDueAt: enrollment.nextInstallmentDueAt?.toISOString() ?? null,
+		currentPeriodEnd: enrollment.currentPeriodEnd?.toISOString() ?? null,
+		subscriptionEndsAt: enrollment.subscriptionEndsAt?.toISOString() ?? null,
+		stripeScheduleEndBehavior: enrollment.stripeScheduleEndBehavior ?? null,
 		subscriptionStatus: enrollment.subscriptionStatus,
 		collectedAmountCents: enrollment.collectedAmountCents,
 		totalAmountCents: enrollment.totalAmountCents,
@@ -151,50 +161,37 @@ export async function getAdminPaymentSummary(enrollmentId: string) {
  * No synthetic rows until Stripe has produced at least one payment record.
  */
 export function expandAdminInstallments(summary: AdminPaymentSummary): AdminPaymentRow[] {
-	if (summary.payments.length === 0) return [];
+	const projection = computeInstallmentProjection({
+		installmentsPaid: summary.installmentsPaid,
+		installmentsTotal: summary.installmentsTotal,
+		totalAmountCents: summary.totalAmountCents,
+		collectedAmountCents: summary.collectedAmountCents,
+		nextInstallmentDueAt: summary.nextInstallmentDueAt
+			? new Date(summary.nextInstallmentDueAt)
+			: null,
+		currentPeriodEnd: summary.currentPeriodEnd ? new Date(summary.currentPeriodEnd) : null,
+		existingPaymentCount: summary.payments.length,
+	});
 
-	const total = summary.installmentsTotal ?? Math.max(summary.payments.length, 1);
-	const byNumber = new Map(summary.payments.map((p) => [p.installmentNumber, p]));
-	const remainingCents = Math.max(
-		0,
-		(summary.totalAmountCents ?? summary.collectedAmountCents) - summary.collectedAmountCents,
-	);
-	const remainingSlots = Math.max(0, total - summary.installmentsPaid);
-	const estimatedCents = remainingSlots > 0 ? Math.round(remainingCents / remainingSlots) : 0;
-
-	const rows: AdminPaymentRow[] = [];
-	let assignedNextDue = false;
-
-	for (let n = 1; n <= total; n++) {
-		const existing = byNumber.get(n);
-		if (existing) {
-			rows.push(existing);
-			if (existing.status !== 'paid' && existing.dueAt) assignedNextDue = true;
-			continue;
-		}
-
-		const dueAt =
-			!assignedNextDue && summary.nextInstallmentDueAt ? summary.nextInstallmentDueAt : null;
-		if (dueAt) assignedNextDue = true;
-
-		rows.push({
-			id: `estimated-${n}`,
-			installmentNumber: n,
+	return expandInstallmentRows({
+		payments: summary.payments,
+		projection,
+		createEstimated: (installmentNumber, estimatedCents, dueAt) => ({
+			id: `estimated-${installmentNumber}`,
+			installmentNumber,
 			amountLabel: formatMoney(estimatedCents),
 			status: 'open',
 			statusLabel: 'À venir',
 			failureReason: null,
-			dueAt,
+			dueAt: dueAt?.toISOString() ?? null,
 			paidAt: null,
 			stripeUrl: null,
 			stripeInvoiceId: null,
 			stripePaymentIntentId: null,
 			invoicePdfUrl: null,
 			hostedInvoiceUrl: null,
-		});
-	}
-
-	return rows;
+		}),
+	});
 }
 
 export { listPaidInvoiceLinks } from '../payments';

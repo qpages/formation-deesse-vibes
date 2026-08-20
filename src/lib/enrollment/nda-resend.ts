@@ -1,12 +1,12 @@
 import type { Enrollment } from '../../generated/prisma/client';
 import { isAwaitingNda } from '../enrollment-gates';
 import { getPrisma } from '../prisma';
-import { getSignaturePort } from '../signature/factory';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
 	resolveNdaProvider,
 } from '../signature/nda-request';
+import { resolveSignatureProviderForEnrollment } from '../signature/providers';
 import type { SignSurface } from '../signature/types';
 import { withUser, type EnrollmentWithUser } from './queries';
 
@@ -87,7 +87,7 @@ export async function resolveNdaSignSurface(
 	}
 
 	try {
-		return await getSignaturePort().getSignSurface({
+		return await resolveSignatureProviderForEnrollment(enrollment).getSignSurface({
 			requestId,
 			signerId,
 			email: enrollment.user.email,

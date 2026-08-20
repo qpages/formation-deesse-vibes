@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const invoicesRetrieve = vi.fn();
 const invoicesList = vi.fn();
+const invoicesCreatePreview = vi.fn();
 const paymentIntentsRetrieve = vi.fn();
 const sessionsRetrieve = vi.fn();
 
 vi.mock('stripe', () => ({
 	default: class {
-		invoices = { retrieve: invoicesRetrieve, list: invoicesList };
+		invoices = {
+			retrieve: invoicesRetrieve,
+			list: invoicesList,
+			createPreview: invoicesCreatePreview,
+		};
 		paymentIntents = { retrieve: paymentIntentsRetrieve };
 		checkout = { sessions: { retrieve: sessionsRetrieve } };
 		webhooks = {};
@@ -22,6 +27,7 @@ vi.mock('./env', () => ({
 vi.mock('./e2e-providers', () => ({ e2eMockProviders: () => false }));
 
 import {
+	createPreviewInvoice,
 	findInvoiceByPaymentIntent,
 	findInvoiceForPaidCheckout,
 	paymentIntentIdFromInvoice,
@@ -98,6 +104,30 @@ describe('findInvoiceByPaymentIntent', () => {
 
 		expect(invoicesList).toHaveBeenCalledWith({ customer: 'cus_1', limit: 20 });
 		expect(found).toEqual(invoice);
+	});
+});
+
+describe('createPreviewInvoice', () => {
+	it('utilise schedule seul quand un schedule est fourni', async () => {
+		invoicesCreatePreview.mockResolvedValue({ id: 'upcoming_in_1', period_end: 1_800_000_000 });
+
+		await createPreviewInvoice({
+			subscriptionId: 'sub_1',
+			scheduleId: 'sub_sched_1',
+		});
+
+		expect(invoicesCreatePreview).toHaveBeenCalledWith({ schedule: 'sub_sched_1' });
+		expect(invoicesCreatePreview).not.toHaveBeenCalledWith(
+			expect.objectContaining({ subscription: expect.anything() }),
+		);
+	});
+
+	it('utilise subscription seul sans schedule', async () => {
+		invoicesCreatePreview.mockResolvedValue({ id: 'upcoming_in_2', period_end: 1_800_000_000 });
+
+		await createPreviewInvoice({ subscriptionId: 'sub_1' });
+
+		expect(invoicesCreatePreview).toHaveBeenCalledWith({ subscription: 'sub_1' });
 	});
 });
 

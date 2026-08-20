@@ -14,16 +14,11 @@ import {
 	resolveNdaSignSurface,
 	type EnrollmentWithUser,
 } from '../enrollment';
-import {
-	confirmPaidCheckout,
-	ensureNdaAfterPayment,
-	listPaidInvoiceLinks,
-	retrieveCheckoutSession,
-} from '../payments';
+import { reconcileEnrollment } from '../enrollment/reconcile';
+import { getLearnerPaymentSchedule, type LearnerPaymentSchedule } from '../payments';
 import { notifyOps } from '../services/slack';
 import { checkoutSuccessFlash, stepStates } from '../status';
 import type { SignSurface } from '../signature/types';
-import { isNdaFullyProvisioned } from '../signature/helpers';
 import {
 	decideMagicLinkOutcome,
 	MAGIC_LINK_CONNECTED_FLASH,
@@ -40,7 +35,7 @@ export type HomeEnrollmentView = {
 	showTracking: boolean;
 	steps: ReturnType<typeof stepStates>;
 	ndaSignSurface: SignSurface | null;
-	invoiceLinks: Awaited<ReturnType<typeof listPaidInvoiceLinks>>;
+	paymentSchedule: LearnerPaymentSchedule | null;
 	magicLinkFailed: boolean;
 };
 
@@ -122,34 +117,42 @@ export async function resolveHomeEnrollment(input: {
 			}
 		}
 
-		// Filet : Stripe a encaissé mais le webhook a loupé
 		const checkoutToSync =
 			sessionId ??
 			(enrollment?.collectionStatus === 'pending' ? enrollment.stripeCheckoutSessionId : null);
-		if (checkoutToSync && (!enrollment || enrollment.collectionStatus === 'pending')) {
+
+		if (enrollment || checkoutToSync) {
 			try {
-				const stripeSession = await retrieveCheckoutSession(checkoutToSync);
-				const confirmed = await confirmPaidCheckout(stripeSession);
-				if (confirmed.ok) {
-					enrollment = await findEnrollmentById(confirmed.enrollmentId);
-					if (enrollment && !setCookie) {
-						setCookie = enrollmentCookieOptions(await createEnrollmentSessionToken(enrollment.id));
+				const reconciled = await reconcileEnrollment(
+					enrollment?.id,
+					{ source: 'page.home', sessionId: checkoutToSync },
+					'full',
+				);
+				if (reconciled.enrollmentId) {
+					const paymentConfirmed = reconciled.steps.some(
+						(s) =>
+							s.step === 'payment' &&
+							s.status === 'ok' &&
+							s.alreadyConfirmed === false,
+					);
+					if (!enrollment) {
+						enrollment = await findEnrollmentById(reconciled.enrollmentId);
+						if (enrollment) {
+							setCookie = enrollmentCookieOptions(
+								await createEnrollmentSessionToken(enrollment.id),
+							);
+						}
+					} else if (reconciled.mutated) {
+						enrollment = await findEnrollmentById(enrollment.id);
+					}
+					if (enrollment && !setCookie && paymentConfirmed) {
+						setCookie = enrollmentCookieOptions(
+							await createEnrollmentSessionToken(enrollment.id),
+						);
 					}
 				}
 			} catch (error) {
-				console.error('[index] checkout reconcile', error);
-			}
-		}
-
-		// Filet 2 : payé en DB, NDA jamais enqueue (ex. confirm avant ce fix)
-		if (enrollment && isAwaitingNda(enrollment) && !isNdaFullyProvisioned(enrollment)) {
-			try {
-				await ensureNdaAfterPayment(
-					enrollment.id,
-					enrollment.stripeCheckoutSessionId ?? `page-reconcile:${enrollment.id}`,
-				);
-			} catch (error) {
-				console.error('[index] nda reconcile', error);
+				console.error('[index] reconcile', error);
 			}
 		}
 
@@ -200,10 +203,10 @@ export async function resolveHomeEnrollment(input: {
 		}
 	}
 
-	const invoiceLinks =
+	const paymentSchedule =
 		enrollment && isPaidEnough(enrollment.collectionStatus)
-			? await listPaidInvoiceLinks(enrollment.id)
-			: [];
+			? await getLearnerPaymentSchedule(enrollment.id)
+			: null;
 
 	return {
 		kind: 'page',
@@ -217,7 +220,7 @@ export async function resolveHomeEnrollment(input: {
 			showTracking,
 			steps,
 			ndaSignSurface,
-			invoiceLinks,
+			paymentSchedule,
 			magicLinkFailed: link === 'invalid',
 		},
 	};

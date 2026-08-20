@@ -53,7 +53,7 @@ describe('persist DocuSeal embed', () => {
 		await persistNdaProvisioned('enr_1', {
 			requestId: 'sub_12',
 			signerId: '42',
-			signatureLink: 'https://docuseal.com/s/abc',
+			signatureLink: 'https://docuseal.eu/s/abc',
 		});
 
 		expect(upsert).toHaveBeenCalledWith(
@@ -61,7 +61,7 @@ describe('persist DocuSeal embed', () => {
 				create: expect.objectContaining({
 					provider: 'docuseal',
 					signKind: 'embed',
-					metadata: { embed_src: 'https://docuseal.com/s/abc' },
+					metadata: { embed_src: 'https://docuseal.eu/s/abc' },
 				}),
 			}),
 		);
@@ -79,7 +79,7 @@ describe('persist DocuSeal redirect', () => {
 		await persistNdaProvisioned('enr_1', {
 			requestId: 'sub_12',
 			signerId: '42',
-			signatureLink: 'https://docuseal.com/s/abc',
+			signatureLink: 'https://docuseal.eu/s/abc',
 		});
 
 		expect(upsert).toHaveBeenCalledWith(

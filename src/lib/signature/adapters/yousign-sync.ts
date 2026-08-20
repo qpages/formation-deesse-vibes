@@ -27,7 +27,15 @@ export async function syncYousignNda(
 		return { ok: false, reason: 'no_nda_request' };
 	}
 
-	const remote = await remoteFns.getSignatureRequest(requestId);
+	let remote: YousignSignatureRequest;
+	try {
+		remote = await remoteFns.getSignatureRequest(requestId);
+	} catch (error) {
+		const detail = formatErrorDetail(error);
+		await recordNdaError(enrollment.id, `lecture Yousign échouée — ${detail}`);
+		return { ok: false, reason: 'unmapped_status', detail };
+	}
+
 	const rawStatus = remote.status?.toLowerCase() ?? '';
 
 	if (rawStatus === 'draft') {

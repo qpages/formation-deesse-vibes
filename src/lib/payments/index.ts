@@ -31,10 +31,19 @@ export {
 export {
 	markSubscriptionScheduleCompleted,
 	syncAllSubscriptionInvoices,
+	syncEnrollmentSubscriptionDates,
+	syncSubscriptionScheduleState,
 	syncSubscriptionState,
 } from './subscription-sync';
 
 export { markEnrollmentRefunded } from './refund';
+
+export {
+	buildLearnerPaymentSchedule,
+	getLearnerPaymentSchedule,
+	type LearnerInstallment,
+	type LearnerPaymentSchedule,
+} from './learner-schedule';
 
 export { syncPaymentFromStripe } from './admin-sync';
 

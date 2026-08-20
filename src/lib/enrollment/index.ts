@@ -5,6 +5,15 @@ export {
 } from './access';
 
 export {
+	reconcileEnrollment,
+	type ReconcileResult,
+	type ReconcileScope,
+	type ReconcileStepResult,
+	type ReconcileTrigger,
+	type ReconcileTriggerSource,
+} from './reconcile';
+
+export {
 	attachStripeCheckoutSession,
 	createPendingEnrollment,
 	DuplicateEnrollmentError,

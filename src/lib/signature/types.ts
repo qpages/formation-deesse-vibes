@@ -48,17 +48,6 @@ export type SignatureCompletedEvent = {
 	occurredAt: Date;
 };
 
-export interface SignaturePort {
-	provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResult>;
-	getSignSurface(input: SignSurfaceInput): Promise<SignSurface | null>;
-	downloadSignedPdf(requestId: string): Promise<SignedDocument>;
-}
-
-export interface SignatureWebhookAdapter {
-	verify(rawBody: string, signatureHeader: string | null): boolean;
-	mapCompletedEvent(payload: unknown): SignatureCompletedEvent | null;
-}
-
 export type SyncNdaStatusResult =
 	| { ok: true; providerStatus: string; followUp: EnqueueResult }
 	| {
@@ -71,7 +60,14 @@ export type SyncNdaStatusResult =
 			detail?: string;
 	  };
 
-/** Provider-specific NDA status sync (admin / learner « j’ai signé »). */
-export interface SignatureOps {
-	sync(enrollmentId: string): Promise<SyncNdaStatusResult>;
+/** Port domaine NDA : provision, sync, surface, téléchargement, webhooks. */
+export interface SignatureProvider {
+	provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResult>;
+	syncStatus(enrollmentId: string): Promise<SyncNdaStatusResult>;
+	getSignSurface(input: SignSurfaceInput): Promise<SignSurface | null>;
+	downloadSignedPdf(requestId: string): Promise<SignedDocument>;
+	verify(rawBody: string, signatureHeader: string | null): boolean;
+	mapCompletedEvent(payload: unknown): SignatureCompletedEvent | null;
+	/** YouSign uniquement — renvoi / réactivation d’un lien expiré. */
+	reactivateNda?(requestId: string): Promise<unknown>;
 }

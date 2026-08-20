@@ -232,3 +232,90 @@ export async function getTeachizyCustomerByEmail(email: string): Promise<Teachiz
 export function isTeachizyConfigured(): boolean {
 	return Boolean(teachizyConfig().apiKey);
 }
+
+function resolveTrainingUuid(trainingUuid?: string): string {
+	return trainingUuid ?? requireEnv('TEACHIZY_TRAINING_UUID');
+}
+
+async function mutateTeachizyAccess(
+	path: '/externals/blocked-customers' | '/externals/unblocked-customers',
+	email: string,
+	trainingUuid: string,
+): Promise<void> {
+	const response = await teachizyFetch(path, {
+		method: 'POST',
+		body: JSON.stringify({
+			email,
+			training_uuids: [trainingUuid],
+		}),
+	});
+
+	if (!response.ok) {
+		const body = await readErrorBody(response);
+		throw new TeachizyApiError(response.status, body);
+	}
+}
+
+/**
+ * Bloque l’accès Teachizy à la formation cible (impayé, révocation).
+ * Idempotent : skip si déjà bloqué ou compte absent.
+ */
+export async function blockTeachizyCustomer(
+	email: string,
+	trainingUuid?: string,
+): Promise<'blocked' | 'already_blocked' | 'not_found'> {
+	requireEnv('TEACHIZY_API_KEY');
+	const uuid = resolveTrainingUuid(trainingUuid);
+
+	const customer = await getTeachizyCustomerByEmail(email);
+	if (!customer) {
+		console.log('[Teachizy] block skipped — customer not found', { email, trainingUuid: uuid });
+		return 'not_found';
+	}
+
+	const training = customer.trainings.find((row) => row.training.uuid === uuid);
+	if (!training) {
+		console.log('[Teachizy] block skipped — no training enrollment', { email, trainingUuid: uuid });
+		return 'not_found';
+	}
+	if (training.blocked_at || customer.status === 'DISABLED') {
+		console.log('[Teachizy] already blocked — skip', { email, trainingUuid: uuid });
+		return 'already_blocked';
+	}
+
+	console.log('[Teachizy] blocking customer', { email, trainingUuid: uuid });
+	await mutateTeachizyAccess('/externals/blocked-customers', email, uuid);
+	return 'blocked';
+}
+
+/**
+ * Débloque l’accès Teachizy après régularisation du paiement.
+ * Idempotent : skip si déjà actif ou compte absent.
+ */
+export async function unblockTeachizyCustomer(
+	email: string,
+	trainingUuid?: string,
+): Promise<'unblocked' | 'already_active' | 'not_found'> {
+	requireEnv('TEACHIZY_API_KEY');
+	const uuid = resolveTrainingUuid(trainingUuid);
+
+	const customer = await getTeachizyCustomerByEmail(email);
+	if (!customer) {
+		console.log('[Teachizy] unblock skipped — customer not found', { email, trainingUuid: uuid });
+		return 'not_found';
+	}
+
+	const training = customer.trainings.find((row) => row.training.uuid === uuid);
+	if (!training) {
+		console.log('[Teachizy] unblock skipped — no training enrollment', { email, trainingUuid: uuid });
+		return 'not_found';
+	}
+	if (!training.blocked_at && customer.status !== 'DISABLED') {
+		console.log('[Teachizy] already active — skip unblock', { email, trainingUuid: uuid });
+		return 'already_active';
+	}
+
+	console.log('[Teachizy] unblocking customer', { email, trainingUuid: uuid });
+	await mutateTeachizyAccess('/externals/unblocked-customers', email, uuid);
+	return 'unblocked';
+}

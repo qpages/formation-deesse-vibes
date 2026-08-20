@@ -5,10 +5,76 @@ import {
 	findEnrollmentByScheduleOrSubscription,
 	findEnrollmentBySubscriptionId,
 } from '../enrollment';
-import { listSubscriptionInvoices, retrieveSubscription } from '../stripe';
-import { syncStripeInvoice } from './invoice-sync';
+import {
+	createPreviewInvoice,
+	listSubscriptionInvoices,
+	retrieveSubscription,
+	retrieveSubscriptionSchedule,
+} from '../stripe';
+import { syncStripeInvoice, recomputeEnrollmentCollectionState } from './invoice-sync';
+import { extractSubscriptionDates } from './subscription-dates';
 import { stripeId } from './stripe-id';
 import { mapSubscriptionStatus } from './stripe-status';
+
+async function resolveScheduleId(
+	subscription: Stripe.Subscription,
+	enrollmentScheduleId?: string | null,
+): Promise<string | undefined> {
+	return (
+		stripeId(subscription.schedule) ??
+		enrollmentScheduleId ??
+		undefined
+	);
+}
+
+/** Sync dates Stripe (période, fin abo, preview) sur l’enrollment. */
+export async function syncEnrollmentSubscriptionDates(enrollmentId: string) {
+	const enrollment = await findEnrollmentById(enrollmentId);
+	if (!enrollment?.stripeSubscriptionId) {
+		return { ok: false as const, reason: 'no_subscription' };
+	}
+
+	const subscription = await retrieveSubscription(enrollment.stripeSubscriptionId);
+	const scheduleId = await resolveScheduleId(subscription, enrollment.stripeScheduleId);
+
+	let schedule: Stripe.SubscriptionSchedule | null = null;
+	if (scheduleId) {
+		try {
+			schedule = await retrieveSubscriptionSchedule(scheduleId);
+		} catch (error) {
+			console.warn('[payments] retrieve subscription schedule', scheduleId, error);
+		}
+	}
+
+	let previewInvoice: Stripe.Invoice | null = null;
+	if (subscription.status !== 'canceled' && subscription.status !== 'incomplete_expired') {
+		try {
+			previewInvoice = await createPreviewInvoice({
+				subscriptionId: subscription.id,
+				scheduleId: schedule?.id,
+			});
+		} catch (error) {
+			console.warn('[payments] preview invoice', subscription.id, error);
+		}
+	}
+
+	const dates = extractSubscriptionDates({ subscription, schedule, previewInvoice });
+
+	await getPrisma().enrollment.update({
+		where: { id: enrollmentId },
+		data: {
+			currentPeriodEnd: dates.currentPeriodEnd,
+			subscriptionEndsAt: dates.subscriptionEndsAt,
+			stripeScheduleEndBehavior: dates.stripeScheduleEndBehavior,
+			subscriptionStatus: mapSubscriptionStatus(subscription.status),
+			...(scheduleId ? { stripeScheduleId: scheduleId } : {}),
+		},
+	});
+
+	await recomputeEnrollmentCollectionState(enrollmentId, { previewDueAt: dates.previewDueAt });
+
+	return { ok: true as const, enrollmentId };
+}
 
 export async function syncSubscriptionState(subscription: Stripe.Subscription) {
 	const subscriptionId = subscription.id;
@@ -27,21 +93,31 @@ export async function syncSubscriptionState(subscription: Stripe.Subscription) {
 				subscriptionStatus: mapSubscriptionStatus(subscription.status),
 			},
 		});
+		await syncEnrollmentSubscriptionDates(byMeta.id);
 		return { ok: true as const, enrollmentId: byMeta.id };
 	}
 
-	const scheduleId =
-		typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id;
+	await syncEnrollmentSubscriptionDates(enrollment.id);
+	return { ok: true as const, enrollmentId: enrollment.id };
+}
 
-	await prisma.enrollment.update({
+export async function syncSubscriptionScheduleState(schedule: Stripe.SubscriptionSchedule) {
+	const subscriptionId = stripeId(schedule.subscription);
+	if (!subscriptionId) {
+		return { ok: false as const, reason: 'no_subscription' };
+	}
+
+	const enrollment = await findEnrollmentByScheduleOrSubscription(schedule.id, subscriptionId);
+	if (!enrollment) {
+		return { ok: false as const, reason: 'enrollment_not_found' };
+	}
+
+	await getPrisma().enrollment.update({
 		where: { id: enrollment.id },
-		data: {
-			subscriptionStatus: mapSubscriptionStatus(subscription.status),
-			...(scheduleId ? { stripeScheduleId: scheduleId } : {}),
-		},
+		data: { stripeScheduleId: schedule.id },
 	});
 
-	return { ok: true as const, enrollmentId: enrollment.id };
+	return syncEnrollmentSubscriptionDates(enrollment.id);
 }
 
 /**
@@ -55,7 +131,6 @@ export async function markSubscriptionScheduleCompleted(schedule: Stripe.Subscri
 		return { ok: false as const, reason: 'no_subscription' };
 	}
 
-	const prisma = getPrisma();
 	const enrollment = await findEnrollmentByScheduleOrSubscription(schedule.id, subscriptionId);
 
 	if (!enrollment) {
@@ -63,11 +138,15 @@ export async function markSubscriptionScheduleCompleted(schedule: Stripe.Subscri
 	}
 
 	const subscription = await retrieveSubscription(subscriptionId);
+	const dates = extractSubscriptionDates({ subscription, schedule });
 
-	await prisma.enrollment.update({
+	await getPrisma().enrollment.update({
 		where: { id: enrollment.id },
 		data: {
 			subscriptionStatus: mapSubscriptionStatus(subscription.status),
+			currentPeriodEnd: dates.currentPeriodEnd,
+			subscriptionEndsAt: dates.subscriptionEndsAt,
+			stripeScheduleEndBehavior: dates.stripeScheduleEndBehavior,
 			nextInstallmentDueAt: null,
 		},
 	});
@@ -86,8 +165,5 @@ export async function syncAllSubscriptionInvoices(enrollmentId: string) {
 		await syncStripeInvoice(invoice, { enrollmentId });
 	}
 
-	const subscription = await retrieveSubscription(enrollment.stripeSubscriptionId);
-	await syncSubscriptionState(subscription);
-
-	return { ok: true as const, enrollmentId };
+	return syncEnrollmentSubscriptionDates(enrollmentId);
 }

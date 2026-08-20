@@ -24,6 +24,7 @@ export type OpsKind =
 	| 'auth.magic_link_requested'
 	| 'auth.magic_link_consumed'
 	| 'nda.resend_requested'
+	| 'nda.copy_sent'
 	| 'ops.api_error'
 	| 'ops.reconcile_issues';
 

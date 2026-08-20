@@ -1,21 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { syncNdaStatus } = vi.hoisted(() => ({
-	syncNdaStatus: vi.fn(),
+const { reconcileEnrollment } = vi.hoisted(() => ({
+	reconcileEnrollment: vi.fn(),
 }));
 
-vi.mock('../signature/sync-nda', () => ({ syncNdaStatus }));
+vi.mock('../enrollment/reconcile', () => ({ reconcileEnrollment }));
 vi.mock('../enrollment', () => ({
 	canResendNda: vi.fn(),
 	findEnrollmentById: vi.fn(),
 }));
-vi.mock('../payments', () => ({ syncPaymentFromStripe: vi.fn() }));
 vi.mock('../services/teachizy-access', () => ({ syncTeachizyAccess: vi.fn() }));
 vi.mock('../services/slack', () => ({ notifyOps: vi.fn() }));
 vi.mock('../inngest/client', () => ({ sendInngestSafe: vi.fn() }));
-vi.mock('../signature/factory', () => ({ getSignaturePort: vi.fn() }));
+vi.mock('../signature/providers', () => ({ resolveSignatureProviderForEnrollment: vi.fn() }));
 
-import { getSignaturePort } from '../signature/factory';
+import { resolveSignatureProviderForEnrollment } from '../signature/providers';
 import { dispatchAdminAction } from './dispatch';
 
 const enrollment = { id: 'enr_1' } as Parameters<typeof dispatchAdminAction>[1];
@@ -25,16 +24,18 @@ beforeEach(() => {
 });
 
 describe('dispatchAdminAction sync NDA', () => {
-	it('sync_nda appelle syncNdaStatus', async () => {
-		syncNdaStatus.mockResolvedValue({
-			ok: true,
-			providerStatus: 'ongoing',
-			followUp: { status: 'skipped' },
+	it('sync_nda appelle reconcileEnrollment nda_signature', async () => {
+		reconcileEnrollment.mockResolvedValue({
+			enrollmentId: 'enr_1',
+			trigger: 'admin.sync_nda',
+			scope: 'nda_signature',
+			steps: [{ step: 'nda_signature', status: 'ok', signed: false }],
+			mutated: false,
 		});
 
 		const result = await dispatchAdminAction('sync_nda', enrollment);
 
-		expect(syncNdaStatus).toHaveBeenCalledWith('enr_1');
+		expect(reconcileEnrollment).toHaveBeenCalledWith('enr_1', 'admin.sync_nda', 'nda_signature');
 		expect(result).toEqual({ ok: true });
 	});
 });
@@ -59,12 +60,12 @@ describe('dispatchAdminAction copy_nda_link', () => {
 	});
 
 	it('copie le lien redirect', async () => {
-		vi.mocked(getSignaturePort).mockReturnValue({
+		vi.mocked(resolveSignatureProviderForEnrollment).mockReturnValue({
 			getSignSurface: vi.fn().mockResolvedValue({
 				kind: 'redirect',
 				url: 'https://sign.example',
 			}),
-		} as unknown as ReturnType<typeof getSignaturePort>);
+		} as unknown as ReturnType<typeof resolveSignatureProviderForEnrollment>);
 
 		const result = await dispatchAdminAction('copy_nda_link', {
 			...enrollment,

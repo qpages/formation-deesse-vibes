@@ -5,8 +5,8 @@ import {
 	verifyEnrollmentSessionToken,
 } from '../../../lib/auth/session';
 import { json } from '../../../lib/http';
+import { reconcileEnrollment } from '../../../lib/enrollment/reconcile';
 import { RATE_LIMITS, clientIp, enforceRateLimit, rateLimitKey } from '../../../lib/rate-limit';
-import { confirmLearnerNdaSignature } from '../../../lib/signature/nda-sync';
 
 export const prerender = false;
 
@@ -44,13 +44,20 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 		);
 		if (limited) return limited;
 
-		const result = await confirmLearnerNdaSignature(enrollmentId);
-		if (!result.ok) {
-			const mapped = ERROR_STATUS[result.reason];
-			return json({ error: mapped.message, reason: result.reason }, mapped.status);
+		const reconciled = await reconcileEnrollment(enrollmentId, 'client.nda_sync', 'nda_signature');
+		const ndaStep = reconciled.steps.find((s) => s.step === 'nda_signature');
+		if (!ndaStep || ndaStep.step !== 'nda_signature') {
+			return json({ error: 'Échec de la vérification de signature.' }, 500);
+		}
+		if (ndaStep.status === 'failed') {
+			const mapped = ERROR_STATUS[ndaStep.reason as keyof typeof ERROR_STATUS];
+			if (mapped) {
+				return json({ error: mapped.message, reason: ndaStep.reason }, mapped.status);
+			}
+			return json({ error: 'Échec de la vérification de signature.' }, 500);
 		}
 
-		if (!result.signed) {
+		if (!ndaStep.signed) {
 			return json({
 				ok: true,
 				signed: false,

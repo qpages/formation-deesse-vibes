@@ -1,10 +1,11 @@
+import type { EnqueueResult } from '../inngest/client';
 import { isAwaitingNda } from '../enrollment-gates';
 import { findEnrollmentById } from '../enrollment/queries';
 import { syncNdaStatus } from './sync-nda';
 
 export type ConfirmLearnerNdaSignatureResult =
-	| { ok: true; signed: true }
-	| { ok: true; signed: false }
+	| { ok: true; signed: true; followUp: EnqueueResult }
+	| { ok: true; signed: false; followUp?: EnqueueResult }
 	| {
 			ok: false;
 			reason: 'enrollment_not_found' | 'not_awaiting' | 'no_nda_request' | 'provider_error';
@@ -24,7 +25,7 @@ export async function confirmLearnerNdaSignature(
 	}
 
 	if (enrollment.contractStatus === 'signed') {
-		return { ok: true, signed: true };
+		return { ok: true, signed: true, followUp: { status: 'skipped' } };
 	}
 
 	if (!isAwaitingNda(enrollment)) {
@@ -40,5 +41,33 @@ export async function confirmLearnerNdaSignature(
 		};
 	}
 
-	return { ok: true, signed: result.providerStatus === 'done' };
+	const updated = await findEnrollmentById(enrollmentId);
+	const signed = updated?.contractStatus === 'signed';
+
+	if (signed) {
+		return { ok: true, signed: true, followUp: result.followUp };
+	}
+
+	return { ok: true, signed: false, followUp: result.followUp };
+}
+
+/**
+ * Webhook completion : même chemin que l’élève, mais retry si le provider
+ * n’a pas encore propagé la signature ou si l’enqueue Teachizy a échoué.
+ */
+export async function confirmLearnerNdaSignatureFromWebhook(
+	enrollmentId: string,
+): Promise<{ enrollmentId: string }> {
+	const result = await confirmLearnerNdaSignature(enrollmentId);
+	if (!result.ok) {
+		const detail = result.detail ? `: ${result.detail}` : '';
+		throw new Error(`NDA sync échoué (${result.reason})${detail}`);
+	}
+	if (!result.signed) {
+		throw new Error('Signature pas encore visible chez le provider — retry');
+	}
+	if (result.followUp.status === 'failed') {
+		throw new Error(`Enqueue Teachizy échoué: ${result.followUp.error}`);
+	}
+	return { enrollmentId };
 }

@@ -1,10 +1,9 @@
 import { decryptPayload } from '../crypto';
-import { ensureTeachizyAfterSignature } from '../signature/after-signature';
 import { eventOccurredAt } from '../signature/event-time';
-import { formatNdaSignedTitle } from '../signature/format-nda-signed-title';
-import { yousignAdapter } from '../signature/adapters/yousign';
+import { findEnrollmentByExternalRequestOrEnrollmentId } from '../enrollment/queries';
+import { confirmLearnerNdaSignatureFromWebhook } from '../signature/nda-sync';
 import { persistNdaSyncMirror } from '../signature/persist';
-import { findEnrollmentByExternalRequestOrEnrollmentId } from '../enrollment';
+import { resolveSignatureProvider } from '../signature/providers';
 import { contractStatusFromYousignRequest, yousignStatusFromEvent } from '../status';
 import { notifyOps } from './slack';
 
@@ -108,7 +107,7 @@ export async function handleYousignProviderEvent(input: {
 	}
 
 	if (eventName === 'signature_request.done') {
-		const completed = yousignAdapter.mapCompletedEvent(payload);
+		const completed = resolveSignatureProvider('yousign').mapCompletedEvent(payload);
 		if (!completed) throw new Error('signature_request.done sans request id');
 
 		const enrollment = await findEnrollmentByExternalRequestOrEnrollmentId(
@@ -120,37 +119,7 @@ export async function handleYousignProviderEvent(input: {
 			throw new Error(`Enrollment introuvable pour Yousign ${completed.requestId}`);
 		}
 
-		const becameSigned = enrollment.contractStatus !== 'signed';
-		const at = completed.occurredAt;
-
-		await persistNdaSyncMirror(enrollment.id, {
-			contractStatus: 'signed',
-			providerStatus: 'done',
-			ndaSignedAt: enrollment.ndaSignedAt ?? at,
-		});
-
-		// Slack avant Teachizy : la notif signature ne dépend pas de l'invite.
-		if (becameSigned) {
-			await notifyOps({
-				kind: 'nda.signed',
-				severity: 'info',
-				title: formatNdaSignedTitle(enrollment.user.firstName, enrollment.user.lastName, at),
-				enrollmentId: enrollment.id,
-				email: enrollment.user.email,
-			});
-		}
-
-		// Webhook = chemin « dur » : une file HS doit rejeter pour être rejouée.
-		const followUp = await ensureTeachizyAfterSignature(
-			enrollment.id,
-			input.providerEventId,
-			completed.requestId,
-		);
-		if (followUp.status === 'failed') {
-			throw new Error(`Enqueue Teachizy échoué: ${followUp.error}`);
-		}
-
-		return { enrollmentId: enrollment.id };
+		return confirmLearnerNdaSignatureFromWebhook(enrollment.id);
 	}
 
 	if (MONITOR_EVENTS.has(eventName)) {

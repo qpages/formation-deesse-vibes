@@ -1,7 +1,7 @@
 import { findEnrollmentById } from '../enrollment/queries';
 import { json } from '../http';
-import { getSignaturePort } from './factory';
 import { resolveExternalRequestId } from './nda-request';
+import { resolveSignatureProviderForEnrollment } from './providers';
 
 export type SignedNdaFailureReason =
 	'enrollment_not_found' | 'not_signed' | 'no_nda_request' | 'provider_error';
@@ -44,7 +44,9 @@ export async function getSignedNdaPdf(enrollmentId: string): Promise<SignedNdaRe
 	}
 
 	try {
-		const file = await getSignaturePort().downloadSignedPdf(requestId);
+		const file = await resolveSignatureProviderForEnrollment(enrollment).downloadSignedPdf(
+			requestId,
+		);
 		return {
 			ok: true,
 			bytes: file.bytes,

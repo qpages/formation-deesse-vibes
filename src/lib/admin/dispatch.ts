@@ -1,16 +1,15 @@
 import type { EnrollmentWithUser } from '../enrollment';
 import { sendInngestSafe } from '../inngest/client';
 import { canResendNda, findEnrollmentById } from '../enrollment';
-import { syncPaymentFromStripe } from '../payments';
+import { reconcileEnrollment } from '../enrollment/reconcile';
 import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncTeachizyAccess } from '../services/teachizy-access';
-import { syncNdaStatus } from '../signature/sync-nda';
-import { getSignaturePort } from '../signature/factory';
 import {
 	resolveExternalRequestId,
 	resolveExternalSignerId,
 	resolveSignKind,
 } from '../signature/nda-request';
+import { resolveSignatureProviderForEnrollment } from '../signature/providers';
 import type { SignSurface } from '../signature/types';
 import { ADMIN_ACTIONS, adminActionExecution, type AdminActionKey } from './actions';
 
@@ -33,24 +32,28 @@ const ADMIN_NOTIFY_SEVERITY: Partial<Record<AdminActionKey, OpsSeverity>> = {
 };
 
 async function runSyncNda(enrollment: EnrollmentWithUser): Promise<AdminDispatchResult> {
-	const result = await syncNdaStatus(enrollment.id);
-	if (!result.ok) {
+	const result = await reconcileEnrollment(enrollment.id, 'admin.sync_nda', 'nda_signature');
+	const ndaStep = result.steps.find((s) => s.step === 'nda_signature');
+	if (!ndaStep || ndaStep.step !== 'nda_signature') {
+		return { ok: false, error: 'Synchronisation NDA incomplète.', status: 500 };
+	}
+	if (ndaStep.status === 'failed') {
 		const messages: Record<string, string> = {
 			enrollment_not_found: 'Inscription introuvable.',
 			no_nda_request: 'Aucune demande de signature NDA associée.',
-			draft_not_activated:
-				'Demande en brouillon (draft), jamais activée — aucun e-mail envoyé. Recréez le lien de signature.',
-			unmapped_status: result.detail
-				? `Statut provider inconnu : ${result.detail}`
-				: 'Statut provider inconnu.',
+			not_awaiting: 'Le contrat n’est pas en attente de signature.',
+			provider_error: 'Impossible de lire le statut chez le provider.',
 		};
 		return {
 			ok: false,
-			error: messages[result.reason] ?? result.reason,
+			error: messages[ndaStep.reason ?? ''] ?? ndaStep.reason ?? 'Synchronisation NDA échouée.',
 			status: 400,
 		};
 	}
-	if (result.followUp.status === 'failed') {
+	if (ndaStep.status === 'skipped') {
+		return { ok: true, toast: 'info', message: 'Rien à synchroniser côté NDA.' };
+	}
+	if (ndaStep.followUpFailed) {
 		return {
 			ok: true,
 			toast: 'info',
@@ -66,19 +69,40 @@ const handlers = {
 	// L'enqueue de l'étape suivante est best-effort : une file HS => succès dégradé.
 
 	async sync_payment(enrollment) {
-		const result = await syncPaymentFromStripe(enrollment.id);
-		if (!result.ok) {
-			const messages: Record<string, string> = {
-				no_checkout_session: 'Aucune session Stripe associée.',
-				enrollment_not_found: 'Inscription introuvable.',
-			};
-			return {
-				ok: false,
-				error: `Paiement non confirmable : ${messages[result.reason] ?? result.reason}`,
-				status: 400,
-			};
+		const payment = await reconcileEnrollment(enrollment.id, 'admin.sync_payment', 'payment');
+		const paymentStep = payment.steps.find((s) => s.step === 'payment');
+		if (paymentStep?.step === 'payment') {
+			if (paymentStep.status === 'failed') {
+				const messages: Record<string, string> = {
+					enrollment_not_found: 'Inscription introuvable.',
+					no_checkout_session: 'Aucune session Stripe associée.',
+					no_enrollment_id: 'Session Stripe sans inscription.',
+				};
+				return {
+					ok: false,
+					error: `Paiement non confirmable : ${messages[paymentStep.reason ?? ''] ?? paymentStep.reason ?? 'échec'}`,
+					status: 400,
+				};
+			}
+			if (
+				paymentStep.status === 'skipped' &&
+				(paymentStep.reason === 'no_checkout_session' ||
+					paymentStep.reason?.startsWith('payment_status'))
+			) {
+				const messages: Record<string, string> = {
+					no_checkout_session: 'Aucune session Stripe associée.',
+				};
+				return {
+					ok: false,
+					error: `Paiement non confirmable : ${messages[paymentStep.reason ?? ''] ?? paymentStep.reason}`,
+					status: 400,
+				};
+			}
 		}
-		if (result.ndaEnqueue?.status === 'failed') {
+
+		const nda = await reconcileEnrollment(enrollment.id, 'admin.sync_payment', 'nda_provision');
+		const ndaStep = nda.steps.find((s) => s.step === 'nda_provision');
+		if (ndaStep?.step === 'nda_provision' && ndaStep.status === 'failed') {
 			return {
 				ok: true,
 				toast: 'info',
@@ -200,7 +224,9 @@ const handlers = {
 				status: 400,
 			};
 		}
-		const surface: SignSurface | null = await getSignaturePort().getSignSurface({
+		const surface: SignSurface | null = await resolveSignatureProviderForEnrollment(
+			enrollment,
+		).getSignSurface({
 			requestId,
 			signerId,
 		});

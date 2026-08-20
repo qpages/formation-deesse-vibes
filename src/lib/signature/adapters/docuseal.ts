@@ -8,15 +8,20 @@ import type {
 	ProvisionNdaInput,
 	ProvisionNdaResult,
 	SignatureCompletedEvent,
-	SignatureOps,
-	SignaturePort,
-	SignatureWebhookAdapter,
+	SignatureProvider,
 	SignedDocument,
 	SignSurface,
 	SignSurfaceInput,
 } from '../types';
 import { syncDocusealNda } from './docuseal-sync';
 import type { DocusealWebhookPayload } from './docuseal-types';
+
+export type DocusealSubmissionEvent = {
+	id?: number;
+	submitter_id?: number;
+	event_type: string;
+	event_timestamp: string;
+};
 
 export type DocusealSubmitter = {
 	id: number;
@@ -26,6 +31,7 @@ export type DocusealSubmitter = {
 	slug?: string;
 	status?: string;
 	completed_at?: string | null;
+	submission_events?: DocusealSubmissionEvent[];
 };
 
 export type DocusealSubmission = {
@@ -82,8 +88,17 @@ function templateId(): number {
 	return id;
 }
 
+function docusealSigningHost(): string {
+	const apiBase = getEnv().DOCUSEAL_API_BASE;
+	if (apiBase.includes('.com')) return 'https://docuseal.com';
+	return 'https://docuseal.eu';
+}
+
+/** POST /submissions returns embed_src; GET often omits it but includes slug. */
 function submitterSigningUrl(submitter: DocusealSubmitter): string | undefined {
-	return submitter.embed_src;
+	if (submitter.embed_src) return submitter.embed_src;
+	if (submitter.slug) return `${docusealSigningHost()}/s/${submitter.slug}`;
+	return undefined;
 }
 
 async function createSubmission(input: {
@@ -125,7 +140,55 @@ async function createSubmission(input: {
 }
 
 async function getSubmission(requestId: string): Promise<DocusealSubmission> {
+	if (e2eMockProviders()) {
+		const completed = requestId.startsWith('e2e-completed-');
+		return {
+			id: 1,
+			status: completed ? 'completed' : 'pending',
+			completed_at: completed ? new Date().toISOString() : null,
+			submitters: [
+				{
+					id: 1,
+					submission_id: 1,
+					email: 'e2e@example.test',
+					slug: 'e2e-mock-slug',
+				},
+			],
+		};
+	}
 	return docusealFetch<DocusealSubmission>(`/submissions/${requestId}`);
+}
+
+async function getSubmitter(signerId: string): Promise<DocusealSubmitter> {
+	if (e2eMockProviders()) {
+		return {
+			id: Number(signerId.replace(/\D/g, '')) || 1,
+			submission_id: 1,
+			email: 'e2e@example.test',
+			slug: `e2e-slug-${signerId}`,
+			status: 'completed',
+			completed_at: new Date().toISOString(),
+		};
+	}
+	return docusealFetch<DocusealSubmitter>(`/submitters/${signerId}`);
+}
+
+/** Submission submitters often omit embed_src; GET /submitters/{id} is the reliable fallback. */
+async function resolveSigningUrl(
+	submission: DocusealSubmission,
+	signerId: string,
+): Promise<{ url?: string; submitter: DocusealSubmitter }> {
+	const fromSubmission =
+		submission.submitters?.find((s) => String(s.id) === signerId) ??
+		submission.submitters?.[0];
+
+	const urlFromSubmission = fromSubmission ? submitterSigningUrl(fromSubmission) : undefined;
+	if (urlFromSubmission && fromSubmission) {
+		return { url: urlFromSubmission, submitter: fromSubmission };
+	}
+
+	const remote = await getSubmitter(signerId);
+	return { url: submitterSigningUrl(remote), submitter: remote };
 }
 
 function verifyDocusealSignature(rawBody: string, signatureHeader: string | null): boolean {
@@ -200,19 +263,34 @@ async function provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResul
 		throw new Error('DocuSeal: signataire introuvable sur la soumission');
 	}
 
+	const { url, submitter: resolved } = await resolveSigningUrl(
+		submission,
+		String(submitter.id),
+	);
+
 	return {
 		requestId: String(submission.id),
-		signerId: String(submitter.id),
-		signatureLink: submitterSigningUrl(submitter),
+		signerId: String(resolved.id),
+		signatureLink: url,
 	};
 }
 
 async function getSignSurface(input: SignSurfaceInput): Promise<SignSurface | null> {
+	if (e2eMockProviders()) {
+		const url = `https://docuseal.eu/s/e2e-${encodeURIComponent(input.requestId)}`;
+		if (input.requestId.startsWith('e2e-redirect-')) {
+			return { kind: 'redirect', url };
+		}
+		const { mode } = resolveSignatureConfig();
+		if (mode === 'redirect') {
+			return { kind: 'redirect', url };
+		}
+		if (!input.email) return null;
+		return { kind: 'embed', src: url, email: input.email };
+	}
+
 	const submission = await getSubmission(input.requestId);
-	const submitter =
-		submission.submitters?.find((s) => String(s.id) === input.signerId) ??
-		submission.submitters?.[0];
-	const url = submitter ? submitterSigningUrl(submitter) : undefined;
+	const { url } = await resolveSigningUrl(submission, input.signerId);
 	if (!url) return null;
 
 	const { mode } = resolveSignatureConfig();
@@ -241,11 +319,10 @@ async function downloadSignedPdf(requestId: string): Promise<SignedDocument> {
 	return docusealFetchBinary(url);
 }
 
-export type DocusealAdapter = SignaturePort &
-	SignatureWebhookAdapter &
-	SignatureOps & {
-		getSubmission(requestId: string): Promise<DocusealSubmission>;
-	};
+export type DocusealAdapter = SignatureProvider & {
+	getSubmission(requestId: string): Promise<DocusealSubmission>;
+	getSubmitter(signerId: string): Promise<DocusealSubmitter>;
+};
 
 export const docusealAdapter: DocusealAdapter = {
 	provisionNda,
@@ -254,5 +331,6 @@ export const docusealAdapter: DocusealAdapter = {
 	verify: verifyDocusealSignature,
 	mapCompletedEvent: mapDocusealCompletedEvent,
 	getSubmission,
-	sync: (enrollmentId) => syncDocusealNda(enrollmentId, { getSubmission }),
+	getSubmitter,
+	syncStatus: (enrollmentId) => syncDocusealNda(enrollmentId, { getSubmission }),
 };

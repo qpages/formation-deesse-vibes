@@ -62,7 +62,7 @@ export function paymentProgressLabel(input: {
 	installmentsTotal: number | null;
 }): string {
 	const total = input.installmentsTotal ?? 1;
-	return `${input.installmentsPaid}/${total} échéance${total > 1 ? 's' : ''}`;
+	return `${input.installmentsPaid}/${total}`;
 }
 
 export function paymentSummaryLine(input: {
@@ -72,8 +72,14 @@ export function paymentSummaryLine(input: {
 	totalAmountCents: number | null;
 	currency?: string;
 }): string {
-	const progress = paymentProgressLabel(input);
+	const totalInstallments = input.installmentsTotal ?? 1;
 	const collected = formatMoney(input.collectedAmountCents, input.currency ?? 'eur');
+
+	if (totalInstallments <= 1) {
+		return collected;
+	}
+
+	const progress = paymentProgressLabel(input);
 	if (input.totalAmountCents) {
 		const total = formatMoney(input.totalAmountCents, input.currency ?? 'eur');
 		return `${progress} · ${collected} / ${total}`;

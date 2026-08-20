@@ -6,8 +6,8 @@ const { findEnrollmentById, downloadSignedPdf } = vi.hoisted(() => ({
 }));
 
 vi.mock('../enrollment/queries', () => ({ findEnrollmentById }));
-vi.mock('./factory', () => ({
-	getSignaturePort: () => ({ downloadSignedPdf }),
+vi.mock('./providers', () => ({
+	resolveSignatureProviderForEnrollment: () => ({ downloadSignedPdf }),
 }));
 
 import { getSignedNdaPdf, toSignedNdaResponse } from './nda-download';

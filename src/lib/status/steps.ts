@@ -1,4 +1,5 @@
 import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
+import { resolveSignatureCheckoutFlashCopy } from '../signature/helpers';
 import type { SignSurface } from '../signature/types';
 import {
 	ACCESS_STATUS_LABELS,
@@ -152,10 +153,10 @@ export function checkoutSuccessFlash(input: OrthogonalStatuses): string | null {
 		return 'Paiement en cours de confirmation. Cette page se met à jour automatiquement.';
 	}
 	if (input.contractStatus === 'sent') {
-		return 'Paiement reçu. Signez votre contrat de confidentialité pour continuer.';
+		return resolveSignatureCheckoutFlashCopy('sent');
 	}
 	if (input.contractStatus === 'pending') {
-		return 'Paiement reçu. Nous préparons votre contrat de confidentialité.';
+		return resolveSignatureCheckoutFlashCopy('pending');
 	}
 	return null;
 }

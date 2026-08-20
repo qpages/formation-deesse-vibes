@@ -4,7 +4,7 @@ import {
 	synthesizeDocusealProviderEventId,
 	type DocusealWebhookPayload,
 } from '../../../lib/services/docuseal-events';
-import { docusealAdapter } from '../../../lib/signature/adapters/docuseal';
+import { resolveSignatureProvider } from '../../../lib/signature/providers';
 import { acknowledgeProviderEvent } from '../../../lib/webhooks/acknowledge-provider-event';
 
 /**
@@ -14,7 +14,7 @@ export const POST: APIRoute = async ({ request }) => {
 	const rawBody = await request.text();
 	const signature = request.headers.get('x-docuseal-signature');
 
-	if (!docusealAdapter.verify(rawBody, signature)) {
+	if (!resolveSignatureProvider('docuseal').verify(rawBody, signature)) {
 		return new Response('Invalid signature', { status: 400 });
 	}
 

@@ -9,9 +9,7 @@ import type {
 	ProvisionNdaInput,
 	ProvisionNdaResult,
 	SignatureCompletedEvent,
-	SignatureOps,
-	SignaturePort,
-	SignatureWebhookAdapter,
+	SignatureProvider,
 	SignedDocument,
 	SignSurface,
 	SignSurfaceInput,
@@ -237,21 +235,19 @@ async function downloadSignedPdf(requestId: string): Promise<SignedDocument> {
 	);
 }
 
-async function sync(enrollmentId: string): Promise<SyncNdaStatusResult> {
+async function syncStatus(enrollmentId: string): Promise<SyncNdaStatusResult> {
 	return syncYousignNda(enrollmentId, {
 		getSignatureRequest,
 		getSigner,
 	});
 }
 
-/** YouSign-specific ops (sync, reactivate) — IDs résolus via nda_requests. */
-export type YouSignAdapter = SignaturePort &
-	SignatureWebhookAdapter &
-	SignatureOps & {
-		getSignatureRequest(requestId: string): Promise<YousignSignatureRequest>;
-		getSigner(requestId: string, signerId: string): Promise<YousignSigner>;
-		reactivateNda(requestId: string): Promise<YousignSignatureRequest>;
-	};
+/** YouSign-specific — IDs résolus via nda_requests. */
+export type YouSignAdapter = SignatureProvider & {
+	getSignatureRequest(requestId: string): Promise<YousignSignatureRequest>;
+	getSigner(requestId: string, signerId: string): Promise<YousignSigner>;
+	reactivateNda(requestId: string): Promise<YousignSignatureRequest>;
+};
 
 export const yousignAdapter: YouSignAdapter = {
 	provisionNda,
@@ -259,7 +255,7 @@ export const yousignAdapter: YouSignAdapter = {
 	downloadSignedPdf,
 	verify: verifyYousignSignature,
 	mapCompletedEvent,
-	sync,
+	syncStatus,
 	getSignatureRequest,
 	getSigner,
 	reactivateNda: (requestId: string) =>

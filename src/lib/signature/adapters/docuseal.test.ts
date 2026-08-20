@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../env', () => ({
 	getEnv: vi.fn(() => ({
-		DOCUSEAL_API_BASE: 'https://api.docuseal.com',
+		DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
 		SIGNATURE_PROVIDER: 'docuseal',
 	})),
 	requireEnv: (key: string) => {
@@ -87,7 +87,7 @@ describe('DocuSeal adapter', () => {
 
 	it('createSubmission embed envoie send_email false', async () => {
 		vi.mocked(getEnv).mockReturnValue({
-			DOCUSEAL_API_BASE: 'https://api.docuseal.com',
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
 			SIGNATURE_PROVIDER: 'docuseal',
 		} as ReturnType<typeof getEnv>);
 
@@ -98,7 +98,7 @@ describe('DocuSeal adapter', () => {
 						id: 42,
 						submission_id: 12,
 						email: 'a@b.c',
-						embed_src: 'https://docuseal.com/s/abc',
+						embed_src: 'https://docuseal.eu/s/abc',
 					},
 				]),
 				{ status: 200 },
@@ -121,7 +121,7 @@ describe('DocuSeal adapter', () => {
 
 	it('createSubmission redirect envoie send_email true', async () => {
 		vi.mocked(getEnv).mockReturnValue({
-			DOCUSEAL_API_BASE: 'https://api.docuseal.com',
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
 			SIGNATURE_PROVIDER: 'docuseal',
 			SIGNATURE_MODE: 'redirect',
 		} as ReturnType<typeof getEnv>);
@@ -133,7 +133,7 @@ describe('DocuSeal adapter', () => {
 						id: 42,
 						submission_id: 12,
 						email: 'a@b.c',
-						embed_src: 'https://docuseal.com/s/abc',
+						embed_src: 'https://docuseal.eu/s/abc',
 					},
 				]),
 				{ status: 200 },
@@ -156,7 +156,7 @@ describe('DocuSeal adapter', () => {
 
 	it('getSignSurface redirect retourne url', async () => {
 		vi.mocked(getEnv).mockReturnValue({
-			DOCUSEAL_API_BASE: 'https://api.docuseal.com',
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
 			SIGNATURE_PROVIDER: 'docuseal',
 			SIGNATURE_MODE: 'redirect',
 		} as ReturnType<typeof getEnv>);
@@ -166,7 +166,7 @@ describe('DocuSeal adapter', () => {
 				JSON.stringify({
 					id: 12,
 					status: 'pending',
-					submitters: [{ id: 42, embed_src: 'https://docuseal.com/s/abc' }],
+					submitters: [{ id: 42, embed_src: 'https://docuseal.eu/s/abc' }],
 				}),
 				{ status: 200 },
 			),
@@ -177,12 +177,188 @@ describe('DocuSeal adapter', () => {
 			signerId: '42',
 		});
 
-		expect(surface).toEqual({ kind: 'redirect', url: 'https://docuseal.com/s/abc' });
+		expect(surface).toEqual({ kind: 'redirect', url: 'https://docuseal.eu/s/abc' });
+	});
+
+	it('getSignSurface embed retombe sur slug si embed_src absent', async () => {
+		vi.mocked(getEnv).mockReturnValue({
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
+			SIGNATURE_PROVIDER: 'docuseal',
+		} as ReturnType<typeof getEnv>);
+
+		vi.mocked(fetch).mockResolvedValueOnce(
+			new Response(
+				JSON.stringify({
+					id: 1497165,
+					status: 'pending',
+					submitters: [{ id: 1857088, slug: 'NLp5rn3W8tEtnj' }],
+				}),
+				{ status: 200 },
+			),
+		);
+
+		const surface = await docusealAdapter.getSignSurface({
+			requestId: '1497165',
+			signerId: '1857088',
+			email: 'a@b.c',
+		});
+
+		expect(surface).toEqual({
+			kind: 'embed',
+			src: 'https://docuseal.eu/s/NLp5rn3W8tEtnj',
+			email: 'a@b.c',
+		});
+		expect(fetch).toHaveBeenCalledTimes(1);
+	});
+
+	it('getSignSurface interroge GET /submitters/{id} si la soumission n’a ni embed_src ni slug', async () => {
+		vi.mocked(getEnv).mockReturnValue({
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
+			SIGNATURE_PROVIDER: 'docuseal',
+		} as ReturnType<typeof getEnv>);
+
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						id: 1497165,
+						status: 'pending',
+						submitters: [{ id: 1857088, email: 'a@b.c' }],
+					}),
+					{ status: 200 },
+				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						id: 1857088,
+						submission_id: 1497165,
+						slug: 'NLp5rn3W8tEtnj',
+					}),
+					{ status: 200 },
+				),
+			);
+
+		const surface = await docusealAdapter.getSignSurface({
+			requestId: '1497165',
+			signerId: '1857088',
+			email: 'a@b.c',
+		});
+
+		expect(surface).toEqual({
+			kind: 'embed',
+			src: 'https://docuseal.eu/s/NLp5rn3W8tEtnj',
+			email: 'a@b.c',
+		});
+		expect(fetch).toHaveBeenCalledTimes(2);
+		expect(String(vi.mocked(fetch).mock.calls[1]?.[0])).toContain('/submitters/1857088');
+	});
+
+	it('getSignSurface retourne null si aucune URL après fallback submitter', async () => {
+		vi.mocked(getEnv).mockReturnValue({
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
+			SIGNATURE_PROVIDER: 'docuseal',
+		} as ReturnType<typeof getEnv>);
+
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						id: 12,
+						status: 'pending',
+						submitters: [{ id: 42, email: 'a@b.c' }],
+					}),
+					{ status: 200 },
+				),
+			)
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ id: 42, submission_id: 12, email: 'a@b.c' }), {
+					status: 200,
+				}),
+			);
+
+		const surface = await docusealAdapter.getSignSurface({
+			requestId: '12',
+			signerId: '42',
+			email: 'a@b.c',
+		});
+
+		expect(surface).toBeNull();
+	});
+
+	it('provisionNda activate retombe sur slug si embed_src absent', async () => {
+		vi.mocked(getEnv).mockReturnValue({
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
+			SIGNATURE_PROVIDER: 'docuseal',
+		} as ReturnType<typeof getEnv>);
+
+		vi.mocked(fetch).mockResolvedValueOnce(
+			new Response(
+				JSON.stringify({
+					id: 1497165,
+					status: 'pending',
+					submitters: [{ id: 1857088, slug: 'NLp5rn3W8tEtnj' }],
+				}),
+				{ status: 200 },
+			),
+		);
+
+		const result = await docusealAdapter.provisionNda({
+			step: 'activate',
+			requestId: '1497165',
+		});
+
+		expect(result).toEqual({
+			requestId: '1497165',
+			signerId: '1857088',
+			signatureLink: 'https://docuseal.eu/s/NLp5rn3W8tEtnj',
+		});
+	});
+
+	it('provisionNda activate interroge GET /submitters/{id} si la soumission n’a ni embed_src ni slug', async () => {
+		vi.mocked(getEnv).mockReturnValue({
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
+			SIGNATURE_PROVIDER: 'docuseal',
+		} as ReturnType<typeof getEnv>);
+
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						id: 1497165,
+						status: 'pending',
+						submitters: [{ id: 1857088, email: 'a@b.c' }],
+					}),
+					{ status: 200 },
+				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						id: 1857088,
+						submission_id: 1497165,
+						slug: 'NLp5rn3W8tEtnj',
+					}),
+					{ status: 200 },
+				),
+			);
+
+		const result = await docusealAdapter.provisionNda({
+			step: 'activate',
+			requestId: '1497165',
+		});
+
+		expect(result).toEqual({
+			requestId: '1497165',
+			signerId: '1857088',
+			signatureLink: 'https://docuseal.eu/s/NLp5rn3W8tEtnj',
+		});
+		expect(fetch).toHaveBeenCalledTimes(2);
 	});
 
 	it('getSignSurface embed retourne src + email', async () => {
 		vi.mocked(getEnv).mockReturnValue({
-			DOCUSEAL_API_BASE: 'https://api.docuseal.com',
+			DOCUSEAL_API_BASE: 'https://api.docuseal.eu',
 			SIGNATURE_PROVIDER: 'docuseal',
 		} as ReturnType<typeof getEnv>);
 
@@ -191,7 +367,7 @@ describe('DocuSeal adapter', () => {
 				JSON.stringify({
 					id: 12,
 					status: 'pending',
-					submitters: [{ id: 42, embed_src: 'https://docuseal.com/s/abc' }],
+					submitters: [{ id: 42, embed_src: 'https://docuseal.eu/s/abc' }],
 				}),
 				{ status: 200 },
 			),
@@ -205,7 +381,7 @@ describe('DocuSeal adapter', () => {
 
 		expect(surface).toEqual({
 			kind: 'embed',
-			src: 'https://docuseal.com/s/abc',
+			src: 'https://docuseal.eu/s/abc',
 			email: 'a@b.c',
 		});
 	});
