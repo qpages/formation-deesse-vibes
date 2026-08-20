@@ -129,6 +129,12 @@ model Enrollment {
   fullyPaidAt          DateTime?
   nextInstallmentDueAt DateTime?
   subscriptionStatus   SubscriptionStatus?
+  /// Fin de période de facturation courante (min items[].current_period_end).
+  currentPeriodEnd     DateTime?
+  /// Fin prévue de l’abonnement (dernière phase du schedule ou cancel_at).
+  subscriptionEndsAt   DateTime?
+  /// Comportement du schedule à la fin (cancel | release).
+  stripeScheduleEndBehavior String?
 
   stripeCheckoutSessionId String? @unique
   stripePaymentIntentId   String? @unique
