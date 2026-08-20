@@ -64,7 +64,7 @@ describe('dispatchAdminAction copy_nda_link', () => {
 				kind: 'redirect',
 				url: 'https://sign.example',
 			}),
-		} as ReturnType<typeof getSignaturePort>);
+		} as unknown as ReturnType<typeof getSignaturePort>);
 
 		const result = await dispatchAdminAction('copy_nda_link', {
 			...enrollment,

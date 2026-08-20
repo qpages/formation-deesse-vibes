@@ -70,7 +70,10 @@ describe('persist DocuSeal embed', () => {
 
 describe('persist DocuSeal redirect', () => {
 	it('persistNdaProvisioned redirect sans metadata embed_src', async () => {
-		getEnv.mockReturnValue({ SIGNATURE_PROVIDER: 'docuseal', SIGNATURE_MODE: 'redirect' });
+		getEnv.mockReturnValue({
+			SIGNATURE_PROVIDER: 'docuseal',
+			SIGNATURE_MODE: 'redirect',
+		} as ReturnType<typeof getEnv>);
 		const { upsert } = mockTransaction();
 
 		await persistNdaProvisioned('enr_1', {

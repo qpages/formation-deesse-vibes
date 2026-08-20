@@ -4,6 +4,7 @@ import type {
 	CollectionStatus,
 	ContractStatus,
 	Enrollment,
+	NdaRequest,
 } from '../../generated/prisma/client';
 import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
 import {
@@ -162,12 +163,7 @@ type VisibilityInput = Pick<
 	Enrollment,
 	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'stripeCheckoutSessionId'
 > & {
-	ndaRequest?: {
-		provider: 'yousign' | 'docuseal';
-		externalRequestId: string;
-		externalSignerId: string | null;
-		signKind?: 'embed' | 'redirect';
-	} | null;
+	ndaRequest?: Pick<NdaRequest, 'provider' | 'externalRequestId' | 'externalSignerId' | 'signKind'> | null;
 };
 
 /** Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.). */
