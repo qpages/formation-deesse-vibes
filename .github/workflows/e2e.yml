@@ -50,7 +50,7 @@ jobs:
       ADMIN_EMAIL: admin@deesse-vibes.com
       ADMIN_PASSWORD: e2e-admin-password
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
