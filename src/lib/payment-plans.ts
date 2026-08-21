@@ -82,16 +82,12 @@ export function formatMoney(cents: number, currency = 'eur'): string {
 	}).format(cents / 100);
 }
 
-function formatCompactMoney(cents: number, currency = 'eur'): string {
-	return formatMoney(cents, currency).replace(/\s+€/, '€');
-}
-
 /** Libellé court du plan échelonné (espace apprenant, admin). */
 export function installmentPlanSummary(plan: PaymentPlan): string {
 	if (plan.installments <= 1) return 'Paiement unique';
 	const total = formatMoney(plan.totalAmountCents);
-	const installment = formatCompactMoney(plan.installmentAmountCents);
-	return `Paiement de ${total} en ${plan.installments} mensualités de ${installment} €`;
+	const installment = formatMoney(plan.installmentAmountCents);
+	return `Paiement de ${total} en ${plan.installments} mensualités de ${installment}`;
 }
 
 /** Message Stripe Checkout sous le bouton de paiement (abonnement échelonné). */

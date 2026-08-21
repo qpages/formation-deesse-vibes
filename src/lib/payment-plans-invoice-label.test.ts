@@ -9,7 +9,7 @@ import {
 describe('installmentPlanSummary', () => {
 	test('plan échelonné avec montant total', () => {
 		expect(installmentPlanSummary(PAYMENT_PLANS.x4)).toBe(
-			'Paiement de 1 999,00 € en 4 mensualités de 499,75 €',
+			'Paiement de 1\u202f999,00\u00a0€ en 4 mensualités de 499,75\u00a0€',
 		);
 	});
 
@@ -21,7 +21,7 @@ describe('installmentPlanSummary', () => {
 describe('installmentCheckoutMessage', () => {
 	test('inclut le total, le nombre de fois et l’arrêt automatique', () => {
 		expect(installmentCheckoutMessage(PAYMENT_PLANS.x4)).toBe(
-			"Paiement de 1 999,00 € en 4 mensualités de 499,75 €. Arrêt automatique de l'abonnement à l'issue de la dernière échéance.",
+			"Paiement de 1\u202f999,00\u00a0€ en 4 mensualités de 499,75\u00a0€. Arrêt automatique de l'abonnement à l'issue de la dernière échéance.",
 		);
 	});
 });
