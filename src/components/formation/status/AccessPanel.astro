@@ -212,6 +212,7 @@ const showContratSection = canDownloadNda || showNdaSendCopy;
 }
 
 <script
+	is:inline
 	define:vars={{
 		funnelFlash,
 		trackingFlash,
@@ -261,14 +262,12 @@ const showContratSection = canDownloadNda || showNdaSendCopy;
 	if (funnelFlash || trackingFlash || checkoutCancel) {
 		showPageToasts();
 	}
+</script>
 
-	const url = new URL(window.location.href);
-	if (url.searchParams.has('connected') || url.searchParams.has('link')) {
-		url.searchParams.delete('connected');
-		url.searchParams.delete('link');
-		const next = `${url.pathname}${url.search}${url.hash}`;
-		window.history.replaceState({}, '', next);
-	}
+<script>
+	import { cleanEnrollmentQueryParams } from '../../../lib/client/enrollment-status-client';
+
+	cleanEnrollmentQueryParams();
 </script>
 
 <script>

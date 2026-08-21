@@ -85,8 +85,6 @@ export async function seedEnrollment(input: {
 	contractStatus?: 'pending' | 'sent' | 'signed';
 	accessStatus?: 'not_eligible' | 'pending' | 'active';
 	stripeCheckoutSessionId?: string | null;
-	/** @deprecated préférer nda */
-	externalRequestId?: string | null;
 	nda?: {
 		provider?: SignatureProvider;
 		signKind?: SignKind;
@@ -123,13 +121,13 @@ export async function seedEnrollment(input: {
 		include: { user: true },
 	});
 
-	if (input.nda ?? input.externalRequestId) {
+	if (input.nda) {
 		await seedNdaRequest(enrollment.id, {
-			externalRequestId: input.nda?.externalRequestId ?? input.externalRequestId ?? undefined,
-			provider: input.nda?.provider,
-			signKind: input.nda?.signKind,
-			externalSignerId: input.nda?.externalSignerId,
-			metadata: input.nda?.metadata,
+			externalRequestId: input.nda.externalRequestId,
+			provider: input.nda.provider,
+			signKind: input.nda.signKind,
+			externalSignerId: input.nda.externalSignerId,
+			metadata: input.nda.metadata,
 		});
 	}
 

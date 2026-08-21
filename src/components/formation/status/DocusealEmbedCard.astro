@@ -25,20 +25,18 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 
 	<div id="nda-docuseal-actions" class="space-y-3">
 		<p id="nda-docuseal-message" class="text-ink-soft text-sm">
-			Signez directement ci-dessus. Cette page se met à jour automatiquement après signature.
+			Signez directement ci-dessus : la page se met à jour automatiquement après signature. En cas
+			de retard, cliquez sur Actualiser pour forcer la vérification.
 		</p>
 		<Button
 			id="nda-docuseal-refresh"
 			type="button"
 			size="md"
-			variant="secondary"
+			variant="primary"
 			class="w-full whitespace-nowrap sm:w-auto"
 		>
 			Actualiser
 		</Button>
-		<p id="nda-docuseal-refresh-hint" class="text-ink-soft text-xs">
-			En cas de retard, utilisez Actualiser pour forcer la vérification.
-		</p>
 		<p id="nda-docuseal-refresh-feedback" class="text-ink-soft text-sm" aria-live="polite" />
 	</div>
 </div>
@@ -46,10 +44,8 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 <script is:inline src={`${cdnBase}/js/form.js`}></script>
 <script>
 	import { lockButton } from '../../../lib/client/lock-button';
-	import {
-		reloadAfterNdaSigned,
-		syncNdaSignature as postNdaSync,
-	} from '../../../lib/client/nda-sync';
+	import { refreshEnrollmentAfterNdaSigned } from '../../../lib/client/enrollment-status-client';
+	import { requestNdaSignatureRefresh } from '../../../lib/client/refresh-nda-signature';
 
 	const formArea = document.getElementById('nda-docuseal-form-area');
 	const form = document.getElementById('nda-docuseal-form');
@@ -62,14 +58,24 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 		'already been submitted',
 		'already submitted',
 		'form has already been submitted',
+		'document signé',
+		'document signed',
+		'signed successfully',
+		'signature complete',
+		'signature completed',
+		'merci pour votre signature',
+		'thank you for signing',
 	];
 
 	const PENDING_MESSAGE = 'Signature détectée. Mise à jour en cours…';
 	const FALLBACK_MESSAGE =
 		'Signature détectée. Si la page ne se met pas à jour sous quelques secondes, cliquez sur Actualiser.';
+	const SYNC_RETRY_INTERVAL_MS = 5_000;
+	const SYNC_RETRY_MAX_MS = 120_000;
 
 	let pendingSync = false;
-	let autoSyncAttempted = false;
+	let syncRetryTimer: ReturnType<typeof setInterval> | undefined;
+	let syncRetryStartedAt = 0;
 
 	function isCompletedDetail(detail: unknown): boolean {
 		if (!detail || typeof detail !== 'object') return false;
@@ -85,8 +91,21 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 		return Boolean(data.completed_at ?? submission?.completed_at);
 	}
 
+	function collectVisibleText(root: ParentNode): string {
+		const parts: string[] = [];
+		const gather = (node: ParentNode) => {
+			parts.push((node as HTMLElement).textContent?.toLowerCase() ?? '');
+			if (node instanceof Element) {
+				if (node.shadowRoot) gather(node.shadowRoot);
+				for (const child of node.children) gather(child);
+			}
+		};
+		gather(root);
+		return parts.join(' ');
+	}
+
 	function textIndicatesSubmitted(root: ParentNode): boolean {
-		const text = (root as HTMLElement).textContent?.toLowerCase() ?? '';
+		const text = collectVisibleText(root);
 		return SUBMITTED_MARKERS.some((marker) => text.includes(marker));
 	}
 
@@ -97,30 +116,50 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 		if (message) message.textContent = PENDING_MESSAGE;
 	}
 
-	async function syncNdaSignature(): Promise<boolean> {
-		const result = await postNdaSync();
+	async function refreshNdaSignature(): Promise<boolean> {
+		const result = await requestNdaSignatureRefresh();
 		if (result.signed) {
-			reloadAfterNdaSigned();
+			await refreshEnrollmentAfterNdaSigned();
 			return true;
 		}
 		if (refreshFeedback) refreshFeedback.textContent = result.message;
 		return false;
 	}
 
-	async function attemptAutoSyncOnce() {
-		if (autoSyncAttempted) return;
-		autoSyncAttempted = true;
-		try {
-			const synced = await syncNdaSignature();
-			if (!synced && message) message.textContent = FALLBACK_MESSAGE;
-		} catch {
-			if (message) message.textContent = FALLBACK_MESSAGE;
+	function stopSyncRetries() {
+		if (syncRetryTimer !== undefined) {
+			clearInterval(syncRetryTimer);
+			syncRetryTimer = undefined;
 		}
+	}
+
+	async function attemptSyncRetry() {
+		if (Date.now() - syncRetryStartedAt >= SYNC_RETRY_MAX_MS) {
+			stopSyncRetries();
+			if (message) message.textContent = FALLBACK_MESSAGE;
+			return;
+		}
+		try {
+			const synced = await refreshNdaSignature();
+			if (synced) {
+				stopSyncRetries();
+				return;
+			}
+		} catch {
+			// keep retrying until timeout
+		}
+	}
+
+	function startSyncRetries() {
+		stopSyncRetries();
+		syncRetryStartedAt = Date.now();
+		void attemptSyncRetry();
+		syncRetryTimer = setInterval(() => void attemptSyncRetry(), SYNC_RETRY_INTERVAL_MS);
 	}
 
 	function onSignatureDetected() {
 		showPendingSync();
-		void attemptAutoSyncOnce();
+		startSyncRetries();
 	}
 
 	function observeSubmittedState() {
@@ -137,8 +176,6 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 		const observer = new MutationObserver(check);
 		observer.observe(form, { childList: true, subtree: true, characterData: true });
 		check();
-
-		window.setTimeout(() => observer.disconnect(), 30_000);
 	}
 
 	form?.addEventListener('load', (event) => {
@@ -147,7 +184,12 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 		}
 	});
 
-	form?.addEventListener('completed', () => {
+	form?.addEventListener('completed', (event) => {
+		const detail = (event as CustomEvent).detail;
+		if (detail != null && typeof detail === 'object' && !isCompletedDetail(detail)) {
+			const status = String((detail as Record<string, unknown>).status ?? '').toLowerCase();
+			if (status && status !== 'completed') return;
+		}
 		onSignatureDetected();
 		if (typeof window.toast === 'function') {
 			window.toast('Signature envoyée. Mise à jour en cours…', 'success');
@@ -160,7 +202,7 @@ const cdnBase = apiBase.includes('.com') ? 'https://cdn.docuseal.com' : 'https:/
 		if (!lock.locked) return;
 		if (refreshFeedback) refreshFeedback.textContent = '';
 		try {
-			await syncNdaSignature();
+			await refreshNdaSignature();
 		} catch {
 			if (refreshFeedback) {
 				refreshFeedback.textContent =

@@ -224,6 +224,25 @@ Dashboard Inngest : http://localhost:8288
 | Yousign | `POST /api/webhooks/yousign` |
 | Inngest | `GET/POST /api/inngest` |
 
+> ⚠️ **L'URL webhook DOIT inclure le chemin complet.** Une URL sans chemin
+> (ex. `https://xxxx.ngrok-free.dev`) POST à la racine → le handler n'est jamais
+> atteint → **0 run Inngest** sur signature/paiement (cause du symptôme « il faut
+> actualiser »). Config exacte à renseigner côté provider :
+>
+> - **DocuSeal** → URL `https://<host>/api/webhooks/docuseal`. Événements à cocher :
+>   `form.completed` (mono-signataire) **et/ou** `submission.completed`. Signature
+>   HMAC : onglet Security → HMAC, copier le `whsec_…` dans `DOCUSEAL_WEBHOOK_SECRET`
+>   (header `X-Docuseal-Signature`, format `timestamp.signature`). `form.viewed`/
+>   `form.started` sont ignorés côté app (200 no-op), inutile de les retirer.
+> - **Stripe** → endpoint `https://<host>/api/webhooks/stripe`, événements :
+>   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+>   `invoice.*`, `customer.subscription.*`, `subscription_schedule.*`,
+>   `charge.refunded`, `charge.dispute.created`. Secret `whsec_…` → `STRIPE_WEBHOOK_SECRET`.
+>
+> Filet sans webhook : le polling client rejoue `reconcileEnrollment` via
+> `POST /api/enrollment/reconcile`, donc la page avance même si un webhook manque —
+> mais configurez quand même les webhooks pour les effets serveur (accès Teachizy).
+
 ## Consoles
 
 | Outil | URL / notes |

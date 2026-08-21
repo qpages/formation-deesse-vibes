@@ -198,7 +198,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 			collectionStatus: 'paid',
 			contractStatus: 'signed',
 			accessStatus: 'active',
-			externalRequestId: crypto.randomUUID(),
+			nda: { externalRequestId: crypto.randomUUID() },
 		});
 		const signedCookie = await enrollmentCookie(signed.id);
 		const pdf = await request.get('/api/enrollment/nda', {
@@ -223,7 +223,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 			collectionStatus: 'paid',
 			contractStatus: 'signed',
 			accessStatus: 'active',
-			externalRequestId: crypto.randomUUID(),
+			nda: { externalRequestId: crypto.randomUUID() },
 		});
 		await context.addCookies([await enrollmentCookie(signed.id)]);
 		await page.goto('/');
