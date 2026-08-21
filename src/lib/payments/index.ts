@@ -1,8 +1,4 @@
-export {
-	hydrateInvoiceUrls,
-	listPaidInvoiceLinks,
-	type PaidInvoiceLink,
-} from './invoice-links';
+export { hydrateInvoiceUrls, listPaidInvoiceLinks, type PaidInvoiceLink } from './invoice-links';
 
 export { ensureNdaAfterPayment } from './nda-trigger';
 
@@ -23,10 +19,7 @@ export {
 
 export { mapSubscriptionStatus } from './stripe-status';
 
-export {
-	recomputeEnrollmentCollectionState,
-	syncStripeInvoice,
-} from './invoice-sync';
+export { recomputeEnrollmentCollectionState, syncStripeInvoice } from './invoice-sync';
 
 export {
 	markSubscriptionScheduleCompleted,

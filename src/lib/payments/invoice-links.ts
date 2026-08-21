@@ -2,11 +2,7 @@ import type Stripe from 'stripe';
 import type { Payment } from '../../generated/prisma/client';
 import { paidInvoiceLabel } from '../payment-plans';
 import { getPrisma } from '../prisma';
-import {
-	findInvoiceByPaymentIntent,
-	paymentIntentIdFromInvoice,
-	retrieveInvoice,
-} from '../stripe';
+import { findInvoiceByPaymentIntent, paymentIntentIdFromInvoice, retrieveInvoice } from '../stripe';
 
 export type PaidInvoiceLink = {
 	installmentNumber: number;

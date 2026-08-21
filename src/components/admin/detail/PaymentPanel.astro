@@ -123,9 +123,7 @@ const summaryClass = [
 		<span class="text-ink/25 mx-1.5">·</span>
 		<span class="text-ink-soft">{installmentSummary}</span>
 		{showNextDue ? <span class="text-ink-soft"> · prochain {nextDue}</span> : null}
-		{showSubscriptionEnd ? (
-			<span class="text-ink-soft"> · fin abo {subscriptionEnd}</span>
-		) : null}
+		{showSubscriptionEnd ? <span class="text-ink-soft"> · fin abo {subscriptionEnd}</span> : null}
 	</p>
 
 	{

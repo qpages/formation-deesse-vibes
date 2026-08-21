@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { enrollmentUpdate, sendInngestSafe, findEnrollmentForAccessPolicy } =
-	vi.hoisted(() => ({
-		enrollmentUpdate: vi.fn(),
-		sendInngestSafe: vi.fn(),
-		findEnrollmentForAccessPolicy: vi.fn(),
-	}));
+const { enrollmentUpdate, sendInngestSafe, findEnrollmentForAccessPolicy } = vi.hoisted(() => ({
+	enrollmentUpdate: vi.fn(),
+	sendInngestSafe: vi.fn(),
+	findEnrollmentForAccessPolicy: vi.fn(),
+}));
 
 vi.mock('../prisma', () => ({
 	getPrisma: () => ({
@@ -120,9 +119,7 @@ describe('applyAccessPolicy', () => {
 	});
 
 	it('active → suspended (contrat manquant) n’émet pas suspend impayé', async () => {
-		findEnrollmentForAccessPolicy.mockResolvedValue(
-			baseEnrollment({ contractStatus: 'pending' }),
-		);
+		findEnrollmentForAccessPolicy.mockResolvedValue(baseEnrollment({ contractStatus: 'pending' }));
 
 		const result = await applyAccessPolicy('enr_1');
 

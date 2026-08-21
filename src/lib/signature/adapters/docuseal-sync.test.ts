@@ -17,7 +17,10 @@ const {
 vi.mock('../../enrollment/queries', () => ({ findEnrollmentById }));
 vi.mock('../after-signature', () => ({ ensureTeachizyAfterSignature }));
 vi.mock('../persist', () => ({ persistNdaSyncMirror, recordNdaError }));
-vi.mock('../../services/slack', () => ({ formatErrorDetail: (e: unknown) => String(e), notifyOps }));
+vi.mock('../../services/slack', () => ({
+	formatErrorDetail: (e: unknown) => String(e),
+	notifyOps,
+}));
 
 import { syncDocusealNda } from './docuseal-sync';
 
@@ -48,9 +51,7 @@ describe('syncDocusealNda', () => {
 			submitters: [{ id: 42, status: 'completed', completed_at: '2024-06-01T10:00:00.000Z' }],
 		});
 
-		await expect(
-			syncDocusealNda('enr_1', { getSubmission }),
-		).resolves.toEqual({
+		await expect(syncDocusealNda('enr_1', { getSubmission })).resolves.toEqual({
 			ok: true,
 			providerStatus: 'completed',
 			followUp: { status: 'enqueued' },
@@ -79,9 +80,7 @@ describe('syncDocusealNda', () => {
 		});
 		const getSubmitter = vi.fn();
 
-		await expect(
-			syncDocusealNda('enr_1', { getSubmission, getSubmitter }),
-		).resolves.toEqual({
+		await expect(syncDocusealNda('enr_1', { getSubmission, getSubmitter })).resolves.toEqual({
 			ok: true,
 			providerStatus: 'awaiting',
 			followUp: { status: 'enqueued' },
@@ -125,9 +124,7 @@ describe('syncDocusealNda', () => {
 			submitters: [{ id: 42, status: 'awaiting' }],
 		});
 
-		await expect(
-			syncDocusealNda('enr_1', { getSubmission }),
-		).resolves.toEqual({
+		await expect(syncDocusealNda('enr_1', { getSubmission })).resolves.toEqual({
 			ok: true,
 			providerStatus: 'pending',
 			followUp: { status: 'skipped' },

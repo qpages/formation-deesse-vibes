@@ -163,7 +163,10 @@ type VisibilityInput = Pick<
 	Enrollment,
 	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'stripeCheckoutSessionId'
 > & {
-	ndaRequest?: Pick<NdaRequest, 'provider' | 'externalRequestId' | 'externalSignerId' | 'signKind'> | null;
+	ndaRequest?: Pick<
+		NdaRequest,
+		'provider' | 'externalRequestId' | 'externalSignerId' | 'signKind'
+	> | null;
 };
 
 /** Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.). */

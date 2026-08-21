@@ -32,10 +32,18 @@ vi.mock('../../../lib/signature/docuseal-send-copy', async (importOriginal) => {
 vi.mock('../../../lib/signature/adapters/docuseal', () => ({
 	docusealAdapter: { getSubmitter: docusealGetSubmitter },
 }));
-vi.mock('../../../lib/services/slack', () => ({ notifyOps, formatErrorDetail: (e: unknown) => String(e) }));
+vi.mock('../../../lib/services/slack', () => ({
+	notifyOps,
+	formatErrorDetail: (e: unknown) => String(e),
+}));
 
 import { POST } from './nda-send-copy';
-import { RATE_LIMITS, enforceRateLimit, rateLimitKey, resetRateLimitStoreForTests } from '../../../lib/rate-limit';
+import {
+	RATE_LIMITS,
+	enforceRateLimit,
+	rateLimitKey,
+	resetRateLimitStoreForTests,
+} from '../../../lib/rate-limit';
 
 function signedEmbedEnrollment(overrides: Record<string, unknown> = {}) {
 	return {
@@ -133,9 +141,7 @@ describe('POST /api/enrollment/nda-send-copy', () => {
 	it('contrat pas signé → 409', async () => {
 		parseCookie.mockReturnValue('valid');
 		verifyEnrollmentSessionToken.mockResolvedValue('enr_1');
-		findEnrollmentById.mockResolvedValue(
-			signedEmbedEnrollment({ contractStatus: 'sent' }),
-		);
+		findEnrollmentById.mockResolvedValue(signedEmbedEnrollment({ contractStatus: 'sent' }));
 
 		const res = await postNdaSendCopy('valid');
 		expect(res.status).toBe(409);

@@ -5,52 +5,53 @@ const optionalUrl = z
 	.optional()
 	.or(z.literal('').transform(() => undefined));
 
-const serverSchema = z.object({
-	STRIPE_SECRET_KEY: z.string().optional(),
-	STRIPE_WEBHOOK_SECRET: z.string().optional(),
-	STRIPE_PRICE_ID: z.string().default('price_1TzdF3L7BRlbDDBVihIiFWwp'),
-	STRIPE_PRICE_UNIQUE: z.string().optional(),
-	STRIPE_PRICE_X2: z.string().optional(),
-	STRIPE_PRICE_X4: z.string().optional(),
-	STRIPE_PRICE_X6: z.string().optional(),
-	YOUSIGN_API_KEY: z.string().optional(),
-	YOUSIGN_TEMPLATE_ID: z.string().optional(),
-	YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
-	YOUSIGN_API_BASE: z.url().default('https://api-sandbox.yousign.app/v3'),
-	YOUSIGN_SIGNER_LABEL: z.string().default('signer'),
-	SIGNATURE_PROVIDER: z.enum(['yousign', 'docuseal']).default('yousign'),
-	SIGNATURE_MODE: z.enum(['embed', 'redirect']).optional(),
-	DOCUSEAL_API_KEY: z.string().optional(),
-	DOCUSEAL_WEBHOOK_SECRET: z.string().optional(),
-	DOCUSEAL_TEMPLATE_ID: z.string().optional(),
-	DOCUSEAL_API_BASE: z.url().default('https://api.docuseal.eu'),
-	BREVO_API_KEY: z.string().optional(),
-	BREVO_FROM: z.string().default('formation@deesse-vibes.com'),
-	MAGIC_LINK_SECRET: z.string().min(32).optional(),
-	SESSION_SECRET: z.string().min(32).optional(),
-	PAYLOAD_ENCRYPTION_KEY: z.string().min(32).optional(),
-	INNGEST_DEV: z.string().optional(),
-	INNGEST_EVENT_KEY: z.string().optional(),
-	INNGEST_SIGNING_KEY: z.string().optional(),
-	TEACHIZY_API_KEY: z.string().optional(),
-	TEACHIZY_API_BASE: z.url().default('https://api.teachizy.fr/api/v1'),
-	TEACHIZY_TRAINING_UUID: z.string().optional(),
-	SLACK_WEBHOOK_URL: optionalUrl,
-	ADMIN_EMAIL: z.email().default('admin@deesse-vibes.com'),
-	ADMIN_PASSWORD: z.string().min(1).default(''),
-	PUBLIC_SITE_URL: z.url().default('http://localhost:4321'),
-	PUBLIC_ADMIN_CONTACT_EMAIL: z.preprocess(
-		(value) => (value === '' || value === undefined || value === null ? undefined : value),
-		z.email().default('contact@deesse-vibes.com'),
-	),
-	PUBLIC_WHATSAPP_NUMBER: z.preprocess(
-		(value) => (value === '' || value === undefined || value === null ? undefined : value),
-		z
-			.string()
-			.regex(/^\d+$/, 'PUBLIC_WHATSAPP_NUMBER must be digits only (e.g. 33612345678)')
-			.optional(),
-	),
-})
+const serverSchema = z
+	.object({
+		STRIPE_SECRET_KEY: z.string().optional(),
+		STRIPE_WEBHOOK_SECRET: z.string().optional(),
+		STRIPE_PRICE_ID: z.string().default('price_1TzdF3L7BRlbDDBVihIiFWwp'),
+		STRIPE_PRICE_UNIQUE: z.string().optional(),
+		STRIPE_PRICE_X2: z.string().optional(),
+		STRIPE_PRICE_X4: z.string().optional(),
+		STRIPE_PRICE_X6: z.string().optional(),
+		YOUSIGN_API_KEY: z.string().optional(),
+		YOUSIGN_TEMPLATE_ID: z.string().optional(),
+		YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
+		YOUSIGN_API_BASE: z.url().default('https://api-sandbox.yousign.app/v3'),
+		YOUSIGN_SIGNER_LABEL: z.string().default('signer'),
+		SIGNATURE_PROVIDER: z.enum(['yousign', 'docuseal']).default('yousign'),
+		SIGNATURE_MODE: z.enum(['embed', 'redirect']).optional(),
+		DOCUSEAL_API_KEY: z.string().optional(),
+		DOCUSEAL_WEBHOOK_SECRET: z.string().optional(),
+		DOCUSEAL_TEMPLATE_ID: z.string().optional(),
+		DOCUSEAL_API_BASE: z.url().default('https://api.docuseal.eu'),
+		BREVO_API_KEY: z.string().optional(),
+		BREVO_FROM: z.string().default('formation@deesse-vibes.com'),
+		MAGIC_LINK_SECRET: z.string().min(32).optional(),
+		SESSION_SECRET: z.string().min(32).optional(),
+		PAYLOAD_ENCRYPTION_KEY: z.string().min(32).optional(),
+		INNGEST_DEV: z.string().optional(),
+		INNGEST_EVENT_KEY: z.string().optional(),
+		INNGEST_SIGNING_KEY: z.string().optional(),
+		TEACHIZY_API_KEY: z.string().optional(),
+		TEACHIZY_API_BASE: z.url().default('https://api.teachizy.fr/api/v1'),
+		TEACHIZY_TRAINING_UUID: z.string().optional(),
+		SLACK_WEBHOOK_URL: optionalUrl,
+		ADMIN_EMAIL: z.email().default('admin@deesse-vibes.com'),
+		ADMIN_PASSWORD: z.string().min(1).default(''),
+		PUBLIC_SITE_URL: z.url().default('http://localhost:4321'),
+		PUBLIC_ADMIN_CONTACT_EMAIL: z.preprocess(
+			(value) => (value === '' || value === undefined || value === null ? undefined : value),
+			z.email().default('contact@deesse-vibes.com'),
+		),
+		PUBLIC_WHATSAPP_NUMBER: z.preprocess(
+			(value) => (value === '' || value === undefined || value === null ? undefined : value),
+			z
+				.string()
+				.regex(/^\d+$/, 'PUBLIC_WHATSAPP_NUMBER must be digits only (e.g. 33612345678)')
+				.optional(),
+		),
+	})
 	.superRefine((data, ctx) => {
 		if (data.SIGNATURE_PROVIDER === 'yousign' && data.SIGNATURE_MODE === 'embed') {
 			ctx.addIssue({
@@ -110,8 +111,7 @@ export function getEnv(): ServerEnv {
 		DOCUSEAL_API_KEY: import.meta.env.DOCUSEAL_API_KEY ?? runtimeEnv.DOCUSEAL_API_KEY,
 		DOCUSEAL_WEBHOOK_SECRET:
 			import.meta.env.DOCUSEAL_WEBHOOK_SECRET ?? runtimeEnv.DOCUSEAL_WEBHOOK_SECRET,
-		DOCUSEAL_TEMPLATE_ID:
-			import.meta.env.DOCUSEAL_TEMPLATE_ID ?? runtimeEnv.DOCUSEAL_TEMPLATE_ID,
+		DOCUSEAL_TEMPLATE_ID: import.meta.env.DOCUSEAL_TEMPLATE_ID ?? runtimeEnv.DOCUSEAL_TEMPLATE_ID,
 		DOCUSEAL_API_BASE: import.meta.env.DOCUSEAL_API_BASE ?? runtimeEnv.DOCUSEAL_API_BASE,
 		BREVO_API_KEY: import.meta.env.BREVO_API_KEY ?? runtimeEnv.BREVO_API_KEY,
 		BREVO_FROM: import.meta.env.BREVO_FROM ?? runtimeEnv.BREVO_FROM,

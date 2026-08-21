@@ -84,10 +84,6 @@ describe('syncYousignNda', () => {
 
 		await syncYousignNda('enr_1', remoteFns);
 
-		expect(ensureTeachizyAfterSignature).toHaveBeenCalledWith(
-			'enr_1',
-			'sync-nda:enr_1',
-			'req_1',
-		);
+		expect(ensureTeachizyAfterSignature).toHaveBeenCalledWith('enr_1', 'sync-nda:enr_1', 'req_1');
 	});
 });

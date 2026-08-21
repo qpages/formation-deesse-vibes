@@ -32,9 +32,7 @@ export function statusUpdateRequiresReload(
 	return false;
 }
 
-export function snapshotFromPayload(
-	payload: EnrollmentStatusSnapshot,
-): EnrollmentStatusSnapshot {
+export function snapshotFromPayload(payload: EnrollmentStatusSnapshot): EnrollmentStatusSnapshot {
 	return {
 		collectionStatus: payload.collectionStatus,
 		contractStatus: payload.contractStatus,

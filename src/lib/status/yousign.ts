@@ -2,13 +2,7 @@ import type { ContractStatus } from '../../generated/prisma/client';
 
 /** Statuts API Yousign (Signature Request) — miroir runtime, plus de colonnes Prisma. */
 export type YousignRequestStatus =
-	| 'ongoing'
-	| 'done'
-	| 'expired'
-	| 'declined'
-	| 'canceled'
-	| 'rejected'
-	| 'error';
+	'ongoing' | 'done' | 'expired' | 'declined' | 'canceled' | 'rejected' | 'error';
 
 /** Statuts API Yousign (Signer). */
 export type YousignSignerStatus =

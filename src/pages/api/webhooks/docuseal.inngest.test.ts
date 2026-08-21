@@ -45,7 +45,12 @@ describe('POST /api/webhooks/docuseal — émission Inngest (symptôme B)', () =
 		const res = await postDocuseal({
 			event_type: 'form.completed',
 			timestamp: '2026-08-21T12:00:00Z',
-			data: { id: 42, submission_id: 12, external_id: 'enr_1', completed_at: '2026-08-21T12:00:00Z' },
+			data: {
+				id: 42,
+				submission_id: 12,
+				external_id: 'enr_1',
+				completed_at: '2026-08-21T12:00:00Z',
+			},
 		});
 
 		expect(res.status).toBe(200);

@@ -8,10 +8,7 @@ const { findEnrollmentById, refreshNdaRequestStatus } = vi.hoisted(() => ({
 vi.mock('./queries', () => ({ findEnrollmentById }));
 vi.mock('../signature/refresh-nda-request-status', () => ({ refreshNdaRequestStatus }));
 
-import {
-	confirmNdaSignature,
-	confirmNdaSignatureFromWebhook,
-} from './confirm-nda-signature';
+import { confirmNdaSignature, confirmNdaSignatureFromWebhook } from './confirm-nda-signature';
 
 function enrollment(overrides: Record<string, unknown> = {}) {
 	return {

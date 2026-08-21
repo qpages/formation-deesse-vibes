@@ -76,9 +76,7 @@ test.describe('P0 checkout + home', () => {
 		await expect(page.getByRole('heading', { name: 'Votre inscription' })).toBeVisible();
 		await expect(page.locator('#access-funnel')).toHaveCount(0);
 		await expect(page.locator('#status-panel')).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: 'Télécharger le contrat' }),
-		).toHaveCount(0);
+		await expect(page.getByRole('link', { name: 'Télécharger le contrat' })).toHaveCount(0);
 	});
 
 	test('5. checkout sans renonciation rétractation → 400', async ({ request }) => {

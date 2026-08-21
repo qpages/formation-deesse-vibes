@@ -8,10 +8,7 @@ import {
 } from '../payment-plans';
 import { getPrisma } from '../prisma';
 import { hydrateInvoiceUrls } from './invoice-links';
-import {
-	computeInstallmentProjection,
-	expandInstallmentRows,
-} from './installment-schedule';
+import { computeInstallmentProjection, expandInstallmentRows } from './installment-schedule';
 
 export type LearnerInstallment = {
 	installmentNumber: number;

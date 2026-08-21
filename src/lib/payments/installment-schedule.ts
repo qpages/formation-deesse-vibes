@@ -43,11 +43,7 @@ export function computeInstallmentProjection(input: {
 export function expandInstallmentRows<T extends { installmentNumber: number }>(input: {
 	payments: T[];
 	projection: InstallmentProjectionContext;
-	createEstimated: (
-		installmentNumber: number,
-		estimatedCents: number,
-		dueAt: Date | null,
-	) => T;
+	createEstimated: (installmentNumber: number, estimatedCents: number, dueAt: Date | null) => T;
 }): Array<T & { isEstimated: boolean }> {
 	if (input.payments.length === 0) return [];
 

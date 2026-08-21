@@ -10,16 +10,9 @@ import {
 	findEnrollmentIdByPaymentIntentId,
 	type EnrollmentWithUser,
 } from '../enrollment';
-import {
-	listSubscriptionInvoices,
-	paymentIntentIdFromInvoice,
-	retrieveInvoice,
-} from '../stripe';
+import { listSubscriptionInvoices, paymentIntentIdFromInvoice, retrieveInvoice } from '../stripe';
 import { resolveNextInstallmentDueAt } from './subscription-dates';
-import {
-	notifyCollectionStatusChange,
-	notifyInstallmentPaid,
-} from './notifications';
+import { notifyCollectionStatusChange, notifyInstallmentPaid } from './notifications';
 import { stripeId } from './stripe-id';
 
 /** Stripe SDK typings omit some Invoice fields depending on API version. */

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { decryptPayload, findEnrollmentByExternalRequestOrEnrollmentId, confirmNdaSignatureFromWebhook } =
-	vi.hoisted(() => ({
-		decryptPayload: vi.fn(),
-		findEnrollmentByExternalRequestOrEnrollmentId: vi.fn(),
-		confirmNdaSignatureFromWebhook: vi.fn(),
-	}));
+const {
+	decryptPayload,
+	findEnrollmentByExternalRequestOrEnrollmentId,
+	confirmNdaSignatureFromWebhook,
+} = vi.hoisted(() => ({
+	decryptPayload: vi.fn(),
+	findEnrollmentByExternalRequestOrEnrollmentId: vi.fn(),
+	confirmNdaSignatureFromWebhook: vi.fn(),
+}));
 
 vi.mock('../crypto', () => ({ decryptPayload }));
 vi.mock('../enrollment/queries', () => ({ findEnrollmentByExternalRequestOrEnrollmentId }));

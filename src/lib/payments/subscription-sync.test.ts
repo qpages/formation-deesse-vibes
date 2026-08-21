@@ -57,9 +57,7 @@ import {
 	syncSubscriptionState,
 } from './subscription-sync';
 
-function subscription(
-	overrides: Partial<Stripe.Subscription> = {},
-): Stripe.Subscription {
+function subscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subscription {
 	return {
 		id: 'sub_1',
 		object: 'subscription',
@@ -137,9 +135,7 @@ describe('syncEnrollmentSubscriptionDates', () => {
 			stripeSubscriptionId: 'sub_2',
 			stripeScheduleId: null,
 		});
-		retrieveSubscription.mockResolvedValue(
-			subscription({ id: 'sub_2', schedule: null }),
-		);
+		retrieveSubscription.mockResolvedValue(subscription({ id: 'sub_2', schedule: null }));
 
 		await syncEnrollmentSubscriptionDates('enr_2');
 
@@ -174,7 +170,9 @@ describe('syncSubscriptionState', () => {
 			stripeSubscriptionId: 'sub_1',
 			stripeScheduleId: null,
 		});
-		retrieveSubscription.mockResolvedValue(subscription({ metadata: { enrollmentId: 'enr_meta' } }));
+		retrieveSubscription.mockResolvedValue(
+			subscription({ metadata: { enrollmentId: 'enr_meta' } }),
+		);
 
 		const result = await syncSubscriptionState(
 			subscription({ metadata: { enrollmentId: 'enr_meta' } }),

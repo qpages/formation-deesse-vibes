@@ -307,7 +307,10 @@ export async function unblockTeachizyCustomer(
 
 	const training = customer.trainings.find((row) => row.training.uuid === uuid);
 	if (!training) {
-		console.log('[Teachizy] unblock skipped — no training enrollment', { email, trainingUuid: uuid });
+		console.log('[Teachizy] unblock skipped — no training enrollment', {
+			email,
+			trainingUuid: uuid,
+		});
 		return 'not_found';
 	}
 	if (!training.blocked_at && customer.status !== 'DISABLED') {

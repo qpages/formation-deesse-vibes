@@ -1,8 +1,4 @@
-export {
-	applyAccessPolicy,
-	evaluateAccess,
-	type AccessDecision,
-} from './access';
+export { applyAccessPolicy, evaluateAccess, type AccessDecision } from './access';
 
 export {
 	reconcileEnrollment,
@@ -27,11 +23,7 @@ export {
 	type MagicLinkLookup,
 } from './magic-link';
 
-export {
-	canResendNda,
-	markNdaResent,
-	resolveNdaSignSurface,
-} from './nda-resend';
+export { canResendNda, markNdaResent, resolveNdaSignSurface } from './nda-resend';
 export { resolveAwaitingNdaSignSurface } from './awaiting-nda-sign-surface';
 
 export {

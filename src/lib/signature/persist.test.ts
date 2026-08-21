@@ -56,10 +56,7 @@ describe('findEnrollmentByExternalRequestOrEnrollmentId', () => {
 
 		expect(findFirst).toHaveBeenCalledWith({
 			where: {
-				OR: [
-					{ ndaRequest: { provider: 'yousign', externalRequestId: 'req_1' } },
-					{ id: 'enr_1' },
-				],
+				OR: [{ ndaRequest: { provider: 'yousign', externalRequestId: 'req_1' } }, { id: 'enr_1' }],
 			},
 			include: { user: true, ndaRequest: true },
 		});
@@ -107,11 +104,15 @@ describe('NDA persist (nda_requests only)', () => {
 	it('persistNdaProvisioned écrit enrollment contractStatus + nda_requests', async () => {
 		const { upsert, update } = mockTransaction();
 
-		await persistNdaProvisioned('enr_1', {
-			requestId: 'req_1',
-			signerId: 'sig_1',
-			signatureLink: 'https://sign',
-		}, yousignRedirect);
+		await persistNdaProvisioned(
+			'enr_1',
+			{
+				requestId: 'req_1',
+				signerId: 'sig_1',
+				signatureLink: 'https://sign',
+			},
+			yousignRedirect,
+		);
 
 		expect(update).toHaveBeenCalledWith(
 			expect.objectContaining({

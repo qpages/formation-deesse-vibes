@@ -15,7 +15,11 @@ import {
 	sendDocusealDocumentsCopy,
 	submitterSlugFromEmbedSrc,
 } from '../../../lib/signature/docuseal-send-copy';
-import { resolveExternalSignerId, resolveNdaProvider, resolveSignKind } from '../../../lib/signature/nda-request';
+import {
+	resolveExternalSignerId,
+	resolveNdaProvider,
+	resolveSignKind,
+} from '../../../lib/signature/nda-request';
 
 export const prerender = false;
 
@@ -28,7 +32,9 @@ const SEND_COPY_COOLDOWN =
 const SEND_COPY_SUCCESS =
 	'Demande transmise à DocuSeal. La copie devrait arriver dans quelques minutes — pensez à vérifier vos spams.';
 
-async function resolveSubmitter(enrollment: NonNullable<Awaited<ReturnType<typeof findEnrollmentById>>>) {
+async function resolveSubmitter(
+	enrollment: NonNullable<Awaited<ReturnType<typeof findEnrollmentById>>>,
+) {
 	const metadata = enrollment.ndaRequest?.metadata as NdaRequestMetadata | null;
 	const fromEmbed = metadata?.embed_src ? submitterSlugFromEmbedSrc(metadata.embed_src) : null;
 

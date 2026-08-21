@@ -73,7 +73,9 @@ describe('POST /api/webhooks/docuseal', () => {
 				method: 'POST',
 				body: rawBody,
 				headers: {
-					'x-docuseal-signature': `${Math.floor(Date.now() / 1000)}.${createHmac('sha256', 'secret').update(`${Math.floor(Date.now() / 1000)}.${rawBody}`).digest('hex')}`,
+					'x-docuseal-signature': `${Math.floor(Date.now() / 1000)}.${createHmac('sha256', 'secret')
+						.update(`${Math.floor(Date.now() / 1000)}.${rawBody}`)
+						.digest('hex')}`,
 				},
 			}),
 		} as Parameters<typeof POST>[0]);

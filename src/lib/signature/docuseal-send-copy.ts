@@ -22,7 +22,9 @@ function docusealSigningHost(): string {
 
 const SEND_COPY_TIMEOUT_MS = 20_000;
 
-export function isSubmitterCompleted(submitter: Pick<DocusealSubmitter, 'completed_at' | 'status'>): boolean {
+export function isSubmitterCompleted(
+	submitter: Pick<DocusealSubmitter, 'completed_at' | 'status'>,
+): boolean {
 	return Boolean(submitter.completed_at) || submitter.status === 'completed';
 }
 

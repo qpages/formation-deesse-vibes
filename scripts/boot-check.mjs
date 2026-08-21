@@ -22,11 +22,7 @@ const REQUIRED_ALWAYS = [
 ];
 
 const REQUIRED_YOUSIGN = ['YOUSIGN_API_KEY', 'YOUSIGN_TEMPLATE_ID', 'YOUSIGN_WEBHOOK_SECRET'];
-const REQUIRED_DOCUSEAL = [
-	'DOCUSEAL_API_KEY',
-	'DOCUSEAL_WEBHOOK_SECRET',
-	'DOCUSEAL_TEMPLATE_ID',
-];
+const REQUIRED_DOCUSEAL = ['DOCUSEAL_API_KEY', 'DOCUSEAL_WEBHOOK_SECRET', 'DOCUSEAL_TEMPLATE_ID'];
 
 const REQUIRED_PROD = ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'];
 const SECRET_MIN = ['MAGIC_LINK_SECRET', 'SESSION_SECRET', 'PAYLOAD_ENCRYPTION_KEY'];
@@ -212,11 +208,7 @@ async function probeYousign(env) {
 export async function probeConnections(env = process.env, { prod = isProd } = {}) {
 	const signatureProbe =
 		signatureProvider(env) === 'docuseal' ? probeDocuseal(env) : probeYousign(env);
-	const results = await Promise.all([
-		probeDatabase(env, prod),
-		probeStripe(env),
-		signatureProbe,
-	]);
+	const results = await Promise.all([probeDatabase(env, prod), probeStripe(env), signatureProbe]);
 	return results.filter(Boolean);
 }
 

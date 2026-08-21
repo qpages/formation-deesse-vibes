@@ -16,7 +16,9 @@ export type ConfirmNdaSignatureResult =
  * Learner-side safety net: reads the signature provider and never marks an NDA
  * signed without provider confirmation. Idempotent when already signed locally.
  */
-export async function confirmNdaSignature(enrollmentId: string): Promise<ConfirmNdaSignatureResult> {
+export async function confirmNdaSignature(
+	enrollmentId: string,
+): Promise<ConfirmNdaSignatureResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) {
 		return { ok: false, reason: 'enrollment_not_found' };

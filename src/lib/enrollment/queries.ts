@@ -1,4 +1,9 @@
-import type { Enrollment, NdaRequest, SignatureProvider, User } from '../../generated/prisma/client';
+import type {
+	Enrollment,
+	NdaRequest,
+	SignatureProvider,
+	User,
+} from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
 
 export type EnrollmentWithUser = Enrollment & { user: User; ndaRequest?: NdaRequest | null };

@@ -13,7 +13,9 @@ vi.mock('../teachizy', () => ({
 	blockTeachizyCustomer: mocks.blockTeachizyCustomer,
 	isTeachizyConfigured: mocks.isTeachizyConfigured,
 }));
-vi.mock('../services/brevo', () => ({ sendPastDueSuspensionEmail: mocks.sendPastDueSuspensionEmail }));
+vi.mock('../services/brevo', () => ({
+	sendPastDueSuspensionEmail: mocks.sendPastDueSuspensionEmail,
+}));
 vi.mock('../services/slack', () => ({
 	alertFinalFailure: vi.fn(),
 	formatErrorDetail: vi.fn(),

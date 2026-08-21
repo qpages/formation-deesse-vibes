@@ -44,9 +44,8 @@ export async function getSignedNdaPdf(enrollmentId: string): Promise<SignedNdaRe
 	}
 
 	try {
-		const file = await resolveSignatureProviderForEnrollment(enrollment).downloadSignedPdf(
-			requestId,
-		);
+		const file =
+			await resolveSignatureProviderForEnrollment(enrollment).downloadSignedPdf(requestId);
 		return {
 			ok: true,
 			bytes: file.bytes,

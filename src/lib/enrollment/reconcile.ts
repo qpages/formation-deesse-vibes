@@ -23,15 +23,9 @@ export type ReconcileTriggerSource =
 	| 'cron.access_policy';
 
 export type ReconcileTrigger =
-	| ReconcileTriggerSource
-	| { source: ReconcileTriggerSource; sessionId?: string | null };
+	ReconcileTriggerSource | { source: ReconcileTriggerSource; sessionId?: string | null };
 
-export type ReconcileScope =
-	| 'full'
-	| 'payment'
-	| 'nda_provision'
-	| 'nda_signature'
-	| 'access_only';
+export type ReconcileScope = 'full' | 'payment' | 'nda_provision' | 'nda_signature' | 'access_only';
 
 export type ReconcileStepName = 'payment' | 'nda_provision' | 'nda_signature' | 'access';
 
@@ -69,10 +63,7 @@ export type ReconcileResult = {
 };
 
 export type NdaSignatureErrorReason =
-	| 'enrollment_not_found'
-	| 'not_awaiting'
-	| 'no_nda_request'
-	| 'provider_error';
+	'enrollment_not_found' | 'not_awaiting' | 'no_nda_request' | 'provider_error';
 
 const NDA_SIGNATURE_ERROR_REASONS = new Set<NdaSignatureErrorReason>([
 	'enrollment_not_found',
@@ -162,7 +153,8 @@ async function runPaymentStep(
 	}
 
 	const checkoutToSync =
-		sessionId ?? (enrollment?.collectionStatus === 'pending' ? enrollment.stripeCheckoutSessionId : null);
+		sessionId ??
+		(enrollment?.collectionStatus === 'pending' ? enrollment.stripeCheckoutSessionId : null);
 
 	if (!checkoutToSync || (enrollment && enrollment.collectionStatus !== 'pending')) {
 		if (!resolvedId) {
@@ -178,7 +170,8 @@ async function runPaymentStep(
 			step: {
 				step: 'payment',
 				status: 'skipped',
-				reason: enrollment?.collectionStatus !== 'pending' ? 'already_confirmed' : 'no_checkout_session',
+				reason:
+					enrollment?.collectionStatus !== 'pending' ? 'already_confirmed' : 'no_checkout_session',
 			},
 			enrollmentId: resolvedId,
 			ranConfirm: false,
@@ -253,9 +246,7 @@ async function runNdaProvisionStep(
 		return { step: 'nda_provision', status: 'skipped', enqueueStatus: 'already_provisioned' };
 	}
 
-	const sourceId =
-		enrollment.stripeCheckoutSessionId ??
-		`${source}:${enrollmentId}`;
+	const sourceId = enrollment.stripeCheckoutSessionId ?? `${source}:${enrollmentId}`;
 
 	const result = await ensureNdaAfterPayment(enrollmentId, sourceId, {
 		soft: !isWebhookStripe(source),
@@ -352,7 +343,11 @@ export async function reconcileEnrollment(
 	if (stepInScope(scope, 'nda_signature')) {
 		const ndaSignature = await runNdaSignatureStep(resolvedEnrollmentId);
 		steps.push(ndaSignature);
-		if (ndaSignature.step === 'nda_signature' && ndaSignature.status === 'ok' && ndaSignature.signed) {
+		if (
+			ndaSignature.step === 'nda_signature' &&
+			ndaSignature.status === 'ok' &&
+			ndaSignature.signed
+		) {
 			mutated = true;
 		}
 	}

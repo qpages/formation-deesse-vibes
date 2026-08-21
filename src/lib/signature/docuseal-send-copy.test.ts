@@ -17,7 +17,9 @@ import {
 
 describe('submitterSlugFromEmbedSrc', () => {
 	it('extrait le slug depuis embed_src', () => {
-		expect(submitterSlugFromEmbedSrc('https://docuseal.eu/s/NLp5rn3W8tEtnj')).toBe('NLp5rn3W8tEtnj');
+		expect(submitterSlugFromEmbedSrc('https://docuseal.eu/s/NLp5rn3W8tEtnj')).toBe(
+			'NLp5rn3W8tEtnj',
+		);
 		expect(submitterSlugFromEmbedSrc('https://docuseal.eu/s/abc')).toBe('abc');
 	});
 
@@ -29,7 +31,9 @@ describe('submitterSlugFromEmbedSrc', () => {
 
 describe('isSubmitterCompleted', () => {
 	it('accepte completed_at ou status completed', () => {
-		expect(isSubmitterCompleted({ completed_at: '2024-01-01T00:00:00Z', status: 'awaiting' })).toBe(true);
+		expect(isSubmitterCompleted({ completed_at: '2024-01-01T00:00:00Z', status: 'awaiting' })).toBe(
+			true,
+		);
 		expect(isSubmitterCompleted({ completed_at: null, status: 'completed' })).toBe(true);
 		expect(isSubmitterCompleted({ completed_at: null, status: 'awaiting' })).toBe(false);
 	});
@@ -109,10 +113,7 @@ describe('sendDocusealDocumentsCopy', () => {
 	});
 
 	it('lève une erreur si DocuSeal répond en erreur', async () => {
-		vi.stubGlobal(
-			'fetch',
-			vi.fn().mockResolvedValue(new Response('bad gateway', { status: 502 })),
-		);
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('bad gateway', { status: 502 })));
 
 		await expect(sendDocusealDocumentsCopy('slug')).rejects.toThrow('DocuSeal send copy 502');
 	});

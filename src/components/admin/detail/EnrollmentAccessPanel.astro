@@ -155,7 +155,11 @@ const detailRows = learner
 			learner ? (
 				<details class="peer group">
 					<summary
-						class:list={['cursor-pointer list-none', linkClass, '[&::-webkit-details-marker]:hidden']}
+						class:list={[
+							'cursor-pointer list-none',
+							linkClass,
+							'[&::-webkit-details-marker]:hidden',
+						]}
 					>
 						<span class="group-open:hidden">Voir le détail</span>
 						<span class="hidden group-open:inline">Masquer le détail</span>

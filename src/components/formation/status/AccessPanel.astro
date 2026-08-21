@@ -51,9 +51,9 @@ const canDownloadNda =
 	Boolean(enrollment && resolveExternalRequestId(enrollment));
 const showNdaSendCopy = Boolean(
 	enrollment &&
-		enrollment.contractStatus === 'signed' &&
-		resolveNdaProvider(enrollment) === 'docuseal' &&
-		resolveSignKind(enrollment) === 'embed',
+	enrollment.contractStatus === 'signed' &&
+	resolveNdaProvider(enrollment) === 'docuseal' &&
+	resolveSignKind(enrollment) === 'embed',
 );
 const showContratSection = canDownloadNda || showNdaSendCopy;
 ---
@@ -202,7 +202,11 @@ const showContratSection = canDownloadNda || showNdaSendCopy;
 									</>
 								) : null}
 							</div>
-							<p id="nda-send-copy-feedback" class="text-ink-soft mt-2 text-sm" aria-live="polite" />
+							<p
+								id="nda-send-copy-feedback"
+								class="text-ink-soft mt-2 text-sm"
+								aria-live="polite"
+							/>
 						</div>
 					) : null}
 				</div>
@@ -291,7 +295,11 @@ const showContratSection = canDownloadNda || showNdaSendCopy;
 				credentials: 'same-origin',
 				signal: AbortSignal.timeout(25_000),
 			});
-			const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; error?: string };
+			const data = (await res.json().catch(() => ({}))) as {
+				ok?: boolean;
+				message?: string;
+				error?: string;
+			};
 			if (res.ok && data.ok) {
 				const message = data.message ?? 'Demande transmise. Vérifiez votre boîte mail.';
 				if (typeof window.toast === 'function') {

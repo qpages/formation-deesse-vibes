@@ -11,7 +11,11 @@ vi.mock('../enrollment/queries', () => ({
 	withUser: { include: { user: true, ndaRequest: true } },
 }));
 
-import { ensureNdaContractSentIfProvisioned, persistNdaDraftRequestId, persistNdaProvisioned } from './persist';
+import {
+	ensureNdaContractSentIfProvisioned,
+	persistNdaDraftRequestId,
+	persistNdaProvisioned,
+} from './persist';
 
 const docusealEmbed = { provider: 'docuseal' as const, signKind: 'embed' as const };
 const docusealRedirect = { provider: 'docuseal' as const, signKind: 'redirect' as const };
@@ -56,11 +60,15 @@ describe('persist DocuSeal embed', () => {
 	it('persistNdaProvisioned stocke embed_src en metadata', async () => {
 		const { upsert } = mockTransaction();
 
-		await persistNdaProvisioned('enr_1', {
-			requestId: 'sub_12',
-			signerId: '42',
-			signatureLink: 'https://docuseal.eu/s/abc',
-		}, docusealEmbed);
+		await persistNdaProvisioned(
+			'enr_1',
+			{
+				requestId: 'sub_12',
+				signerId: '42',
+				signatureLink: 'https://docuseal.eu/s/abc',
+			},
+			docusealEmbed,
+		);
 
 		expect(upsert).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -78,11 +86,15 @@ describe('persist DocuSeal redirect', () => {
 	it('persistNdaProvisioned redirect sans metadata embed_src', async () => {
 		const { upsert } = mockTransaction();
 
-		await persistNdaProvisioned('enr_1', {
-			requestId: 'sub_12',
-			signerId: '42',
-			signatureLink: 'https://docuseal.eu/s/abc',
-		}, docusealRedirect);
+		await persistNdaProvisioned(
+			'enr_1',
+			{
+				requestId: 'sub_12',
+				signerId: '42',
+				signatureLink: 'https://docuseal.eu/s/abc',
+			},
+			docusealRedirect,
+		);
 
 		expect(upsert).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -109,7 +121,11 @@ describe('ensureNdaContractSentIfProvisioned', () => {
 		const enrollment = {
 			id: 'enr_1',
 			contractStatus: 'pending' as const,
-			ndaRequest: { externalRequestId: 'sub_1', externalSignerId: '42', provider: 'docuseal' as const },
+			ndaRequest: {
+				externalRequestId: 'sub_1',
+				externalSignerId: '42',
+				provider: 'docuseal' as const,
+			},
 			user: { email: 'a@b.c' },
 		} as unknown as Parameters<typeof ensureNdaContractSentIfProvisioned>[0];
 
@@ -129,7 +145,11 @@ describe('ensureNdaContractSentIfProvisioned', () => {
 		const enrollment = {
 			id: 'enr_1',
 			contractStatus: 'sent' as const,
-			ndaRequest: { externalRequestId: 'sub_1', externalSignerId: '42', provider: 'docuseal' as const },
+			ndaRequest: {
+				externalRequestId: 'sub_1',
+				externalSignerId: '42',
+				provider: 'docuseal' as const,
+			},
 			user: { email: 'a@b.c' },
 		} as unknown as Parameters<typeof ensureNdaContractSentIfProvisioned>[0];
 

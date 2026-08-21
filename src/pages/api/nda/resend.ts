@@ -61,7 +61,10 @@ export const POST: APIRoute = async ({ request }) => {
 			detail: adminEmail ? `via=admin (${adminEmail})` : 'via=élève',
 		});
 
-		return json({ ok: true, message: 'Le contrat de confidentialité a été renvoyé par e-mail (Yousign).' });
+		return json({
+			ok: true,
+			message: 'Le contrat de confidentialité a été renvoyé par e-mail (Yousign).',
+		});
 	} catch (error) {
 		console.error('[nda/resend]', error);
 		return json({ error: 'Échec du renvoi du NDA.' }, 500);

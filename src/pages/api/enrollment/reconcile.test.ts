@@ -27,7 +27,12 @@ vi.mock('../../../lib/enrollment/reconcile', async (importOriginal) => {
 });
 
 import { POST } from './reconcile';
-import { RATE_LIMITS, enforceRateLimit, rateLimitKey, resetRateLimitStoreForTests } from '../../../lib/rate-limit';
+import {
+	RATE_LIMITS,
+	enforceRateLimit,
+	rateLimitKey,
+	resetRateLimitStoreForTests,
+} from '../../../lib/rate-limit';
 
 function postReconcile(cookie?: string) {
 	return POST({

@@ -6,9 +6,7 @@ import {
 	isCheckoutPaid,
 } from './checkout';
 
-function session(
-	overrides: Partial<Stripe.Checkout.Session> = {},
-): Stripe.Checkout.Session {
+function session(overrides: Partial<Stripe.Checkout.Session> = {}): Stripe.Checkout.Session {
 	return {
 		object: 'checkout.session',
 		id: 'cs_test',
@@ -39,11 +37,15 @@ describe('isCheckoutPaid', () => {
 
 describe('assertCheckoutAmountAcceptable', () => {
 	it('accepte un montant dans la borne', () => {
-		expect(() => assertCheckoutAmountAcceptable(session({ amount_total: 5000 }), 10000)).not.toThrow();
+		expect(() =>
+			assertCheckoutAmountAcceptable(session({ amount_total: 5000 }), 10000),
+		).not.toThrow();
 	});
 
 	it('accepte un montant égal au max (promo)', () => {
-		expect(() => assertCheckoutAmountAcceptable(session({ amount_total: 10000 }), 10000)).not.toThrow();
+		expect(() =>
+			assertCheckoutAmountAcceptable(session({ amount_total: 10000 }), 10000),
+		).not.toThrow();
 	});
 
 	it('throw si amount_total manquant', () => {

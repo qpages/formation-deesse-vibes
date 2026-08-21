@@ -131,10 +131,7 @@ export async function resolveHomeEnrollment(input: {
 				);
 				if (reconciled.enrollmentId) {
 					const paymentConfirmed = reconciled.steps.some(
-						(s) =>
-							s.step === 'payment' &&
-							s.status === 'ok' &&
-							s.alreadyConfirmed === false,
+						(s) => s.step === 'payment' && s.status === 'ok' && s.alreadyConfirmed === false,
 					);
 					if (!enrollment) {
 						enrollment = await findEnrollmentById(reconciled.enrollmentId);
@@ -147,9 +144,7 @@ export async function resolveHomeEnrollment(input: {
 						enrollment = await findEnrollmentById(enrollment.id);
 					}
 					if (enrollment && !setCookie && paymentConfirmed) {
-						setCookie = enrollmentCookieOptions(
-							await createEnrollmentSessionToken(enrollment.id),
-						);
+						setCookie = enrollmentCookieOptions(await createEnrollmentSessionToken(enrollment.id));
 					}
 				}
 			} catch (error) {
@@ -202,9 +197,10 @@ export async function resolveHomeEnrollment(input: {
 		}
 	}
 
-	const ndaSignSurface = enrollment && isAwaitingNda(enrollment)
-		? await resolveAwaitingNdaSignSurface(enrollment)
-		: null;
+	const ndaSignSurface =
+		enrollment && isAwaitingNda(enrollment)
+			? await resolveAwaitingNdaSignSurface(enrollment)
+			: null;
 
 	const paymentSchedule =
 		enrollment && isPaidEnough(enrollment.collectionStatus)

@@ -20,11 +20,7 @@ async function resolveScheduleId(
 	subscription: Stripe.Subscription,
 	enrollmentScheduleId?: string | null,
 ): Promise<string | undefined> {
-	return (
-		stripeId(subscription.schedule) ??
-		enrollmentScheduleId ??
-		undefined
-	);
+	return stripeId(subscription.schedule) ?? enrollmentScheduleId ?? undefined;
 }
 
 /** Sync dates Stripe (période, fin abo, preview) sur l’enrollment. */

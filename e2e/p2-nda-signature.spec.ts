@@ -1,9 +1,5 @@
 import { expect, test } from '@playwright/test';
-import {
-	enrollmentCookie,
-	seedEnrollment,
-	uniqueEmail,
-} from './helpers/seed';
+import { enrollmentCookie, seedEnrollment, uniqueEmail } from './helpers/seed';
 
 const embedNda = (embedSrc: string) => ({
 	provider: 'docuseal' as const,

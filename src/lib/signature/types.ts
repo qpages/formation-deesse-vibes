@@ -53,11 +53,7 @@ export type SyncNdaStatusResult =
 	| { ok: true; providerStatus: string; followUp: EnqueueResult }
 	| {
 			ok: false;
-			reason:
-				| 'enrollment_not_found'
-				| 'no_nda_request'
-				| 'unmapped_status'
-				| 'draft_not_activated';
+			reason: 'enrollment_not_found' | 'no_nda_request' | 'unmapped_status' | 'draft_not_activated';
 			detail?: string;
 	  };
 

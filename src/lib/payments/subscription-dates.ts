@@ -7,9 +7,7 @@ export function stripeUnixToDate(unix: number | null | undefined): Date | null {
 }
 
 /** Min `current_period_end` among subscription items (Stripe billing period anchor). */
-export function currentPeriodEndFromSubscription(
-	subscription: Stripe.Subscription,
-): Date | null {
+export function currentPeriodEndFromSubscription(subscription: Stripe.Subscription): Date | null {
 	const items = subscription.items?.data ?? [];
 	if (items.length === 0) return null;
 

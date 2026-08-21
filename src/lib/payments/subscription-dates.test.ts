@@ -21,10 +21,7 @@ describe('currentPeriodEndFromSubscription', () => {
 	it('prend le min current_period_end des items', () => {
 		const subscription = {
 			items: {
-				data: [
-					{ current_period_end: 1_800_000_000 },
-					{ current_period_end: 1_700_000_000 },
-				],
+				data: [{ current_period_end: 1_800_000_000 }, { current_period_end: 1_700_000_000 }],
 			},
 		} as Stripe.Subscription;
 

@@ -59,10 +59,7 @@ function renderMessageBlock(view: StatusPanelViewPayload): string {
 	}
 
 	return `<div class="max-w-prose space-y-1.5">${view.message
-		.map(
-			(line) =>
-				`<p class="text-ink-soft text-sm">${escapeHtml(line)}</p>`,
-		)
+		.map((line) => `<p class="text-ink-soft text-sm">${escapeHtml(line)}</p>`)
 		.join('')}</div>`;
 }
 
@@ -147,10 +144,7 @@ function bindRefreshButton(panel: HTMLElement) {
 	});
 }
 
-export function applyStatusPanelPatch(
-	panel: HTMLElement,
-	payload: EnrollmentStatusPayload,
-): void {
+export function applyStatusPanelPatch(panel: HTMLElement, payload: EnrollmentStatusPayload): void {
 	const { view } = payload;
 
 	setHidden(panel.querySelector('#status-sign-ready'), !view.showSignSurfaceReady);

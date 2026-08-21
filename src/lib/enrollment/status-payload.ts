@@ -5,9 +5,7 @@ import { resolveAwaitingNdaSignSurface } from './awaiting-nda-sign-surface';
 import { ensureNdaContractSentIfProvisioned } from '../signature/persist';
 import type { SignSurface } from '../signature/types';
 import { primaryAction, shouldPollEnrollment, statusMessage, type PrimaryAction } from '../status';
-import {
-	enrollmentFingerprint,
-} from '../status/snapshot';
+import { enrollmentFingerprint } from '../status/snapshot';
 import type { EnrollmentStatusSnapshot } from '../status/snapshot';
 
 export {
@@ -102,4 +100,3 @@ export async function buildEnrollmentStatusPayload(
 		view: buildStatusPanelView(enrollment, ndaSignSurface),
 	};
 }
-

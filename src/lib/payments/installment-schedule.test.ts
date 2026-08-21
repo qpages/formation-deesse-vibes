@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	computeInstallmentProjection,
-	expandInstallmentRows,
-} from './installment-schedule';
+import { computeInstallmentProjection, expandInstallmentRows } from './installment-schedule';
 
 describe('computeInstallmentProjection', () => {
 	it('projette les dates des échéances futures', () => {

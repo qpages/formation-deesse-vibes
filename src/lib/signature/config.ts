@@ -17,7 +17,10 @@ export function resolveSignKind(mode: SignatureMode): SignKind {
 	return mode;
 }
 
-export function assertValidProviderModeCombo(provider: SignatureProvider, mode: SignatureMode): void {
+export function assertValidProviderModeCombo(
+	provider: SignatureProvider,
+	mode: SignatureMode,
+): void {
 	if (provider === 'yousign' && mode === 'embed') {
 		throw new Error(
 			'SIGNATURE_MODE=embed is not supported with SIGNATURE_PROVIDER=yousign. Use SIGNATURE_MODE=redirect (default).',

@@ -228,9 +228,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		await context.addCookies([await enrollmentCookie(signed.id)]);
 		await page.goto('/');
 		await expect(page.locator('#access-tracking')).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: 'Télécharger le contrat' }),
-		).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Télécharger le contrat' })).toBeVisible();
 	});
 
 	test('10. webhook DocuSeal sans / mauvaise signature → 400, valide → received', async ({

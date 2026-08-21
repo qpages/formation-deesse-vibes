@@ -179,8 +179,7 @@ async function resolveSigningUrl(
 	signerId: string,
 ): Promise<{ url?: string; submitter: DocusealSubmitter }> {
 	const fromSubmission =
-		submission.submitters?.find((s) => String(s.id) === signerId) ??
-		submission.submitters?.[0];
+		submission.submitters?.find((s) => String(s.id) === signerId) ?? submission.submitters?.[0];
 
 	const urlFromSubmission = fromSubmission ? submitterSigningUrl(fromSubmission) : undefined;
 	if (urlFromSubmission && fromSubmission) {
@@ -200,9 +199,7 @@ function verifyDocusealSignature(rawBody: string, signatureHeader: string | null
 
 	if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
 
-	const expected = createHmac('sha256', secret)
-		.update(`${timestamp}.${rawBody}`)
-		.digest('hex');
+	const expected = createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
 
 	try {
 		const a = Buffer.from(expected, 'utf8');
@@ -215,9 +212,7 @@ function verifyDocusealSignature(rawBody: string, signatureHeader: string | null
 
 function docusealOccurredAt(payload: DocusealWebhookPayload): Date {
 	const raw =
-		payload.data?.completed_at ??
-		payload.data?.submission?.completed_at ??
-		payload.timestamp;
+		payload.data?.completed_at ?? payload.data?.submission?.completed_at ?? payload.timestamp;
 	if (typeof raw === 'string' && raw.trim()) {
 		const parsed = new Date(raw);
 		if (!Number.isNaN(parsed.getTime())) return parsed;
@@ -263,10 +258,7 @@ async function provisionNda(input: ProvisionNdaInput): Promise<ProvisionNdaResul
 		throw new Error('DocuSeal: signataire introuvable sur la soumission');
 	}
 
-	const { url, submitter: resolved } = await resolveSigningUrl(
-		submission,
-		String(submitter.id),
-	);
+	const { url, submitter: resolved } = await resolveSigningUrl(submission, String(submitter.id));
 
 	return {
 		requestId: String(submission.id),
@@ -332,6 +324,5 @@ export const docusealAdapter: DocusealAdapter = {
 	mapCompletedEvent: mapDocusealCompletedEvent,
 	getSubmission,
 	getSubmitter,
-	syncStatus: (enrollmentId) =>
-		syncDocusealNda(enrollmentId, { getSubmission, getSubmitter }),
+	syncStatus: (enrollmentId) => syncDocusealNda(enrollmentId, { getSubmission, getSubmitter }),
 };
