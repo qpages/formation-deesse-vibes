@@ -11,9 +11,6 @@ const REQUIRED_ALWAYS = [
 	'STRIPE_SECRET_KEY',
 	'STRIPE_WEBHOOK_SECRET',
 	'STRIPE_PRICE_ID',
-	'YOUSIGN_API_KEY',
-	'YOUSIGN_TEMPLATE_ID',
-	'YOUSIGN_WEBHOOK_SECRET',
 	'BREVO_API_KEY',
 	'MAGIC_LINK_SECRET',
 	'SESSION_SECRET',
@@ -23,6 +20,9 @@ const REQUIRED_ALWAYS = [
 	'ADMIN_PASSWORD',
 	'PUBLIC_SITE_URL',
 ];
+
+const REQUIRED_YOUSIGN = ['YOUSIGN_API_KEY', 'YOUSIGN_TEMPLATE_ID', 'YOUSIGN_WEBHOOK_SECRET'];
+const REQUIRED_DOCUSEAL = ['DOCUSEAL_API_KEY', 'DOCUSEAL_WEBHOOK_SECRET', 'DOCUSEAL_TEMPLATE_ID'];
 
 const REQUIRED_PROD = ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'];
 const SECRET_MIN = ['MAGIC_LINK_SECRET', 'SESSION_SECRET', 'PAYLOAD_ENCRYPTION_KEY'];
@@ -34,12 +34,41 @@ function blank(value) {
 	return value === undefined || value === null || value === '';
 }
 
+function signatureProvider(env) {
+	return env.SIGNATURE_PROVIDER === 'docuseal' ? 'docuseal' : 'yousign';
+}
+
 /** @returns {{ key: string, message: string }[]} */
+function checkSignatureConfig(env) {
+	const issues = [];
+	const provider = signatureProvider(env);
+	const mode = env.SIGNATURE_MODE;
+
+	if (mode && mode !== 'embed' && mode !== 'redirect') {
+		issues.push({
+			key: 'SIGNATURE_MODE',
+			message: 'doit être embed ou redirect',
+		});
+	}
+
+	if (provider === 'yousign' && mode === 'embed') {
+		issues.push({
+			key: 'SIGNATURE_MODE',
+			message:
+				'embed non supporté avec yousign — utilisez redirect (défaut) ou omettez SIGNATURE_MODE',
+		});
+	}
+
+	return issues;
+}
+
 export function checkRequiredEnv(env = process.env, { prod = isProd } = {}) {
 	const issues = [];
+	const provider = signatureProvider(env);
 	const keys = [
 		prod ? 'PRODUCTION_DATABASE_URL' : 'DEV_DATABASE_URL',
 		...REQUIRED_ALWAYS,
+		...(provider === 'docuseal' ? REQUIRED_DOCUSEAL : REQUIRED_YOUSIGN),
 		...(prod ? REQUIRED_PROD : []),
 	];
 
@@ -62,6 +91,8 @@ export function checkRequiredEnv(env = process.env, { prod = isProd } = {}) {
 			message: 'mot de passe par défaut interdit en production',
 		});
 	}
+
+	issues.push(...checkSignatureConfig(env));
 
 	return issues;
 }
@@ -120,6 +151,30 @@ async function probeStripe(env) {
 	}
 }
 
+async function probeDocuseal(env) {
+	const base = env.DOCUSEAL_API_BASE || 'https://api.docuseal.eu';
+	const templateId = env.DOCUSEAL_TEMPLATE_ID;
+	try {
+		await withTimeout('DocuSeal', PROBE_MS, async () => {
+			const res = await fetch(`${base}/templates/${templateId}`, {
+				headers: {
+					'X-Auth-Token': env.DOCUSEAL_API_KEY,
+					Accept: 'application/json',
+				},
+			});
+			if (!res.ok) {
+				throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+			}
+		});
+		return null;
+	} catch (error) {
+		return {
+			key: 'DOCUSEAL_API_KEY',
+			message: error instanceof Error ? error.message : String(error),
+		};
+	}
+}
+
 async function probeYousign(env) {
 	const base = env.YOUSIGN_API_BASE || 'https://api-sandbox.yousign.app/v3';
 	try {
@@ -151,11 +206,9 @@ async function probeYousign(env) {
 }
 
 export async function probeConnections(env = process.env, { prod = isProd } = {}) {
-	const results = await Promise.all([
-		probeDatabase(env, prod),
-		probeStripe(env),
-		probeYousign(env),
-	]);
+	const signatureProbe =
+		signatureProvider(env) === 'docuseal' ? probeDocuseal(env) : probeYousign(env);
+	const results = await Promise.all([probeDatabase(env, prod), probeStripe(env), signatureProbe]);
 	return results.filter(Boolean);
 }
 

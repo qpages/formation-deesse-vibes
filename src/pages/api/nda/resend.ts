@@ -8,7 +8,7 @@ import {
 } from '../../../lib/auth/session';
 import { inngest } from '../../../lib/inngest/client';
 import { json } from '../../../lib/http';
-import { canResendNda, findEnrollmentById } from '../../../lib/services/enrollment';
+import { canResendNda, findEnrollmentById } from '../../../lib/enrollment';
 import { notifyOps } from '../../../lib/services/slack';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -61,7 +61,10 @@ export const POST: APIRoute = async ({ request }) => {
 			detail: adminEmail ? `via=admin (${adminEmail})` : 'via=élève',
 		});
 
-		return json({ ok: true, message: 'Le contrat de confidentialité a été renvoyé par e-mail (Yousign).' });
+		return json({
+			ok: true,
+			message: 'Le contrat de confidentialité a été renvoyé par e-mail (Yousign).',
+		});
 	} catch (error) {
 		console.error('[nda/resend]', error);
 		return json({ error: 'Échec du renvoi du NDA.' }, 500);

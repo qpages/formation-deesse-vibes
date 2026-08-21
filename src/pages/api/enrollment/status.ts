@@ -4,8 +4,9 @@ import {
 	TRACKING_COOKIE,
 	verifyEnrollmentSessionToken,
 } from '../../../lib/auth/session';
+import { findEnrollmentById } from '../../../lib/enrollment';
+import { buildEnrollmentStatusPayload } from '../../../lib/enrollment/status-payload';
 import { json } from '../../../lib/http';
-import { findEnrollmentById } from '../../../lib/services/enrollment';
 
 export const GET: APIRoute = async ({ request }) => {
 	const token = parseCookie(request.headers.get('cookie'), TRACKING_COOKIE);
@@ -23,13 +24,7 @@ export const GET: APIRoute = async ({ request }) => {
 		return json({ error: 'Inscription introuvable.' }, 404);
 	}
 
-	return json(
-		{
-			collectionStatus: enrollment.collectionStatus,
-			contractStatus: enrollment.contractStatus,
-			accessStatus: enrollment.accessStatus,
-		},
-		200,
-		{ 'Cache-Control': 'no-store' },
-	);
+	const payload = await buildEnrollmentStatusPayload(enrollment);
+
+	return json(payload, 200, { 'Cache-Control': 'no-store' });
 };

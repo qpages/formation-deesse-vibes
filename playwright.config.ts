@@ -25,12 +25,18 @@ export default defineConfig({
 		env: {
 			...process.env,
 			E2E_MOCK_PROVIDERS: '1',
+			SIGNATURE_PROVIDER: process.env.SIGNATURE_PROVIDER ?? 'docuseal',
+			SIGNATURE_MODE: process.env.SIGNATURE_MODE ?? 'embed',
 			SLACK_WEBHOOK_URL: '',
 			INNGEST_DEV: '1',
 			PUBLIC_SITE_URL: baseURL,
 			STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || 'sk_test_e2e_mock_not_a_live_key_xxxxx',
 			STRIPE_WEBHOOK_SECRET:
 				process.env.STRIPE_WEBHOOK_SECRET || 'whsec_e2e_playwright_dummy_secret_xx',
+			DOCUSEAL_WEBHOOK_SECRET:
+				process.env.DOCUSEAL_WEBHOOK_SECRET || 'whsec_e2e_docuseal_webhook_secret_xx',
+			ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@deesse-vibes.com',
+			ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'e2e-admin-password',
 		},
 	},
 });

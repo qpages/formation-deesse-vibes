@@ -10,6 +10,8 @@ const {
 	markEnrollmentRefunded,
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
+	syncEnrollmentSubscriptionDates,
+	syncSubscriptionScheduleState,
 	syncSubscriptionState,
 	findEnrollmentById,
 	findEnrollmentIdByPaymentIntentId,
@@ -19,21 +21,25 @@ const {
 	markEnrollmentRefunded: vi.fn(),
 	markSubscriptionScheduleCompleted: vi.fn(),
 	syncStripeInvoice: vi.fn(),
+	syncEnrollmentSubscriptionDates: vi.fn(),
+	syncSubscriptionScheduleState: vi.fn(),
 	syncSubscriptionState: vi.fn(),
 	findEnrollmentById: vi.fn(),
 	findEnrollmentIdByPaymentIntentId: vi.fn(),
 }));
 
-vi.mock('./payments', () => ({
+vi.mock('../payments', () => ({
 	confirmPaidCheckout,
 	ensureNdaAfterPayment,
 	markEnrollmentRefunded,
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
+	syncEnrollmentSubscriptionDates,
+	syncSubscriptionScheduleState,
 	syncSubscriptionState,
 }));
 
-vi.mock('./enrollment', () => ({
+vi.mock('../enrollment', () => ({
 	findEnrollmentByCheckoutSession: vi.fn(),
 	findEnrollmentById,
 	findEnrollmentByScheduleId: vi.fn(),
@@ -61,6 +67,13 @@ describe('isHandledStripeEventType', () => {
 		expect(isHandledStripeEventType('charge.refunded')).toBe(true);
 		expect(isHandledStripeEventType('charge.dispute.created')).toBe(true);
 	});
+
+	it('gère les events invoice lifecycle et schedule', () => {
+		expect(isHandledStripeEventType('invoice.created')).toBe(true);
+		expect(isHandledStripeEventType('invoice.finalized')).toBe(true);
+		expect(isHandledStripeEventType('invoice.upcoming')).toBe(true);
+		expect(isHandledStripeEventType('subscription_schedule.updated')).toBe(true);
+	});
 });
 
 describe('handleStripeProviderEvent — invoice.paid', () => {
@@ -76,6 +89,7 @@ describe('handleStripeProviderEvent — invoice.paid', () => {
 		);
 
 		expect(syncStripeInvoice).toHaveBeenCalled();
+		expect(syncEnrollmentSubscriptionDates).toHaveBeenCalledWith('enr_1');
 		expect(ensureNdaAfterPayment).toHaveBeenCalledWith('enr_1', 'in_123', { soft: true });
 		expect(result).toEqual({ enrollmentId: 'enr_1' });
 	});

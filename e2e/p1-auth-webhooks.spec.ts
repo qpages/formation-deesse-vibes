@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import Stripe from 'stripe';
 import { enrollmentCookie, seedEnrollment, seedMagicLink, uniqueEmail } from './helpers/seed';
@@ -30,8 +31,28 @@ function signedStripeEvent(id: string) {
 	return { payload, signature };
 }
 
+function docusealWebhookSecret() {
+	return process.env.DOCUSEAL_WEBHOOK_SECRET || 'whsec_e2e_docuseal_webhook_secret_xx';
+}
+
+function signedDocusealPayload(body: Record<string, unknown>) {
+	const payload = JSON.stringify(body);
+	const timestamp = String(Math.floor(Date.now() / 1000));
+	const signature = createHmac('sha256', docusealWebhookSecret())
+		.update(`${timestamp}.${payload}`)
+		.digest('hex');
+	return { payload, signature: `${timestamp}.${signature}` };
+}
+
+function adminCredentials() {
+	return {
+		email: process.env.ADMIN_EMAIL || 'admin@deesse-vibes.com',
+		password: process.env.ADMIN_PASSWORD || 'e2e-admin-password',
+	};
+}
+
 test.describe('P1 magic link, admin, IDOR, webhooks', () => {
-	test('5. magic link unused → cookie + /?connected=1', async ({ page, context }) => {
+	test('1. magic link unused → cookie + /?connected=1', async ({ page, context }) => {
 		const email = uniqueEmail('ml');
 		const token = `e2e-ml-${Date.now()}`;
 		const enrollment = await seedEnrollment({
@@ -51,7 +72,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		await expect(page.locator('#access-tracking')).toBeVisible();
 	});
 
-	test('6. même lien utilisé, autre navigateur → /?link=invalid', async ({ browser }) => {
+	test('2. même lien utilisé, autre navigateur → /?link=invalid', async ({ browser }) => {
 		const email = uniqueEmail('mlused');
 		const token = `e2e-ml-used-${Date.now()}`;
 		const enrollment = await seedEnrollment({
@@ -68,7 +89,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		await other.close();
 	});
 
-	test('7. magic-link/request connu et inconnu → même JSON 200', async ({ request }) => {
+	test('3. magic-link/request connu et inconnu → même JSON 200', async ({ request }) => {
 		const known = uniqueEmail('known');
 		await seedEnrollment({
 			email: known,
@@ -88,7 +109,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		expect((await knownRes.json()).ok).toBe(true);
 	});
 
-	test('8. /admin sans session → 302 login', async ({ request }) => {
+	test('4. /admin sans session → 302 login', async ({ request }) => {
 		const res = await request.get('/admin/inscriptions', { maxRedirects: 0 });
 		expect([302, 303, 401]).toContain(res.status());
 		if (res.status() !== 401) {
@@ -96,7 +117,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		}
 	});
 
-	test('9. nda/resend IDOR → 403', async ({ request }) => {
+	test('5. nda/resend IDOR → 403', async ({ request }) => {
 		const a = await seedEnrollment({
 			email: uniqueEmail('studenta'),
 			collectionStatus: 'current',
@@ -116,7 +137,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		expect(res.status()).toBe(403);
 	});
 
-	test('10. webhook Stripe sans / mauvaise signature → 400', async ({ request }) => {
+	test('6. webhook Stripe sans / mauvaise signature → 400', async ({ request }) => {
 		const missing = await request.post('/api/webhooks/stripe', {
 			data: '{}',
 			headers: { 'content-type': 'application/json' },
@@ -133,7 +154,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		expect(bad.status()).toBe(400);
 	});
 
-	test('11. même événement Stripe deux fois → duplicate: true', async ({ request }) => {
+	test('7. même événement Stripe deux fois → duplicate: true', async ({ request }) => {
 		const eventId = `evt_e2e_${Date.now()}`;
 		const { payload, signature } = signedStripeEvent(eventId);
 		const headers = {
@@ -156,29 +177,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		expect(body.duplicate).toBe(true);
 	});
 
-	test('12. nda-sync sans session → 401 ; déjà signé → signed true', async ({ request }) => {
-		const anonymous = await request.post('/api/enrollment/nda-sync');
-		expect(anonymous.status()).toBe(401);
-
-		const enrollment = await seedEnrollment({
-			email: uniqueEmail('ndasync'),
-			collectionStatus: 'paid',
-			contractStatus: 'signed',
-			accessStatus: 'active',
-		});
-		const cookie = await enrollmentCookie(enrollment.id);
-		const res = await request.post('/api/enrollment/nda-sync', {
-			headers: { Cookie: `dv_enrollment=${cookie.value}` },
-		});
-		expect(res.status(), await res.text()).toBe(200);
-		expect(await res.json()).toEqual({ ok: true, signed: true });
-	});
-
-	test('13. nda PDF sans session → 401 ; pas signé → 409 ; admin sans session → 401', async ({
-		request,
-		page,
-		context,
-	}) => {
+	test('8. nda PDF — matrice auth API', async ({ request }) => {
 		const anonymous = await request.get('/api/enrollment/nda');
 		expect(anonymous.status()).toBe(401);
 
@@ -199,7 +198,7 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 			collectionStatus: 'paid',
 			contractStatus: 'signed',
 			accessStatus: 'active',
-			yousignRequestId: crypto.randomUUID(),
+			nda: { externalRequestId: crypto.randomUUID() },
 		});
 		const signedCookie = await enrollmentCookie(signed.id);
 		const pdf = await request.get('/api/enrollment/nda', {
@@ -209,12 +208,6 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 		expect(pdf.headers()['content-type']).toBe('application/pdf');
 		expect(pdf.headers()['content-disposition']).toContain('contrat-confidentialite.pdf');
 
-		await context.addCookies([signedCookie]);
-		await page.goto('/');
-		await expect(
-			page.getByRole('link', { name: 'Télécharger le contrat de confidentialité' }),
-		).toBeVisible();
-
 		const adminAnon = await request.get(`/api/admin/enrollment/${signed.id}/nda`);
 		expect(adminAnon.status()).toBe(401);
 
@@ -222,5 +215,69 @@ test.describe('P1 magic link, admin, IDOR, webhooks', () => {
 			headers: { Cookie: `dv_enrollment=${unsignedCookie.value}` },
 		});
 		expect(learnerHitsAdmin.status()).toBe(401);
+	});
+
+	test('9. inscription signée — lien téléchargement NDA', async ({ page, context }) => {
+		const signed = await seedEnrollment({
+			email: uniqueEmail('nda-download-ui'),
+			collectionStatus: 'paid',
+			contractStatus: 'signed',
+			accessStatus: 'active',
+			nda: { externalRequestId: crypto.randomUUID() },
+		});
+		await context.addCookies([await enrollmentCookie(signed.id)]);
+		await page.goto('/');
+		await expect(page.locator('#access-tracking')).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Télécharger le contrat' })).toBeVisible();
+	});
+
+	test('10. webhook DocuSeal sans / mauvaise signature → 400, valide → received', async ({
+		request,
+	}) => {
+		const missing = await request.post('/api/webhooks/docuseal', {
+			data: '{}',
+			headers: { 'content-type': 'application/json' },
+		});
+		expect(missing.status()).toBe(400);
+
+		const bad = await request.post('/api/webhooks/docuseal', {
+			data: '{"event_type":"form.viewed"}',
+			headers: {
+				'content-type': 'application/json',
+				'x-docuseal-signature': `${Math.floor(Date.now() / 1000)}.deadbeef`,
+			},
+		});
+		expect(bad.status()).toBe(400);
+
+		const { payload, signature } = signedDocusealPayload({
+			event_type: 'form.viewed',
+			timestamp: new Date().toISOString(),
+		});
+		const ok = await request.post('/api/webhooks/docuseal', {
+			data: payload,
+			headers: {
+				'content-type': 'application/json',
+				'x-docuseal-signature': signature,
+			},
+		});
+		expect(ok.status(), await ok.text()).toBe(200);
+		expect(await ok.json()).toMatchObject({ received: true });
+	});
+
+	test('11. admin login → GET /admin/inscriptions 200', async ({ request }) => {
+		const { email, password } = adminCredentials();
+		const login = await request.post('/api/admin/login', {
+			data: { email, password },
+		});
+		expect(login.status(), await login.text()).toBe(200);
+
+		const setCookie = login.headers()['set-cookie'] ?? '';
+		const match = setCookie.match(/dv_admin=([^;]+)/);
+		expect(match, 'cookie dv_admin manquant').toBeTruthy();
+
+		const res = await request.get('/admin/inscriptions', {
+			headers: { Cookie: `dv_admin=${match![1]}` },
+		});
+		expect(res.status(), await res.text()).toBe(200);
 	});
 });

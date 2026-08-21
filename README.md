@@ -2,18 +2,19 @@
 
 Portail `formation.jessica-stamck.com` — Formation Matrice Évolution (1 849 €).
 
-Parcours : landing → Stripe Checkout → NDA Yousign → Teachizy.  
+Parcours : landing → Stripe Checkout → NDA (DocuSeal par défaut, Yousign optionnel) → Teachizy.  
 Suivi sur la même page via lien magique Brevo. Accès Teachizy uniquement via API directe après signature vérifiée.
 
 ## Stack
 
 - Astro 7 SSR + Vercel Functions
 - Postgres + Prisma ORM
-- Stripe, Yousign, Inngest, Brevo, Teachizy, Slack
+- Stripe, DocuSeal / Yousign, Inngest, Brevo, Teachizy, Slack
 - Admin : `/admin` (credentials env `ADMIN_EMAIL` / `ADMIN_PASSWORD`)
 
 ## Liens utiles
 
+- [DocuSeal (signature NDA)](https://docuseal.eu/)
 - [Documentation API Teachizy](https://developer.teachizy.fr/)
 - [Dashboard Prisma](https://console.prisma.io/m6drw0l75hj6xaykknxtzga2/dashboard)
 - [Dashboard Inngest (production)](https://app.inngest.com/env/production)

@@ -5,14 +5,14 @@ Portail `formation.jessica-stamck.com` — 1 849 € TTC (paiement unique ; majo
 ## Parcours
 
 ```
-Landing → Stripe Checkout → NDA Yousign → Teachizy (API)
+Landing → Stripe Checkout → NDA (DocuSeal par défaut) → Teachizy (API)
               ↑                              ↓
        même page `/` ← reconnexion sur le site (e-mail d’ouverture Brevo)
 ```
 
 1. Formulaire (nom, prénom, e-mail, consentements) → Checkout Stripe
-2. Webhook Stripe vérifié → Inngest `createNdaAfterPayment` → demande Yousign
-3. Signature NDA → webhook Yousign → Inngest `grantTeachizyAccess` → API Teachizy
+2. Webhook Stripe vérifié → Inngest `createNdaAfterPayment` → demande de signature (DocuSeal ou Yousign selon `SIGNATURE_PROVIDER`)
+3. Signature NDA → webhook provider → Inngest `grantTeachizyAccess` → API Teachizy
 4. Retour plus tard : e-mail d’ouverture → formation.jessica-stamck.com (même page)
 
 ```
@@ -73,24 +73,24 @@ Exemple plan ×4 : 4 lignes Payment, chacune avec son `status`.
 | `canceled` | Annulé |
 | `error` | Échec technique |
 
-Miroir provider Yousign : `yousignStatus` (`ongoing`, `done`…). Référence métier = `contractStatus`.
+Miroir provider (`nda_requests`) : statut technique (`ongoing`, `done`…). Référence métier = `contractStatus`.
 
-### Miroir Signer Yousign
+### Miroir signataire (provider)
 
 Détail d’engagement côté signataire (pas de nouveau `contractStatus`) :
 
 | Champ | Source | Rôle |
 | --- | --- | --- |
-| `yousignSignerStatus` | API Signer / webhooks | `initiated` → `notified` → … → `signed` |
-| `signatureLinkExpiresAt` | API Signer | Expiration du magic link (~48h) |
-| `ndaNotifiedAt` | `signer.notified` (+ sync) | E-mail parti / lien prêt |
-| `ndaLinkOpenedAt` | `signer.link_opened` | Lien ouvert |
-| `ndaSignedAt` | `signature_request.done` / `signed_at` | Date de signature |
-| `ndaDeliveryFailedAt` | `signer.notification_delivery_failed` | Bounce e-mail |
+| `ndaRequest.providerStatus` | API / webhooks | `initiated` → `notified` → … → `signed` |
+| `signatureLinkExpiresAt` | API Signer | Expiration du magic link (~48h, surtout Yousign redirect) |
+| `ndaNotifiedAt` | webhook notified (+ sync) | E-mail parti / lien prêt |
+| `ndaLinkOpenedAt` | webhook link_opened | Lien ouvert |
+| `ndaSignedAt` | signature done / `signed_at` | Date de signature |
+| `ndaDeliveryFailedAt` | webhook delivery_failed | Bounce e-mail |
 
 Engagement (`notified`, `link_opened`) : webhooks **sans Slack**.  
 Alertes Slack : `nda.monitor` (échecs) + `nda.signed`.  
-Le lien de signature n’est **jamais** stocké : fetch live (`getSignatureLink`) pour l’élève / action admin « Copier le lien ».
+Le lien de signature n’est **jamais** stocké : fetch live (`getSignSurface`) pour l’élève / action admin « Copier le lien ».
 
 ### `accessStatus`
 
@@ -132,7 +132,7 @@ Pas de table d’événements dédiée : vérité = `Enrollment` / `Payment` / `
 | --- | --- |
 | `checkout.created` | 1re session Checkout (+ plan financier) |
 | `payment.first_confirmed` | 1er paiement confirmé (entrée funnel) |
-| `nda.sent` | Lien Yousign provisionné |
+| `nda.sent` | Demande de signature provisionnée |
 | `nda.signed` | NDA signé |
 | `access.active` | Invité Teachizy / accès actif |
 
@@ -149,7 +149,7 @@ Pas de table d’événements dédiée : vérité = `Enrollment` / `Payment` / `
 
 | Kind | Sévérité | Quand |
 | --- | --- | --- |
-| `nda.monitor` | warn/critical | Yousign declined / expired / delivery fail… |
+| `nda.monitor` | warn/critical | Signature declined / expired / delivery fail… |
 | `access.suspended` | warn | Accès Teachizy suspendu |
 | `access.revoked` | critical | Accès révoqué |
 | `job.first_failure` | warn | 1er échec Inngest (retries à suivre) |
@@ -175,7 +175,7 @@ Sans `SLACK_WEBHOOK_URL` : warn console, parcours métier inchangé.
 
 ## Stack
 
-Astro 7 SSR (Vercel) · Prisma Postgres + Prisma ORM · Stripe · Yousign · Teachizy · Inngest · Brevo · Slack  
+Astro 7 SSR (Vercel) · Prisma Postgres + Prisma ORM · Stripe · DocuSeal (défaut) / Yousign · Teachizy · Inngest · Brevo · Slack  
 Admin `/admin` : `ADMIN_EMAIL` / `ADMIN_PASSWORD` + JWT
 
 ## Inngest
@@ -183,10 +183,11 @@ Admin `/admin` : `ADMIN_EMAIL` / `ADMIN_PASSWORD` + JWT
 | Fonction | Events | Cron | Retries | Rôle |
 | --- | --- | --- | --- | --- |
 | `processStripeWebhook` | `provider/stripe-event.received` | — | 2 | Traite un `ProviderEvent` Stripe (idempotent) |
-| `processYousignWebhook` | `provider/yousign-event.received` | — | 2 | Traite un `ProviderEvent` Yousign (idempotent) |
+| `processYousignWebhook` | `provider/yousign-event.received` | — | 2 | Traite un `ProviderEvent` Yousign (idempotent, si `SIGNATURE_PROVIDER=yousign`) |
+| `processDocusealWebhook` | `provider/docuseal-event.received` | — | 2 | Traite un `ProviderEvent` DocuSeal (idempotent, défaut) |
 | `createNdaAfterPayment` | `stripe/payment.confirmed`, `admin/recreate-nda` | — | 2 | Crée / active le NDA (alerte Slack) |
-| `grantTeachizyAccess` | `yousign/signature.done`, `enrollment/access.grant` | — | 2 | Invite Teachizy (alerte Slack) |
-| `resendNda` | `admin/resend-nda` | — | 3 | Renvoie le lien Yousign |
+| `grantTeachizyAccess` | `nda/signature.completed`, `enrollment/access.grant` | — | 2 | Invite Teachizy (alerte Slack) |
+| `resendNda` | `admin/resend-nda` | — | 3 | Renvoie le lien (Yousign redirect uniquement) |
 | `reconcileEnrollments` | `ops/reconcile-enrollments` | `0 4 * * *` | 2 | Ré-applique `applyAccessPolicy` |
 | `purgeWebhookPayloads` | `ops/purge-webhook-payloads` | `0 3 * * *` | 2 | Null les payloads chiffrés > 30 j |
 
@@ -219,8 +220,28 @@ Dashboard Inngest : http://localhost:8288
 | Source | Endpoint |
 | --- | --- |
 | Stripe | `POST /api/webhooks/stripe` |
+| DocuSeal | `POST /api/webhooks/docuseal` |
 | Yousign | `POST /api/webhooks/yousign` |
 | Inngest | `GET/POST /api/inngest` |
+
+> ⚠️ **L'URL webhook DOIT inclure le chemin complet.** Une URL sans chemin
+> (ex. `https://xxxx.ngrok-free.dev`) POST à la racine → le handler n'est jamais
+> atteint → **0 run Inngest** sur signature/paiement (cause du symptôme « il faut
+> actualiser »). Config exacte à renseigner côté provider :
+>
+> - **DocuSeal** → URL `https://<host>/api/webhooks/docuseal`. Événements à cocher :
+>   `form.completed` (mono-signataire) **et/ou** `submission.completed`. Signature
+>   HMAC : onglet Security → HMAC, copier le `whsec_…` dans `DOCUSEAL_WEBHOOK_SECRET`
+>   (header `X-Docuseal-Signature`, format `timestamp.signature`). `form.viewed`/
+>   `form.started` sont ignorés côté app (200 no-op), inutile de les retirer.
+> - **Stripe** → endpoint `https://<host>/api/webhooks/stripe`, événements :
+>   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+>   `invoice.*`, `customer.subscription.*`, `subscription_schedule.*`,
+>   `charge.refunded`, `charge.dispute.created`. Secret `whsec_…` → `STRIPE_WEBHOOK_SECRET`.
+>
+> Filet sans webhook : le polling client rejoue `reconcileEnrollment` via
+> `POST /api/enrollment/reconcile`, donc la page avance même si un webhook manque —
+> mais configurez quand même les webhooks pour les effets serveur (accès Teachizy).
 
 ## Consoles
 
@@ -228,7 +249,8 @@ Dashboard Inngest : http://localhost:8288
 | --- | --- |
 | Prisma Postgres | https://console.prisma.io |
 | Stripe | prix `STRIPE_PRICE_UNIQUE` (1 849 €) + X2/X4/X6 |
-| Yousign | template NDA côté Yousign (pas dans le repo) |
+| DocuSeal | template NDA + webhook (`SIGNATURE_PROVIDER=docuseal`, défaut) |
+| Yousign | template NDA côté Yousign (option `SIGNATURE_PROVIDER=yousign`) |
 | Brevo | from `formation@deesse-vibes.com` |
 | Inngest | https://app.inngest.com |
 | Teachizy | https://developer.teachizy.fr/ |
@@ -243,9 +265,9 @@ Secrets : `.env.example` → `.env` (local) / Vercel (prod).
 - Doublons e-mail bloqués avant paiement
 - Codes promo Stripe activés
 - Renvoi NDA : max 1 / 15 min, 5 / jour
-- NDA signé stocké chez Yousign (IDs seulement en DB)
+- NDA signé stocké chez le provider (IDs seulement en DB)
 - Payloads webhook chiffrés, rétention 30 jours
-- Preview ≠ prod (Stripe / Yousign / Teachizy / Prisma Postgres)
+- Preview ≠ prod (Stripe / DocuSeal ou Yousign / Teachizy / Prisma Postgres)
 - Slack = canal ops (facade `notifyOps`), pas un second journal d’événements
 
 ## Qualité : invariants → tests → gate live
@@ -265,15 +287,15 @@ Si un invariant est faux en prod = incident. Chaque règle doit avoir **un owner
 | # | Règle | Owner typique | Si violé |
 | --- | --- | --- | --- |
 | 1 | 1er paiement confirmé → `ensureNdaAfterPayment` sur **tous** les chemins (webhook Stripe, retour Checkout, sync admin) | Inngest / payments | Élève payé, jamais de NDA |
-| 2 | NDA `signed` → `ensureTeachizyAfterSignature` sur **tous** les chemins (webhook Yousign, sync admin) | Inngest / access | NDA OK, pas d’accès |
+| 2 | NDA `signed` → `ensureTeachizyAfterSignature` sur **tous** les chemins (webhook provider, sync admin) | Inngest / access | NDA OK, pas d’accès |
 | 3 | Plans `x2` / `x4` / `x6` : Subscription Schedule avec durée = N mois et `end_behavior: cancel` (pas d’abo infini). API Stripe actuelle : `phases[].duration`, **pas** `iterations` | `src/lib/stripe.ts` | Prélèvements au-delà du plan |
 | 4 | Pas d’`accessStatus: active` sans 1er paiement OK + `contractStatus: signed` + pas d’impayé bloquant | `access` / eligibility | Accès cours non autorisé |
 | 5 | `collectionStatus: past_due` → accès Teachizy coupé (`suspended`) via API réelle, pas DB-only | Teachizy + payments | Cours ouverts malgré impayé |
 | 6 | `collectionStatus: refunded` (refund/dispute) → `accessStatus: revoked` | Stripe webhooks + access | Accès après remboursement |
-| 7 | Webhooks Stripe/Yousign : signature vérifiée ; même event id → pas de double effet métier | webhook handlers | Double NDA / double charge logique |
-| 8 | Lien de signature Yousign **jamais** persisté en DB (fetch live seulement) | yousign / enrollment | Fuite / lien périmé stocké |
+| 7 | Webhooks Stripe / provider signature : signature vérifiée ; même event id → pas de double effet métier | webhook handlers | Double NDA / double charge logique |
+| 8 | Lien de signature **jamais** persisté en DB (fetch live seulement) | signature / enrollment | Fuite / lien périmé stocké |
 
-Gaps connus aujourd’hui (ne pas “oublier” au gate) : voir `task.md` §1 (Teachizy suspend/revoke API, refund→revoke, Brevo).
+Gaps connus (ne pas oublier au gate) : Teachizy suspend/revoke API, refund→revoke, Brevo transactional complet.
 
 ### Tests (preuve exécutable)
 
@@ -284,7 +306,7 @@ Minimum avant live — au-delà = bonus.
 | Unitaire | Payload `ensureSubscriptionSchedule` : `duration` + `end_behavior: cancel` ; pas de `iterations` | `pnpm test` rouge si on régresse |
 | Unitaire | Eligibility accès + mapping refund/past_due → statut accès | Idem |
 | Unitaire / intégration | Idempotence `ProviderEvent` (replay même id) | Pas de double side-effect |
-| E2E test-mode | Parcours **unique** : payé → NDA → invite Teachizy | Checklist `task.md` §3 |
+| E2E test-mode | Parcours **unique** : payé → NDA → invite Teachizy | Checklist gate live ci-dessous |
 | E2E test-mode | Parcours **x4** : schedule Stripe = 4 mois + cancel ; pas de 5e prélèvement | Vérifié Dashboard test ou API |
 | E2E test-mode | Magic link → même page `/` statut cohérent | OK manuel ou scripté |
 
@@ -304,7 +326,7 @@ Copier dans la PR ou le runbook ; cocher seulement avec preuve (lien Dashboard, 
 - [ ] Invariants 5–6 : implémentés **ou** décision écrite d’accepter le risque (sinon NO-GO)
 - [ ] Stripe **test** : parcours unique + x4 OK (schedule s’arrête)
 - [ ] Stripe **live** : prix + webhooks endpoint prod verts
-- [ ] Yousign : template NDA juridique final + webhook prod
+- [ ] Provider signature (DocuSeal ou Yousign) : template NDA juridique final + webhook prod
 - [ ] Teachizy : UUID formation + invite OK ; coupe accès réelle si 5 exigé
 - [ ] DB prod migrée (`prisma migrate deploy`)
 - [ ] Secrets prod ≠ défauts ; admin password fort ; secrets JWT/session ≥ 32
@@ -315,7 +337,7 @@ Copier dans la PR ou le runbook ; cocher seulement avec preuve (lien Dashboard, 
 
 - [ ] Slack ops branché (`notifyOps`)
 - [x] CGV / confidentialité / mentions
-- [ ] Handoff accès outils au client (`task.md` §5)
+- [ ] Handoff accès outils au client (consoles Stripe, DocuSeal/Yousign, Teachizy, Vercel)
 
 **Verdict**
 
@@ -324,5 +346,3 @@ Copier dans la PR ou le runbook ; cocher seulement avec preuve (lien Dashboard, 
 | **NO-GO** | ≥1 bloquant absolu ouvert, ou invariant 3/4/7 cassé |
 | **GO avec conditions** | Bloquants OK ; gaps 5–6 ou Brevo listés avec owner + date |
 | **GO** | Bloquants + recommandés OK |
-
-Todo détaillée ops/code : [`task.md`](../task.md).

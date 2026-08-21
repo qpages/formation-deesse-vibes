@@ -43,6 +43,8 @@ const { signUrl } = Astro.props;
 </div>
 
 <script>
+	import { copyText } from '../../../lib/client/copy-text';
+
 	const input = document.getElementById('nda-sign-url') as HTMLInputElement | null;
 	const btn = document.getElementById('copy-sign-url');
 	const label = btn?.querySelector<HTMLElement>('[data-copy-label]');
@@ -50,15 +52,7 @@ const { signUrl } = Astro.props;
 
 	async function copyUrl() {
 		if (!input || !btn || !label) return;
-		const value = input.value;
-		try {
-			await navigator.clipboard.writeText(value);
-		} catch {
-			input.select();
-			document.execCommand('copy');
-			input.setSelectionRange(0, 0);
-			input.blur();
-		}
+		if ((await copyText(input.value)) !== 'copied') return;
 		btn.dataset.copied = 'true';
 		label.textContent = 'Copié';
 		if (feedback) feedback.textContent = 'Lien copié dans le presse-papiers.';

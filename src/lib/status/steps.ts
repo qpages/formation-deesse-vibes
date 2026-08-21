@@ -1,18 +1,21 @@
-import type { YousignRequestStatus } from '../../generated/prisma/client';
 import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
+import { resolveSignatureCheckoutFlashCopy } from '../signature/helpers';
 import {
-	ACCESS_STATUS_LABELS,
-	COLLECTION_STATUS_LABELS,
-	CONTRACT_STATUS_LABELS,
-	YOUSIGN_STATUS_LABELS,
-} from './labels';
+	isSignatureRequestFailure,
+	mapSignatureRequestPhase,
+	signatureRequestPhaseLabel,
+} from '../signature/status-phase';
+import type { SignSurface } from '../signature/types';
+import type { SignatureProvider } from '../../generated/prisma/client';
+import { ACCESS_STATUS_LABELS, COLLECTION_STATUS_LABELS, CONTRACT_STATUS_LABELS } from './labels';
 import type { BadgeTone, OrthogonalStatuses, PrimaryAction, StepKey, StepState } from './types';
-import { YOUSIGN_FAILURE } from './yousign';
 
 export const TEACHIZY_ACADEMY_URL = 'https://jsmatriceacademy.teachizy.fr';
 
 export const ENROLLMENT_POLL_INTERVAL_MS = 2_000;
 export const ENROLLMENT_POLL_MAX_MS = 180_000;
+/** Cadence min entre deux POST /api/enrollment/reconcile (sans surface NDA). Alignée sur le tick de poll. */
+export const ENROLLMENT_RECONCILE_INTERVAL_MS = ENROLLMENT_POLL_INTERVAL_MS;
 
 export function stepTone(state: StepState): BadgeTone {
 	switch (state) {
@@ -76,8 +79,9 @@ export function stepLabel(state: StepState): string {
 /** Colonnes admin : Paiement / Signature / Accès depuis les 3 enums. */
 export function adminPipelineBadges(
 	input: OrthogonalStatuses & {
-		yousignStatus?: YousignRequestStatus | null;
-		yousignLastError?: string | null;
+		ndaProvider?: SignatureProvider | null;
+		ndaProviderStatus?: string | null;
+		ndaLastError?: string | null;
 	},
 ): {
 	paiement: { label: string; tone: BadgeTone };
@@ -85,6 +89,7 @@ export function adminPipelineBadges(
 	acces: { label: string; tone: BadgeTone };
 } {
 	const steps = stepStates(input);
+	const providerPhase = mapSignatureRequestPhase(input.ndaProvider, input.ndaProviderStatus);
 
 	if (input.collectionStatus === 'refunded' || input.accessStatus === 'revoked') {
 		return {
@@ -93,8 +98,8 @@ export function adminPipelineBadges(
 				tone: 'neutral',
 			},
 			signature: {
-				label: input.yousignStatus
-					? YOUSIGN_STATUS_LABELS[input.yousignStatus]
+				label: providerPhase
+					? signatureRequestPhaseLabel(providerPhase)
 					: CONTRACT_STATUS_LABELS[input.contractStatus],
 				tone: 'neutral',
 			},
@@ -110,16 +115,16 @@ export function adminPipelineBadges(
 		tone: stepTone(steps.nda),
 	};
 
-	if (input.yousignStatus && YOUSIGN_FAILURE.has(input.yousignStatus)) {
+	if (isSignatureRequestFailure(providerPhase)) {
 		signature = {
-			label: YOUSIGN_STATUS_LABELS[input.yousignStatus],
+			label: signatureRequestPhaseLabel(providerPhase),
 			tone: 'action',
 		};
-	} else if (input.yousignStatus === 'done' || input.contractStatus === 'signed') {
+	} else if (providerPhase === 'signed' || input.contractStatus === 'signed') {
 		signature = { label: 'Signé', tone: 'success' };
-	} else if (input.yousignStatus === 'ongoing' || input.contractStatus === 'sent') {
+	} else if (providerPhase === 'awaiting_signature' || input.contractStatus === 'sent') {
 		signature = { label: 'En attente', tone: 'action' };
-	} else if (input.yousignLastError && input.contractStatus === 'pending') {
+	} else if (input.ndaLastError && input.contractStatus === 'pending') {
 		signature = { label: 'Erreur', tone: 'action' };
 	} else if (steps.nda === 'en_cours') {
 		signature = { label: 'En cours', tone: 'progress' };
@@ -135,7 +140,7 @@ export function adminPipelineBadges(
 export function shouldPollEnrollment(
 	input: OrthogonalStatuses & {
 		hasCheckoutSession?: boolean;
-		hasNdaSignUrl?: boolean;
+		hasNdaSignSurface?: boolean;
 	},
 ): boolean {
 	if (input.collectionStatus === 'pending' && input.hasCheckoutSession) return true;
@@ -149,10 +154,10 @@ export function checkoutSuccessFlash(input: OrthogonalStatuses): string | null {
 		return 'Paiement en cours de confirmation. Cette page se met à jour automatiquement.';
 	}
 	if (input.contractStatus === 'sent') {
-		return 'Paiement reçu. Signez votre contrat de confidentialité pour continuer.';
+		return resolveSignatureCheckoutFlashCopy('sent');
 	}
 	if (input.contractStatus === 'pending') {
-		return 'Paiement reçu. Nous préparons votre contrat de confidentialité.';
+		return resolveSignatureCheckoutFlashCopy('pending');
 	}
 	return null;
 }
@@ -182,7 +187,7 @@ export function statusMessage(input: OrthogonalStatuses): string[] | null {
 
 export function primaryAction(
 	input: OrthogonalStatuses,
-	ndaSignUrl?: string | null,
+	ndaSignSurface?: SignSurface | null,
 ): PrimaryAction {
 	if (input.accessStatus === 'revoked' || input.collectionStatus === 'refunded') {
 		return { kind: 'none', label: 'Contacter un administrateur' };
@@ -191,9 +196,10 @@ export function primaryAction(
 		return { kind: 'checkout', label: 'Je m’inscris' };
 	}
 	if (input.contractStatus === 'pending' || input.contractStatus === 'sent') {
-		return ndaSignUrl
-			? { kind: 'sign_nda', label: 'Signer mon accord', href: ndaSignUrl }
-			: { kind: 'refresh', label: 'Actualiser' };
+		if (ndaSignSurface?.kind === 'redirect') {
+			return { kind: 'sign_nda', label: 'Signer mon accord', href: ndaSignSurface.url };
+		}
+		return { kind: 'refresh', label: 'Actualiser' };
 	}
 	if (input.accessStatus === 'pending' || input.accessStatus === 'not_eligible') {
 		return { kind: 'refresh', label: 'Actualiser' };

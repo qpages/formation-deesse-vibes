@@ -4,6 +4,7 @@ import type {
 	CollectionStatus,
 	ContractStatus,
 	Enrollment,
+	NdaRequest,
 	Payment,
 	Prisma,
 	User,
@@ -11,7 +12,8 @@ import type {
 import { getPrisma } from '../prisma';
 import { paginate, type Pagination } from '../pagination';
 import { stripeDashboardUrl } from '../stripe';
-import { yousignAppUrl } from '../yousign';
+import { resolveNdaProvider, signatureProviderAppUrl } from '../signature/helpers';
+import { resolveExternalRequestId, resolveExternalSignerId } from '../signature/nda-request';
 import { adminPipelineBadges } from '../status';
 import { adminActionLabel } from './action-labels';
 import { visibleActions, type AdminActionKey } from './actions';
@@ -34,11 +36,14 @@ export type AdminListFilters = {
 
 export type AdminEnrollmentRow = Enrollment & {
 	user: User;
+	ndaRequest: NdaRequest | null;
 	email: string;
+	externalRequestId: string | null;
+	externalSignerId: string | null;
 	pipeline: ReturnType<typeof adminPipelineBadges>;
 	paymentSummary: AdminPaymentSummary;
 	stripeUrl: string | null;
-	yousignUrl: string | null;
+	signatureUrl: string | null;
 	displayName: string;
 	visibleActions: AdminActionKey[];
 };
@@ -114,20 +119,28 @@ export function adminListHref(input: {
 }
 
 export function toAdminEnrollmentRow(
-	row: Enrollment & { user: User },
+	row: Enrollment & { user: User; ndaRequest?: NdaRequest | null },
 	payments: Payment[],
 ): AdminEnrollmentRow {
+	const { user, ndaRequest, ...enrollment } = row;
 	const paymentSummary = buildAdminPaymentSummary(row, payments);
+	const externalRequestId = resolveExternalRequestId(row);
+	const externalSignerId = resolveExternalSignerId(row);
 
 	return {
-		...row,
+		...enrollment,
+		user,
+		ndaRequest: ndaRequest ?? null,
 		email: row.user.email,
+		externalRequestId,
+		externalSignerId,
 		pipeline: adminPipelineBadges({
 			collectionStatus: row.collectionStatus,
 			contractStatus: row.contractStatus,
 			accessStatus: row.accessStatus,
-			yousignStatus: row.yousignStatus,
-			yousignLastError: row.yousignLastError,
+			ndaLastError: row.ndaRequest?.lastError,
+			ndaProvider: row.ndaRequest?.provider,
+			ndaProviderStatus: row.ndaRequest?.providerStatus,
 		}),
 		paymentSummary,
 		stripeUrl: stripeDashboardUrl({
@@ -136,7 +149,7 @@ export function toAdminEnrollmentRow(
 			subscriptionId: row.stripeSubscriptionId,
 			scheduleId: row.stripeScheduleId,
 		}),
-		yousignUrl: yousignAppUrl(row.yousignRequestId),
+		signatureUrl: signatureProviderAppUrl(resolveNdaProvider(row), externalRequestId),
 		displayName: `${row.user.firstName} ${row.user.lastName}`,
 		visibleActions: visibleActions(row),
 	};
@@ -148,6 +161,7 @@ export async function listEnrollmentsForExport() {
 		orderBy: { createdAt: 'desc' },
 		include: {
 			user: true,
+			ndaRequest: true,
 			payments: { orderBy: { installmentNumber: 'asc' } },
 		},
 	});
@@ -175,7 +189,7 @@ export async function listAdminEnrollments(input: AdminListFilters): Promise<Adm
 
 	const enrollments = await prisma.enrollment.findMany({
 		where,
-		include: { user: true },
+		include: { user: true, ndaRequest: true },
 		orderBy: { createdAt: 'desc' },
 		skip: pagination.skip,
 		take: pagination.take,
@@ -201,6 +215,7 @@ export async function getAdminEnrollmentDetail(id: string): Promise<AdminEnrollm
 		where: { id },
 		include: {
 			user: true,
+			ndaRequest: true,
 			payments: { orderBy: { installmentNumber: 'asc' } },
 			adminActions: { orderBy: { createdAt: 'desc' }, take: 50 },
 		},

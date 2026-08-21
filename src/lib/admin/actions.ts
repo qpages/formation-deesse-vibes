@@ -4,8 +4,14 @@ import type {
 	CollectionStatus,
 	ContractStatus,
 	Enrollment,
+	NdaRequest,
 } from '../../generated/prisma/client';
 import { isAwaitingNda, isPaidEnough } from '../enrollment-gates';
+import {
+	resolveExternalRequestId,
+	resolveExternalSignerId,
+	resolveSignKind,
+} from '../signature/nda-request';
 
 export const adminActionZones = ['metier', 'actions'] as const;
 export type AdminActionZone = (typeof adminActionZones)[number];
@@ -25,7 +31,7 @@ export const adminActionKeys = [
 	'retrigger_teachizy',
 	'sync_teachizy',
 	'sync_payment',
-	'sync_yousign',
+	'sync_nda',
 	'recreate_nda',
 	'copy_nda_link',
 ] as const;
@@ -55,7 +61,7 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		eyebrow: 'Signature',
 		title: 'Copier le lien de signature',
 		description:
-			'Récupérer le lien Yousign actuel de {name} et le copier dans le presse-papiers (fetch live, non stocké).',
+			'Récupérer le lien de signature actuel de {name} et le copier dans le presse-papiers (fetch live, non stocké).',
 		confirm: 'Copier le lien',
 	},
 	{
@@ -92,36 +98,36 @@ export const ADMIN_ACTIONS: AdminActionDef[] = [
 		confirm: 'Synchroniser',
 	},
 	{
-		action: 'sync_yousign',
-		label: 'Sync statut Yousign',
+		action: 'sync_nda',
+		label: 'Sync NDA',
 		zone: 'actions',
 		execution: 'sync',
 		eyebrow: 'Action',
-		title: 'Synchroniser Yousign',
+		title: 'Synchroniser le NDA',
 		description:
-			'Lire le statut Yousign de {name} et aligner contractStatus / yousignStatus. Invite Teachizy si le NDA est signé (si la file est disponible).',
+			'Lire le statut de signature de {name} chez le provider et aligner contractStatus. Invite Teachizy si le NDA est signé (si la file est disponible).',
 		confirm: 'Synchroniser',
 	},
 	{
 		action: 'resend_nda',
-		label: 'Renvoyer le lien Yousign',
+		label: 'Renvoyer le lien de signature',
 		zone: 'actions',
 		execution: 'flow',
 		eyebrow: 'Action',
-		title: 'Renvoyer le lien Yousign',
+		title: 'Renvoyer le lien de signature',
 		description:
-			'Renvoyer à {name} le même lien de signature Yousign (réactivation). L’ancien lien reste valide.',
+			'Renvoyer à {name} le même lien de signature (réactivation). L’ancien lien reste valide.',
 		confirm: 'Renvoyer le lien',
 	},
 	{
 		action: 'recreate_nda',
-		label: 'Recréer un lien Yousign',
+		label: 'Recréer un lien de signature',
 		zone: 'actions',
 		execution: 'flow',
 		eyebrow: 'Action',
-		title: 'Recréer un lien Yousign',
+		title: 'Recréer un lien de signature',
 		description:
-			'Créer une nouvelle demande Yousign pour {name}. L’ancien lien ne sera plus valide.',
+			'Créer une nouvelle demande de signature pour {name}. L’ancien lien ne sera plus valide.',
 		confirm: 'Recréer le lien',
 	},
 ];
@@ -155,24 +161,29 @@ export function adminActionMetaForClient(): AdminActionMetaClient {
 
 type VisibilityInput = Pick<
 	Enrollment,
-	| 'collectionStatus'
-	| 'contractStatus'
-	| 'accessStatus'
-	| 'yousignRequestId'
-	| 'yousignSignerId'
-	| 'stripeCheckoutSessionId'
->;
+	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'stripeCheckoutSessionId'
+> & {
+	ndaRequest?: Pick<
+		NdaRequest,
+		'provider' | 'externalRequestId' | 'externalSignerId' | 'signKind'
+	> | null;
+};
 
 /** Miroir des gates API (sync). L’API reste source de vérité (cooldown relance, etc.). */
 export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boolean {
 	const paidEnough = isPaidEnough(e.collectionStatus);
+	const requestId = resolveExternalRequestId(e);
+	const signerId = resolveExternalSignerId(e);
 
 	switch (action) {
 		case 'resend_nda':
-			return isAwaitingNda(e) && Boolean(e.yousignRequestId);
+			return isAwaitingNda(e) && Boolean(requestId) && resolveSignKind(e) === 'redirect';
 		case 'copy_nda_link':
 			return (
-				e.contractStatus === 'sent' && Boolean(e.yousignRequestId) && Boolean(e.yousignSignerId)
+				e.contractStatus === 'sent' &&
+				Boolean(requestId) &&
+				Boolean(signerId) &&
+				resolveSignKind(e) === 'redirect'
 			);
 		case 'recreate_nda':
 			return paidEnough && e.contractStatus !== 'signed';
@@ -182,8 +193,8 @@ export function isActionVisible(action: AdminActionKey, e: VisibilityInput): boo
 			return e.accessStatus !== 'revoked' && e.contractStatus === 'signed';
 		case 'sync_payment':
 			return Boolean(e.stripeCheckoutSessionId);
-		case 'sync_yousign':
-			return Boolean(e.yousignRequestId);
+		case 'sync_nda':
+			return Boolean(requestId);
 		default:
 			return false;
 	}

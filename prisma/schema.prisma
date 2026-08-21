@@ -37,31 +37,6 @@ enum AccessStatus {
   revoked
 }
 
-// État de la demande Yousign (indépendant du statut métier).
-enum YousignRequestStatus {
-  ongoing
-  done
-  expired
-  declined
-  canceled
-  rejected
-  error
-}
-
-/// Miroir 1:1 du status Signer API Yousign.
-/// @see https://developers.yousign.com/docs/signer-1
-enum YousignSignerStatus {
-  initiated
-  notified
-  verified
-  consent_given
-  processing
-  declined
-  signed
-  aborted
-  error
-}
-
 enum PaymentPlanId {
   unique
   x2
@@ -94,6 +69,17 @@ enum SubscriptionStatus {
 enum Provider {
   stripe
   yousign
+  docuseal
+}
+
+enum SignatureProvider {
+  yousign
+  docuseal
+}
+
+enum SignKind {
+  redirect
+  embed
 }
 
 enum ProviderEventStatus {
@@ -143,16 +129,18 @@ model Enrollment {
   fullyPaidAt          DateTime?
   nextInstallmentDueAt DateTime?
   subscriptionStatus   SubscriptionStatus?
+  /// Fin de période de facturation courante (min items[].current_period_end).
+  currentPeriodEnd     DateTime?
+  /// Fin prévue de l’abonnement (dernière phase du schedule ou cancel_at).
+  subscriptionEndsAt   DateTime?
+  /// Comportement du schedule à la fin (cancel | release).
+  stripeScheduleEndBehavior String?
 
   stripeCheckoutSessionId String? @unique
   stripePaymentIntentId   String? @unique
   stripeSubscriptionId    String? @unique
   stripeScheduleId        String? @unique
 
-  yousignRequestId     String?               @unique
-  yousignSignerId      String?
-  yousignStatus        YousignRequestStatus?
-  yousignSignerStatus  YousignSignerStatus?
   signatureLinkExpiresAt DateTime?
   ndaNotifiedAt        DateTime?
   ndaLinkOpenedAt      DateTime?
@@ -161,8 +149,6 @@ model Enrollment {
   ndaResendCount       Int                   @default(0)
   ndaResendDay         DateTime?
   ndaLastResendAt      DateTime?
-  yousignLastError     String?
-  yousignLastErrorAt   DateTime?
 
   accessGrantedAt   DateTime?
   accessSuspendedAt DateTime?
@@ -176,6 +162,7 @@ model Enrollment {
   payments     Payment[]
   magicLinks   MagicLink[]
   adminActions AdminAction[]
+  ndaRequest   NdaRequest?
 
   @@index([userId])
   @@index([collectionStatus])
@@ -257,4 +244,24 @@ model AdminAction {
   @@index([enrollmentId])
   @@index([createdAt])
   @@map("admin_actions")
+}
+
+model NdaRequest {
+  id                String            @id @default(cuid())
+  enrollmentId      String            @unique
+  enrollment        Enrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  provider          SignatureProvider
+  externalRequestId String
+  externalSignerId  String?
+  signKind          SignKind          @default(redirect)
+  providerStatus    String?
+  lastError         String?
+  lastErrorAt       DateTime?
+  metadata          Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([provider, externalRequestId])
+  @@index([enrollmentId])
+  @@map("nda_requests")
 }

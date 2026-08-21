@@ -36,10 +36,13 @@ jobs:
       DEV_DATABASE_URL: postgresql://deesse:deesse@localhost:5432/formation_deesse_vibes
       PUBLIC_SITE_URL: http://127.0.0.1:4322
       E2E_MOCK_PROVIDERS: '1'
+      SIGNATURE_PROVIDER: docuseal
+      SIGNATURE_MODE: embed
       INNGEST_DEV: '1'
       SLACK_WEBHOOK_URL: ''
       STRIPE_SECRET_KEY: sk_test_e2e_mock_not_a_live_key_xxxxx
       STRIPE_WEBHOOK_SECRET: whsec_e2e_playwright_dummy_secret_xx
+      DOCUSEAL_WEBHOOK_SECRET: whsec_e2e_docuseal_webhook_secret_xx
       STRIPE_PRICE_ID: price_e2e_mock
       SESSION_SECRET: e2e-session-secret-must-be-32-chars-min
       MAGIC_LINK_SECRET: e2e-magic-link-secret-32-chars-minxx

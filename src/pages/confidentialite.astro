@@ -4,12 +4,14 @@ import Container from '../components/ui/Container.astro';
 import Section from '../components/ui/Section.astro';
 import BackLink from '../components/ui/BackLink.astro';
 import { getEnv } from '../lib/env';
+import { resolveSignaturePrivacyDisclosure } from '../lib/signature/helpers';
 
 const env = getEnv();
 const contactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL ?? 'contact@deesse-vibes.com';
 const siteUrl = env.PUBLIC_SITE_URL ?? 'https://formation-deesse-vibes.vercel.app/';
 const siteHost = new URL(siteUrl).host;
 const updatedAt = '19 août 2026';
+const signaturePrivacy = resolveSignaturePrivacyDisclosure();
 ---
 
 <MarketingLayout
@@ -30,8 +32,8 @@ const updatedAt = '19 août 2026';
 		<div class="prose-legal text-ink-soft max-w-2xl space-y-8 text-sm leading-relaxed">
 			<p>
 				Cette politique s’adresse aux personnes qui s’inscrivent à la Formation Matrice Évolution
-				sur <strong>{siteHost}</strong>. Elle est rédigée en langage clair, conformément
-				aux exigences du RGPD.
+				sur <strong>{siteHost}</strong>. Elle est rédigée en langage clair, conformément aux
+				exigences du RGPD.
 			</p>
 
 			<section class="space-y-3">
@@ -42,10 +44,9 @@ const updatedAt = '19 août 2026';
 					</li>
 					<li>11 chemin de la Ferrière, 06800 Cagnes-sur-Mer, France</li>
 					<li>
-						Contact :{" "}
-						<a
-							href={`mailto:${contactEmail}`}
-							class="text-ink hover:underline underline-offset-2">{contactEmail}</a
+						Contact :{' '}
+						<a href={`mailto:${contactEmail}`} class="text-ink underline-offset-2 hover:underline"
+							>{contactEmail}</a
 						>
 					</li>
 				</ul>
@@ -63,52 +64,54 @@ const updatedAt = '19 août 2026';
 				</p>
 				<ul class="list-disc space-y-2 pl-5">
 					<li>
-						<strong>Votre identité et vos coordonnées</strong> (prénom, nom, e-mail) : pour créer
-						votre dossier d’inscription et vous contacter.
+						<strong>Votre identité et vos coordonnées</strong> (prénom, nom, e-mail) : pour créer votre
+						dossier d’inscription et vous contacter.
 					</li>
 					<li>
-						<strong>Vos consentements</strong> (date d’acceptation des CGV, de cette politique,
-						de l’engagement de signature du contrat de confidentialité et de la renonciation au droit de rétractation
+						<strong>Vos consentements</strong> (date d’acceptation des CGV, de cette politique, de l’engagement
+						de signature du contrat de confidentialité et de la renonciation au droit de rétractation
 						pour l’accès immédiat) : pour conserver la preuve de votre accord.
 					</li>
 					<li>
-						<strong>Informations de commande et de paiement</strong> (montant, plan de paiement,
-						statut des échéances, références de transaction) : pour traiter votre achat et votre
-						facturation. Vos coordonnées bancaires sont saisies directement chez notre prestataire
-						de paiement ; nous n’y avons pas accès.
+						<strong>Informations de commande et de paiement</strong> (montant, plan de paiement, statut
+						des échéances, références de transaction) : pour traiter votre achat et votre facturation.
+						Vos coordonnées bancaires sont saisies directement chez notre prestataire de paiement ; nous
+						n’y avons pas accès.
 					</li>
 					<li>
-						<strong>Informations liées à la signature du contrat de confidentialité</strong> (statut, dates) : pour
-						débloquer votre accès à la formation. Le document signé est conservé par notre
+						<strong>Informations liées à la signature du contrat de confidentialité</strong> (statut,
+						dates) : pour débloquer votre accès à la formation. Le document signé est conservé par notre
 						prestataire de signature électronique.
 					</li>
 					<li>
-						<strong>Informations d’accès à la formation</strong> : pour vous inviter sur la
-						plateforme Teachizy et gérer l’activation ou la suspension de votre accès le cas
-						échéant.
+						<strong>Informations d’accès à la formation</strong> : pour vous inviter sur la plateforme
+						Teachizy et gérer l’activation ou la suspension de votre accès le cas échéant.
 					</li>
 					<li>
-						<strong>Données de connexion au suivi</strong> : pour vous permettre de retrouver
-						l’état de votre inscription sur {siteHost} (cookie de session).
+						<strong>Données de connexion au suivi</strong> : pour vous permettre de retrouver l’état de
+						votre inscription sur {siteHost} (cookie de session).
 					</li>
 				</ul>
 				<p>
-					Nous ne vous demandons pas de données sensibles (santé, opinions, etc.) dans le cadre
-					de l’inscription.
+					Nous ne vous demandons pas de données sensibles (santé, opinions, etc.) dans le cadre de
+					l’inscription.
 				</p>
 			</section>
 
 			<section class="space-y-3">
 				<h3 class="text-ink font-medium">3. Sur quel fondement juridique ?</h3>
-				<p>Vos données sont traitées principalement pour <strong>exécuter votre contrat</strong> d’achat de la formation (inscription, paiement, contrat de confidentialité, accès Teachizy, suivi).</p>
 				<p>
-					Certains traitements reposent aussi sur une <strong>obligation légale</strong> (conservation
-					comptable) ou sur notre <strong>intérêt légitime</strong> (sécurité du service et
-					prévention de la fraude), dans le respect de vos droits.
+					Vos données sont traitées principalement pour <strong>exécuter votre contrat</strong> d’achat
+					de la formation (inscription, paiement, contrat de confidentialité, accès Teachizy, suivi).
 				</p>
 				<p>
-					Nous n’utilisons pas vos données à des fins de prospection commerciale sans votre
-					accord. Les e-mails que vous recevez (relance du contrat de confidentialité, accès formation,
+					Certains traitements reposent aussi sur une <strong>obligation légale</strong> (conservation
+					comptable) ou sur notre <strong>intérêt légitime</strong> (sécurité du service et prévention
+					de la fraude), dans le respect de vos droits.
+				</p>
+				<p>
+					Nous n’utilisons pas vos données à des fins de prospection commerciale sans votre accord.
+					Les e-mails que vous recevez (relance du contrat de confidentialité, accès formation,
 					rappel de connexion au site) concernent uniquement votre inscription.
 				</p>
 			</section>
@@ -119,8 +122,8 @@ const updatedAt = '19 août 2026';
 				<ul class="list-disc space-y-1 pl-5">
 					<li>à Jessica Stamck et aux personnes habilitées au sein de Déesse Vibes ;</li>
 					<li>
-						à nos prestataires, uniquement pour les missions décrites ci-dessous et dans le cadre
-						de contrats encadrant la protection des données.
+						à nos prestataires, uniquement pour les missions décrites ci-dessous et dans le cadre de
+						contrats encadrant la protection des données.
 					</li>
 				</ul>
 				<ul class="mt-3 list-disc space-y-2 pl-5">
@@ -129,15 +132,16 @@ const updatedAt = '19 août 2026';
 							href="https://stripe.com/fr/privacy"
 							target="_blank"
 							rel="noopener noreferrer"
-							class="text-ink hover:underline underline-offset-2">politique de confidentialité</a
+							class="text-ink underline-offset-2 hover:underline">politique de confidentialité</a
 						>)
 					</li>
 					<li>
-						<strong>Yousign</strong> : signature électronique du contrat de confidentialité (<a
-							href="https://yousign.com/fr-fr/politique-de-confidentialite"
+						<strong>{signaturePrivacy.providerName}</strong> : signature électronique du contrat de confidentialité
+						(<a
+							href={signaturePrivacy.privacyUrl}
 							target="_blank"
 							rel="noopener noreferrer"
-							class="text-ink hover:underline underline-offset-2">politique de confidentialité</a
+							class="text-ink underline-offset-2 hover:underline">politique de confidentialité</a
 						>)
 					</li>
 					<li>
@@ -147,13 +151,13 @@ const updatedAt = '19 août 2026';
 						<strong>Brevo</strong> : envoi des e-mails transactionnels liés à votre inscription
 					</li>
 					<li>
-						<strong>Vercel, Prisma et Inngest</strong> : hébergement du site, de la base de
-						données, et tâches automatiques liées à votre inscription
+						<strong>Vercel, Prisma et Inngest</strong> : hébergement du site, de la base de données, et
+						tâches automatiques liées à votre inscription
 					</li>
 				</ul>
 				<p>
-					Stripe, Vercel et Inngest peuvent traiter certaines de ces données aux États-Unis.
-					Ces transferts sont encadrés par leurs contrats de protection des données (clauses
+					Stripe, Vercel et Inngest peuvent traiter certaines de ces données aux États-Unis. Ces
+					transferts sont encadrés par leurs contrats de protection des données (clauses
 					contractuelles types de la Commission européenne).
 				</p>
 			</section>
@@ -162,54 +166,55 @@ const updatedAt = '19 août 2026';
 				<h3 class="text-ink font-medium">5. Combien de temps conservons-nous vos données ?</h3>
 				<ul class="list-disc space-y-2 pl-5">
 					<li>
-						<strong>Dossier d’inscription :</strong> pendant la durée de la relation contractuelle,
-						puis le temps nécessaire aux obligations légales (notamment comptables, jusqu’à 10 ans
-						pour les documents de facturation).
+						<strong>Dossier d’inscription :</strong> pendant la durée de la relation contractuelle, puis
+						le temps nécessaire aux obligations légales (notamment comptables, jusqu’à 10 ans pour les
+						documents de facturation).
 					</li>
 					<li>
-						<strong>Preuves de consentement :</strong> pendant la relation contractuelle et les
-						délais légaux applicables.
+						<strong>Preuves de consentement :</strong> pendant la relation contractuelle et les délais
+						légaux applicables.
 					</li>
 					<li>
-						<strong>Jetons de connexion temporaires :</strong> valables 30 minutes (reconnexion sur le site).
+						<strong>Jetons de connexion temporaires :</strong> valables 30 minutes (reconnexion sur le
+						site).
 					</li>
 					<li>
 						<strong>Cookie de session :</strong> 30 jours maximum, ou jusqu’à votre déconnexion.
 					</li>
 					<li>
-						<strong>Contrat de confidentialité signé :</strong> conservé par Yousign selon sa propre politique ; nous
-						conservons uniquement les informations nécessaires pour attester de la signature.
+						<strong>Contrat de confidentialité signé :</strong> conservé par {
+							signaturePrivacy.providerName
+						} selon sa propre politique ; nous conservons uniquement les informations nécessaires pour
+						attester de la signature.
 					</li>
 				</ul>
 			</section>
 
 			<section class="space-y-3">
 				<h3 class="text-ink font-medium">6. Cookies</h3>
-				<p>
-					Le site n’utilise pas de cookies publicitaires ni de traceurs de mesure d’audience.
-				</p>
+				<p>Le site n’utilise pas de cookies publicitaires ni de traceurs de mesure d’audience.</p>
 				<p>
 					Un seul cookie strictement nécessaire est déposé pour mémoriser votre session
-					d’inscription sur {siteHost} et afficher votre suivi. Vous pouvez le
-					supprimer à tout moment depuis votre navigateur ou via « Se déconnecter » sur le site.
+					d’inscription sur {siteHost} et afficher votre suivi. Vous pouvez le supprimer à tout moment
+					depuis votre navigateur ou via « Se déconnecter » sur le site.
 				</p>
 				<p>
-					Ce cookie ne nécessite pas de consentement préalable, car il est indispensable au
-					service que vous demandez.
+					Ce cookie ne nécessite pas de consentement préalable, car il est indispensable au service
+					que vous demandez.
 				</p>
 			</section>
 
 			<section class="space-y-3">
 				<h3 class="text-ink font-medium">7. Comment protégeons-nous vos données ?</h3>
 				<p>
-					Nous mettons en œuvre des mesures de sécurité adaptées : connexion chiffrée (HTTPS),
-					accès restreint aux données, et recours à des prestataires reconnus pour le paiement,
-					la signature et l’hébergement.
+					Nous mettons en œuvre des mesures de sécurité adaptées : connexion chiffrée (HTTPS), accès
+					restreint aux données, et recours à des prestataires reconnus pour le paiement, la
+					signature et l’hébergement.
 				</p>
 				<p>
-					Aucun système n’étant infaillible, en cas d’incident susceptible d’affecter vos
-					droits, nous informerons la CNIL et, si nécessaire, les personnes concernées conformément
-					à la réglementation.
+					Aucun système n’étant infaillible, en cas d’incident susceptible d’affecter vos droits,
+					nous informerons la CNIL et, si nécessaire, les personnes concernées conformément à la
+					réglementation.
 				</p>
 			</section>
 
@@ -224,20 +229,19 @@ const updatedAt = '19 août 2026';
 					<li>portabilité, lorsque applicable.</li>
 				</ul>
 				<p>
-					Pour les exercer, écrivez à{" "}
-					<a
-						href={`mailto:${contactEmail}`}
-						class="text-ink hover:underline underline-offset-2">{contactEmail}</a
-					>. Nous répondrons dans un délai d’un mois. Un justificatif d’identité pourra être
-					demandé en cas de doute raisonnable.
+					Pour les exercer, écrivez à{' '}
+					<a href={`mailto:${contactEmail}`} class="text-ink underline-offset-2 hover:underline"
+						>{contactEmail}</a
+					>. Nous répondrons dans un délai d’un mois. Un justificatif d’identité pourra être demandé
+					en cas de doute raisonnable.
 				</p>
 				<p>
-					Vous pouvez aussi introduire une réclamation auprès de la{" "}
+					Vous pouvez aussi introduire une réclamation auprès de la{' '}
 					<a
 						href="https://www.cnil.fr"
 						target="_blank"
 						rel="noopener noreferrer"
-						class="text-ink hover:underline underline-offset-2">CNIL</a
+						class="text-ink underline-offset-2 hover:underline">CNIL</a
 					>.
 				</p>
 			</section>
@@ -245,8 +249,8 @@ const updatedAt = '19 août 2026';
 			<section class="space-y-3">
 				<h3 class="text-ink font-medium">9. Mineurs</h3>
 				<p>
-					La formation s’adresse aux personnes majeures. Le site n’est pas destiné aux moins de
-					18 ans.
+					La formation s’adresse aux personnes majeures. Le site n’est pas destiné aux moins de 18
+					ans.
 				</p>
 			</section>
 
@@ -254,8 +258,8 @@ const updatedAt = '19 août 2026';
 				<h3 class="text-ink font-medium">10. Évolution de cette politique</h3>
 				<p>
 					Nous pouvons mettre à jour cette page pour refléter l’évolution du service ou de la
-					réglementation. La date en tête de page indique la dernière révision. En cas de
-					changement important, nous vous en informerons par e-mail si vous êtes inscrit.
+					réglementation. La date en tête de page indique la dernière révision. En cas de changement
+					important, nous vous en informerons par e-mail si vous êtes inscrit.
 				</p>
 			</section>
 		</div>

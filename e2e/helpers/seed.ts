@@ -37,6 +37,46 @@ export function uniqueEmail(prefix = 'e2e') {
 	return `${prefix}.${Date.now()}.${Math.random().toString(16).slice(2)}@example.test`;
 }
 
+type SignatureProvider = 'docuseal' | 'yousign';
+type SignKind = 'embed' | 'redirect';
+
+function defaultSignatureProvider(): SignatureProvider {
+	const provider = process.env.SIGNATURE_PROVIDER ?? 'docuseal';
+	return provider === 'yousign' ? 'yousign' : 'docuseal';
+}
+
+function defaultSignKind(provider: SignatureProvider): SignKind {
+	const mode = process.env.SIGNATURE_MODE;
+	if (mode === 'embed' || mode === 'redirect') return mode;
+	return provider === 'docuseal' ? 'embed' : 'redirect';
+}
+
+export async function seedNdaRequest(
+	enrollmentId: string,
+	input?: {
+		provider?: SignatureProvider;
+		signKind?: SignKind;
+		externalRequestId?: string;
+		externalSignerId?: string;
+		metadata?: { embed_src?: string };
+	},
+) {
+	const provider = input?.provider ?? defaultSignatureProvider();
+	const signKind = input?.signKind ?? defaultSignKind(provider);
+	const externalRequestId = input?.externalRequestId ?? crypto.randomUUID();
+
+	return getPrisma().ndaRequest.create({
+		data: {
+			enrollmentId,
+			provider,
+			externalRequestId,
+			externalSignerId: input?.externalSignerId ?? crypto.randomUUID(),
+			signKind,
+			metadata: input?.metadata ?? undefined,
+		},
+	});
+}
+
 export async function seedEnrollment(input: {
 	email: string;
 	firstName?: string;
@@ -45,7 +85,13 @@ export async function seedEnrollment(input: {
 	contractStatus?: 'pending' | 'sent' | 'signed';
 	accessStatus?: 'not_eligible' | 'pending' | 'active';
 	stripeCheckoutSessionId?: string | null;
-	yousignRequestId?: string | null;
+	nda?: {
+		provider?: SignatureProvider;
+		signKind?: SignKind;
+		externalRequestId?: string;
+		externalSignerId?: string;
+		metadata?: { embed_src?: string };
+	};
 }) {
 	const db = getPrisma();
 	const user = await db.user.create({
@@ -56,7 +102,7 @@ export async function seedEnrollment(input: {
 		},
 	});
 
-	return db.enrollment.create({
+	const enrollment = await db.enrollment.create({
 		data: {
 			userId: user.id,
 			collectionStatus: input.collectionStatus ?? 'pending',
@@ -67,7 +113,6 @@ export async function seedEnrollment(input: {
 			totalAmountCents: 184_900,
 			amountCents: 184_900,
 			stripeCheckoutSessionId: input.stripeCheckoutSessionId ?? undefined,
-			yousignRequestId: input.yousignRequestId ?? undefined,
 			consentCgvAt: new Date(),
 			consentNdaAt: new Date(),
 			consentPrivacyAt: new Date(),
@@ -75,6 +120,18 @@ export async function seedEnrollment(input: {
 		},
 		include: { user: true },
 	});
+
+	if (input.nda) {
+		await seedNdaRequest(enrollment.id, {
+			externalRequestId: input.nda.externalRequestId,
+			provider: input.nda.provider,
+			signKind: input.nda.signKind,
+			externalSignerId: input.nda.externalSignerId,
+			metadata: input.nda.metadata,
+		});
+	}
+
+	return enrollment;
 }
 
 export async function seedMagicLink(enrollmentId: string, token: string, used = false) {

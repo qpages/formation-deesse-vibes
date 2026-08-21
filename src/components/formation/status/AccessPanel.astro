@@ -1,10 +1,17 @@
 ---
-import type { EnrollmentWithUser } from '../../../lib/services/enrollment';
-import type { PaidInvoiceLink } from '../../../lib/services/payments';
+import type { EnrollmentWithUser } from '../../../lib/enrollment';
+import type { LearnerPaymentSchedule } from '../../../lib/payments/learner-schedule';
 import { getEnv } from '../../../lib/env';
+import {
+	resolveExternalRequestId,
+	resolveNdaProvider,
+	resolveSignKind,
+} from '../../../lib/signature/nda-request';
+import type { SignSurface } from '../../../lib/signature/types';
 import { whatsappHelpHref } from '../../../lib/whatsapp';
 import CheckoutForm from '../landing/CheckoutForm.astro';
 import MagicLinkForm from './MagicLinkForm.astro';
+import InvoicesPanel from './InvoicesPanel.astro';
 import StatusPanel from './StatusPanel.astro';
 
 const env = getEnv();
@@ -17,8 +24,8 @@ const adminContactExternal = adminContactHref.startsWith('https://');
 interface Props {
 	showFunnel: boolean;
 	enrollment: EnrollmentWithUser | null;
-	ndaSignUrl?: string | null;
-	invoiceLinks?: PaidInvoiceLink[];
+	ndaSignSurface?: SignSurface | null;
+	paymentSchedule?: LearnerPaymentSchedule | null;
 	flash?: string | null;
 	checkoutCancel?: boolean;
 	magicLinkFailed?: boolean;
@@ -28,8 +35,8 @@ interface Props {
 const {
 	showFunnel,
 	enrollment,
-	ndaSignUrl = null,
-	invoiceLinks = [],
+	ndaSignSurface = null,
+	paymentSchedule = null,
 	flash = null,
 	checkoutCancel = false,
 	magicLinkFailed = false,
@@ -40,7 +47,15 @@ const activeTab = magicLinkFailed ? 'retrouver' : defaultTab;
 const funnelFlash = showFunnel ? flash : null;
 const trackingFlash = showFunnel ? null : flash;
 const canDownloadNda =
-	enrollment?.contractStatus === 'signed' && Boolean(enrollment.yousignRequestId);
+	enrollment?.contractStatus === 'signed' &&
+	Boolean(enrollment && resolveExternalRequestId(enrollment));
+const showNdaSendCopy = Boolean(
+	enrollment &&
+	enrollment.contractStatus === 'signed' &&
+	resolveNdaProvider(enrollment) === 'docuseal' &&
+	resolveSignKind(enrollment) === 'embed',
+);
+const showContratSection = canDownloadNda || showNdaSendCopy;
 ---
 
 {
@@ -113,7 +128,7 @@ const canDownloadNda =
 			{enrollment && (
 				<div class="space-y-8">
 					<div>
-						<StatusPanel enrollment={enrollment} ndaSignUrl={ndaSignUrl} />
+						<StatusPanel enrollment={enrollment} ndaSignSurface={ndaSignSurface} />
 					</div>
 
 					<div>
@@ -151,53 +166,47 @@ const canDownloadNda =
 						</div>
 					</div>
 
-					{invoiceLinks.length > 0 && (
+					{paymentSchedule && paymentSchedule.installments.length > 0 && (
 						<div>
-							<p class="text-ink/40 mb-3 text-[10px] tracking-[0.12em] uppercase">Factures</p>
-							<ul class="space-y-3">
-								{invoiceLinks.map((invoice) => (
-									<li class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-										<p class="text-ink text-sm">{invoice.label}</p>
-										<div class="flex shrink-0 items-center gap-x-3 text-sm">
-											{invoice.viewUrl ? (
-												<a
-													href={invoice.viewUrl}
-													target="_blank"
-													rel="noopener noreferrer"
-													class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
-												>
-													Voir
-												</a>
-											) : null}
-											{invoice.downloadUrl ? (
-												<a
-													href={invoice.downloadUrl}
-													target="_blank"
-													rel="noopener noreferrer"
-													class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
-												>
-													Télécharger
-												</a>
-											) : null}
-										</div>
-									</li>
-								))}
-							</ul>
+							<InvoicesPanel schedule={paymentSchedule} />
 						</div>
 					)}
 
-					{canDownloadNda ? (
+					{showContratSection ? (
 						<div>
 							<p class="text-ink/40 mb-3 text-[10px] tracking-[0.12em] uppercase">Contrat</p>
-							<p class="text-ink-soft text-sm">
-								<a
-									id="nda-download"
-									href="/api/enrollment/nda"
-									class="hover:text-ink underline-offset-4 hover:underline"
-								>
-									Télécharger le contrat de confidentialité
-								</a>
-							</p>
+							<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+								{canDownloadNda ? (
+									<a
+										id="nda-download"
+										href="/api/enrollment/nda"
+										class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
+									>
+										Télécharger le contrat
+									</a>
+								) : null}
+								{showNdaSendCopy ? (
+									<>
+										{canDownloadNda ? (
+											<span class="text-ink/25" aria-hidden="true">
+												·
+											</span>
+										) : null}
+										<button
+											type="button"
+											id="nda-send-copy"
+											class="text-ink-soft hover:text-ink underline-offset-4 hover:underline"
+										>
+											Envoyer une copie par mail
+										</button>
+									</>
+								) : null}
+							</div>
+							<p
+								id="nda-send-copy-feedback"
+								class="text-ink-soft mt-2 text-sm"
+								aria-live="polite"
+							/>
 						</div>
 					) : null}
 				</div>
@@ -207,6 +216,7 @@ const canDownloadNda =
 }
 
 <script
+	is:inline
 	define:vars={{
 		funnelFlash,
 		trackingFlash,
@@ -237,18 +247,6 @@ const canDownloadNda =
 		});
 	});
 
-	const clearBtn = document.getElementById('clear-session');
-	clearBtn?.addEventListener('click', async () => {
-		clearBtn.setAttribute('disabled', 'true');
-		try {
-			const response = await fetch('/api/session/clear', { method: 'POST' });
-			if (!response.ok) throw new Error('Session impossible à réinitialiser');
-			window.location.assign('/');
-		} catch {
-			clearBtn.removeAttribute('disabled');
-		}
-	});
-
 	function showPageToasts(attempt = 0) {
 		if (typeof window.toast !== 'function') {
 			if (attempt < 20) window.setTimeout(() => showPageToasts(attempt + 1), 25);
@@ -268,12 +266,77 @@ const canDownloadNda =
 	if (funnelFlash || trackingFlash || checkoutCancel) {
 		showPageToasts();
 	}
+</script>
 
-	const url = new URL(window.location.href);
-	if (url.searchParams.has('connected') || url.searchParams.has('link')) {
-		url.searchParams.delete('connected');
-		url.searchParams.delete('link');
-		const next = `${url.pathname}${url.search}${url.hash}`;
-		window.history.replaceState({}, '', next);
-	}
+<script>
+	import { cleanEnrollmentQueryParams } from '../../../lib/client/enrollment-status-client';
+
+	cleanEnrollmentQueryParams();
+</script>
+
+<script>
+	import { lockButton } from '../../../lib/client/lock-button';
+
+	const sendCopyBtn = document.getElementById('nda-send-copy') as HTMLButtonElement | null;
+	const sendCopyFeedback = document.getElementById('nda-send-copy-feedback');
+
+	const SEND_COPY_ERROR =
+		'Impossible d’envoyer la copie pour le moment. Réessayez dans quelques secondes.';
+
+	sendCopyBtn?.addEventListener('click', async () => {
+		if (!sendCopyBtn) return;
+		const lock = lockButton(sendCopyBtn, { busyLabel: 'Envoie en cours…' });
+		if (!lock.locked) return;
+		if (sendCopyFeedback) sendCopyFeedback.textContent = '';
+		try {
+			const res = await fetch('/api/enrollment/nda-send-copy', {
+				method: 'POST',
+				headers: { Accept: 'application/json' },
+				credentials: 'same-origin',
+				signal: AbortSignal.timeout(25_000),
+			});
+			const data = (await res.json().catch(() => ({}))) as {
+				ok?: boolean;
+				message?: string;
+				error?: string;
+			};
+			if (res.ok && data.ok) {
+				const message = data.message ?? 'Demande transmise. Vérifiez votre boîte mail.';
+				if (typeof window.toast === 'function') {
+					window.toast(message, 'success');
+				} else if (sendCopyFeedback) {
+					sendCopyFeedback.textContent = message;
+				}
+				return;
+			}
+			const errorMessage = data.error ?? SEND_COPY_ERROR;
+			if (typeof window.toast === 'function') {
+				window.toast(errorMessage, 'error');
+			} else if (sendCopyFeedback) {
+				sendCopyFeedback.textContent = errorMessage;
+			}
+		} catch {
+			if (typeof window.toast === 'function') {
+				window.toast(SEND_COPY_ERROR, 'error');
+			} else if (sendCopyFeedback) {
+				sendCopyFeedback.textContent = SEND_COPY_ERROR;
+			}
+		} finally {
+			lock.unlock();
+		}
+	});
+
+	const clearBtn = document.getElementById('clear-session') as HTMLButtonElement | null;
+	clearBtn?.addEventListener('click', async () => {
+		if (!clearBtn) return;
+		const lock = lockButton(clearBtn);
+		if (!lock.locked) return;
+		try {
+			const response = await fetch('/api/session/clear', { method: 'POST' });
+			if (!response.ok) throw new Error('Session impossible à réinitialiser');
+			window.location.assign('/');
+		} catch {
+			lock.unlock();
+		}
+	});
 </script>

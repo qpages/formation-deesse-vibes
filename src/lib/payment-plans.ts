@@ -82,6 +82,21 @@ export function formatMoney(cents: number, currency = 'eur'): string {
 	}).format(cents / 100);
 }
 
+/** Libellé court du plan échelonné (espace apprenant, admin). */
+export function installmentPlanSummary(plan: PaymentPlan): string {
+	if (plan.installments <= 1) return 'Paiement unique';
+	const total = formatMoney(plan.totalAmountCents);
+	const installment = formatMoney(plan.installmentAmountCents);
+	return `Paiement de ${total} en ${plan.installments} mensualités de ${installment}`;
+}
+
+/** Message Stripe Checkout sous le bouton de paiement (abonnement échelonné). */
+export function installmentCheckoutMessage(plan: PaymentPlan): string {
+	const summary = installmentPlanSummary(plan);
+	if (plan.installments <= 1) return summary;
+	return `${summary}. Arrêt automatique de l'abonnement à l'issue de la dernière échéance.`;
+}
+
 export function paidInvoiceLabel(
 	amountCents: number,
 	paidAt: Date | null,

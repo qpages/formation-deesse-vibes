@@ -1,18 +1,24 @@
-import { purgeOldWebhookPayloads } from '../services/enrollment';
+import { purgeOldWebhookPayloads } from '../enrollment';
 import { createNdaAfterPayment } from './create-nda-after-payment';
 import { grantTeachizyAccess } from './grant-teachizy-access';
 import { inngest } from './client';
+import { processDocusealWebhook } from './process-docuseal-webhook';
 import { processStripeWebhook } from './process-stripe-webhook';
 import { processYousignWebhook } from './process-yousign-webhook';
 import { reconcileEnrollments } from './reconcile-enrollments';
 import { resendNda } from './resend-nda';
+import { revokeTeachizyAccess } from './revoke-teachizy-access';
+import { suspendTeachizyAccess } from './suspend-teachizy-access';
 
 export { createNdaAfterPayment } from './create-nda-after-payment';
 export { grantTeachizyAccess } from './grant-teachizy-access';
+export { processDocusealWebhook } from './process-docuseal-webhook';
 export { processStripeWebhook } from './process-stripe-webhook';
 export { processYousignWebhook } from './process-yousign-webhook';
 export { reconcileEnrollments } from './reconcile-enrollments';
 export { resendNda } from './resend-nda';
+export { revokeTeachizyAccess } from './revoke-teachizy-access';
+export { suspendTeachizyAccess } from './suspend-teachizy-access';
 
 export const purgeWebhookPayloads = inngest.createFunction(
 	{
@@ -29,8 +35,11 @@ export const purgeWebhookPayloads = inngest.createFunction(
 export const inngestFunctions = [
 	processStripeWebhook,
 	processYousignWebhook,
+	processDocusealWebhook,
 	createNdaAfterPayment,
 	grantTeachizyAccess,
+	suspendTeachizyAccess,
+	revokeTeachizyAccess,
 	resendNda,
 	reconcileEnrollments,
 	purgeWebhookPayloads,

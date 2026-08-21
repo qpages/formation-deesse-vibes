@@ -1,4 +1,5 @@
 import type { AdminActionMetaClient } from '../../lib/admin/actions';
+import { copyText } from '../../lib/client/copy-text';
 
 const confirmBtnPrimary =
 	'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blush disabled:pointer-events-none disabled:opacity-50 h-10 px-4 text-sm text-mist bg-ink hover:bg-ink-soft shadow-[0_12px_30px_rgb(26_20_16/0.18)]';
@@ -176,10 +177,9 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 
 			if (res.ok) {
 				if (typeof json.copyUrl === 'string' && json.copyUrl) {
-					try {
-						await navigator.clipboard.writeText(json.copyUrl);
+					if ((await copyText(json.copyUrl)) === 'copied') {
 						toast(json.message || 'Lien copié.', 'success');
-					} catch {
+					} else {
 						toast(
 							'Lien récupéré mais copie impossible — collez depuis la console réseau.',
 							'error',
@@ -215,10 +215,9 @@ export function bindAdminActions(actionMeta: AdminActionMetaClient) {
 			event.preventDefault();
 			const text = copyBtn.getAttribute('data-copy-text');
 			if (!text) return;
-			try {
-				await navigator.clipboard.writeText(text);
+			if ((await copyText(text)) === 'copied') {
 				toast(copyBtn.getAttribute('data-copy-success') || 'Copié.', 'success');
-			} catch {
+			} else {
 				toast('Copie impossible.', 'error');
 			}
 			return;

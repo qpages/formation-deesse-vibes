@@ -5,7 +5,7 @@ const { recordProviderEvent, sendInngestSafe } = vi.hoisted(() => ({
 	sendInngestSafe: vi.fn(),
 }));
 
-vi.mock('../services/provider-events', () => ({ recordProviderEvent }));
+vi.mock('../enrollment/provider-events', () => ({ recordProviderEvent }));
 vi.mock('../inngest/client', () => ({ sendInngestSafe }));
 
 import { acknowledgeProviderEvent } from './acknowledge-provider-event';

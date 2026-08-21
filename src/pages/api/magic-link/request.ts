@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { json } from '../../../lib/http';
 import { RATE_LIMITS, clientIp, enforceRateLimit, rateLimitKey } from '../../../lib/rate-limit';
-import { requestMagicLink } from '../../../lib/services/enrollment';
+import { requestMagicLink } from '../../../lib/enrollment';
 import { formatErrorDetail, notifyOps } from '../../../lib/services/slack';
 import { magicLinkSchema } from '../../../lib/validation';
 

@@ -13,7 +13,6 @@ const path = Astro.url.pathname;
 const inscriptionsActive =
 	path.startsWith('/admin/inscriptions') || path.startsWith('/admin/enrollments');
 const learnersActive = path.startsWith('/admin/apprenants');
-const faqActive = path.startsWith('/admin/faq');
 
 function navLinkClass(active: boolean) {
 	return active
@@ -45,9 +44,9 @@ function navLinkClass(active: boolean) {
 								{email}
 							</span>
 							<button
+								id="admin-logout"
 								type="submit"
 								class="border-mist/25 text-mist/85 hover:border-mist/50 hover:text-mist focus-visible:outline-gold inline-flex min-h-11 items-center border px-3 text-xs tracking-[0.14em] uppercase transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-								onclick="event.preventDefault(); fetch('/api/admin/logout',{method:'POST'}).then(()=>location.href='/admin/login')"
 							>
 								Déconnexion
 							</button>
@@ -74,13 +73,6 @@ function navLinkClass(active: boolean) {
 							>
 								Apprenants
 							</a>
-							<a
-								href="/admin/faq"
-								class={navLinkClass(faqActive)}
-								aria-current={faqActive ? 'page' : undefined}
-							>
-								FAQ
-							</a>
 						</nav>
 					)
 				}
@@ -96,3 +88,12 @@ function navLinkClass(active: boolean) {
 	</div>
 	<Toast />
 </BaseLayout>
+
+<script>
+	document.getElementById('admin-logout')?.addEventListener('click', (clickEvent) => {
+		clickEvent.preventDefault();
+		fetch('/api/admin/logout', { method: 'POST' }).then(() => {
+			location.href = '/admin/login';
+		});
+	});
+</script>

@@ -1,18 +1,23 @@
-import type { Enrollment } from '../../generated/prisma/client';
+import type { EnrollmentWithUser } from '../enrollment';
 import { sendInngestSafe } from '../inngest/client';
-import { canResendNda, findEnrollmentById } from '../services/enrollment';
-import { syncPaymentFromStripe } from '../services/payments';
+import { canResendNda, findEnrollmentById } from '../enrollment';
+import { reconcileEnrollment, ndaSignatureStepError } from '../enrollment/reconcile';
 import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncTeachizyAccess } from '../services/teachizy-access';
-import { syncYousignStatus } from '../services/yousign-events';
-import { getSignatureLink } from '../yousign';
+import {
+	resolveExternalRequestId,
+	resolveExternalSignerId,
+	resolveSignKind,
+} from '../signature/nda-request';
+import { resolveSignatureProviderForEnrollment } from '../signature/providers';
+import type { SignSurface } from '../signature/types';
 import { ADMIN_ACTIONS, adminActionExecution, type AdminActionKey } from './actions';
 
 export type AdminDispatchResult =
 	| { ok: true; message?: string; toast?: 'success' | 'info'; copyUrl?: string }
 	| { ok: false; error: string; status?: number };
 
-type Handler = (enrollment: Enrollment) => Promise<AdminDispatchResult>;
+type Handler = (enrollment: EnrollmentWithUser) => Promise<AdminDispatchResult>;
 
 /** Message unique quand la file Inngest est indisponible (dev sans `inngest:dev`). */
 const QUEUE_DOWN = 'File de traitement indisponible — réessayez plus tard.';
@@ -22,28 +27,90 @@ const ADMIN_NOTIFY_SEVERITY: Partial<Record<AdminActionKey, OpsSeverity>> = {
 	retrigger_teachizy: 'info',
 	sync_teachizy: 'info',
 	sync_payment: 'info',
-	sync_yousign: 'info',
+	sync_nda: 'info',
 	recreate_nda: 'warn',
 };
+
+async function runSyncNda(enrollment: EnrollmentWithUser): Promise<AdminDispatchResult> {
+	const result = await reconcileEnrollment(enrollment.id, 'admin.sync_nda', 'nda_signature');
+	const ndaStep = result.steps.find((s) => s.step === 'nda_signature');
+	if (!ndaStep || ndaStep.step !== 'nda_signature') {
+		return { ok: false, error: 'Synchronisation NDA incomplète.', status: 500 };
+	}
+	const stepError = ndaSignatureStepError(ndaStep);
+	if (stepError) {
+		const messages: Record<string, string> = {
+			enrollment_not_found: 'Inscription introuvable.',
+			no_nda_request: 'Aucune demande de signature NDA associée.',
+			not_awaiting: 'Le contrat n’est pas en attente de signature.',
+			provider_error: 'Impossible de lire le statut chez le provider.',
+		};
+		return {
+			ok: false,
+			error: messages[stepError.reason] ?? stepError.reason,
+			status: 400,
+		};
+	}
+	if (ndaStep.status === 'failed') {
+		return {
+			ok: false,
+			error: ndaStep.reason ?? 'Synchronisation NDA échouée.',
+			status: 400,
+		};
+	}
+	if (ndaStep.status === 'skipped') {
+		return { ok: true, toast: 'info', message: 'Rien à synchroniser côté NDA.' };
+	}
+	if (ndaStep.followUpFailed) {
+		return {
+			ok: true,
+			toast: 'info',
+			message:
+				'Statut NDA synchronisé. Invitation Teachizy non déclenchée (file indisponible) — relancez « Inviter à la formation ».',
+		};
+	}
+	return { ok: true };
+}
 
 const handlers = {
 	// --- Actions « sync » : l'effet primaire est le miroir DB. -------------------
 	// L'enqueue de l'étape suivante est best-effort : une file HS => succès dégradé.
 
 	async sync_payment(enrollment) {
-		const result = await syncPaymentFromStripe(enrollment.id);
-		if (!result.ok) {
-			const messages: Record<string, string> = {
-				no_checkout_session: 'Aucune session Stripe associée.',
-				enrollment_not_found: 'Inscription introuvable.',
-			};
-			return {
-				ok: false,
-				error: `Paiement non confirmable : ${messages[result.reason] ?? result.reason}`,
-				status: 400,
-			};
+		const payment = await reconcileEnrollment(enrollment.id, 'admin.sync_payment', 'payment');
+		const paymentStep = payment.steps.find((s) => s.step === 'payment');
+		if (paymentStep?.step === 'payment') {
+			if (paymentStep.status === 'failed') {
+				const messages: Record<string, string> = {
+					enrollment_not_found: 'Inscription introuvable.',
+					no_checkout_session: 'Aucune session Stripe associée.',
+					no_enrollment_id: 'Session Stripe sans inscription.',
+				};
+				return {
+					ok: false,
+					error: `Paiement non confirmable : ${messages[paymentStep.reason ?? ''] ?? paymentStep.reason ?? 'échec'}`,
+					status: 400,
+				};
+			}
+			if (
+				paymentStep.status === 'skipped' &&
+				(paymentStep.reason === 'no_checkout_session' ||
+					paymentStep.reason?.startsWith('payment_status'))
+			) {
+				const messages: Record<string, string> = {
+					no_checkout_session: 'Aucune session Stripe associée.',
+				};
+				return {
+					ok: false,
+					error: `Paiement non confirmable : ${messages[paymentStep.reason ?? ''] ?? paymentStep.reason}`,
+					status: 400,
+				};
+			}
 		}
-		if (result.ndaEnqueue?.status === 'failed') {
+
+		const nda = await reconcileEnrollment(enrollment.id, 'admin.sync_payment', 'nda_provision');
+		const ndaStep = nda.steps.find((s) => s.step === 'nda_provision');
+		if (ndaStep?.step === 'nda_provision' && ndaStep.status === 'failed') {
 			return {
 				ok: true,
 				toast: 'info',
@@ -54,33 +121,8 @@ const handlers = {
 		return { ok: true };
 	},
 
-	async sync_yousign(enrollment) {
-		const result = await syncYousignStatus(enrollment.id);
-		if (!result.ok) {
-			const messages: Record<string, string> = {
-				enrollment_not_found: 'Inscription introuvable.',
-				no_yousign_request: 'Aucune demande Yousign associée.',
-				draft_not_activated:
-					'Yousign : demande en brouillon (draft), jamais activée — aucun e-mail envoyé. Recréez le lien Yousign.',
-				unmapped_status: result.detail
-					? `Statut Yousign inconnu : ${result.detail}`
-					: 'Statut Yousign inconnu.',
-			};
-			return {
-				ok: false,
-				error: messages[result.reason] ?? result.reason,
-				status: 400,
-			};
-		}
-		if (result.followUp.status === 'failed') {
-			return {
-				ok: true,
-				toast: 'info',
-				message:
-					'Statut Yousign synchronisé. Invitation Teachizy non déclenchée (file indisponible) — relancez « Inviter à la formation ».',
-			};
-		}
-		return { ok: true };
+	async sync_nda(enrollment) {
+		return runSyncNda(enrollment);
 	},
 
 	async sync_teachizy(enrollment) {
@@ -173,15 +215,30 @@ const handlers = {
 	// --- Actions « read » : lecture pure, aucun effet persistant. -----------------
 
 	async copy_nda_link(enrollment) {
-		if (!enrollment.yousignRequestId || !enrollment.yousignSignerId) {
+		if (resolveSignKind(enrollment) === 'embed') {
 			return {
 				ok: false,
-				error: 'Demande ou signataire Yousign manquant.',
+				error: 'Signature intégrée (embed) — pas de lien à copier.',
 				status: 400,
 			};
 		}
-		const url = await getSignatureLink(enrollment.yousignRequestId, enrollment.yousignSignerId);
-		if (!url) {
+
+		const requestId = resolveExternalRequestId(enrollment);
+		const signerId = resolveExternalSignerId(enrollment);
+		if (!requestId || !signerId) {
+			return {
+				ok: false,
+				error: 'Demande ou signataire de signature manquant.',
+				status: 400,
+			};
+		}
+		const surface: SignSurface | null = await resolveSignatureProviderForEnrollment(
+			enrollment,
+		).getSignSurface({
+			requestId,
+			signerId,
+		});
+		if (!surface || surface.kind !== 'redirect') {
 			return {
 				ok: false,
 				error: 'Lien de signature indisponible (signataire pas encore notifié ?).',
@@ -191,14 +248,14 @@ const handlers = {
 		return {
 			ok: true,
 			message: 'Lien copié dans le presse-papiers.',
-			copyUrl: url,
+			copyUrl: surface.url,
 		};
 	},
 } satisfies Record<AdminActionKey, Handler>;
 
 async function notifyAdminAction(
 	action: AdminActionKey,
-	enrollment: Enrollment,
+	enrollment: EnrollmentWithUser,
 	result: Extract<AdminDispatchResult, { ok: true }>,
 ) {
 	const severity = ADMIN_NOTIFY_SEVERITY[action];
@@ -224,7 +281,7 @@ async function notifyAdminAction(
 
 export async function dispatchAdminAction(
 	action: AdminActionKey,
-	enrollment: Enrollment,
+	enrollment: EnrollmentWithUser,
 ): Promise<AdminDispatchResult> {
 	const result = await handlers[action](enrollment);
 	if (result.ok) {

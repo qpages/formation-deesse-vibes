@@ -17,7 +17,7 @@ test.describe('P0 checkout + home', () => {
 		expect(body.url).toMatch(/^https:\/\/checkout\.stripe\.com\//);
 	});
 
-	test('2. retour succès → cookie dv_enrollment + flash', async ({ page, context }) => {
+	test('2. retour succès → cookie dv_enrollment + suivi', async ({ page, context }) => {
 		const email = uniqueEmail('success');
 		const sessionId = `cs_test_e2e_success_${Date.now()}`;
 		await seedEnrollment({
@@ -34,12 +34,11 @@ test.describe('P0 checkout + home', () => {
 		expect(cookies.some((c) => c.name === 'dv_enrollment' && c.value)).toBeTruthy();
 
 		await expect(page.locator('#access-tracking')).toBeVisible();
+		await expect(page.locator('#status-panel')).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Votre inscription' })).toBeVisible();
 		await expect(
-			page.getByText('Paiement reçu. Nous préparons votre contrat de confidentialité.'),
-		).toBeVisible({
-			timeout: 8_000,
-		});
+			page.getByText('Votre paiement est bien confirmé', { exact: false }),
+		).toBeVisible();
 	});
 
 	test('3. déjà inscrit → 409', async ({ request }) => {
@@ -76,10 +75,8 @@ test.describe('P0 checkout + home', () => {
 		await expect(page.locator('#access-tracking')).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Votre inscription' })).toBeVisible();
 		await expect(page.locator('#access-funnel')).toHaveCount(0);
-		await expect(page.locator('#nda-confirm-signed')).toBeVisible();
-		await expect(
-			page.getByRole('link', { name: 'Télécharger le contrat de confidentialité' }),
-		).toHaveCount(0);
+		await expect(page.locator('#status-panel')).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Télécharger le contrat' })).toHaveCount(0);
 	});
 
 	test('5. checkout sans renonciation rétractation → 400', async ({ request }) => {

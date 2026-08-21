@@ -13,7 +13,9 @@ export const RATE_LIMITS = {
 	magicLink: { name: 'magic-link', max: 5, windowMs: 15 * 60 * 1000 },
 	checkout: { name: 'checkout', max: 8, windowMs: 10 * 60 * 1000 },
 	ndaSync: { name: 'nda-sync', max: 8, windowMs: 10 * 60 * 1000 },
+	statusPoll: { name: 'status-poll', max: 120, windowMs: 10 * 60 * 1000 },
 	ndaDownload: { name: 'nda-download', max: 10, windowMs: 10 * 60 * 1000 },
+	ndaSendCopy: { name: 'nda-send-copy', max: 3, windowMs: 30 * 60 * 1000 },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 const hits = new Map<string, number[]>();

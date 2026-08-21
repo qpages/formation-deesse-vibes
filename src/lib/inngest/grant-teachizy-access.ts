@@ -1,5 +1,5 @@
-import { applyAccessPolicy } from '../services/access';
-import { findEnrollmentByIdOrThrow, updateEnrollmentYousignMirror } from '../services/enrollment';
+import { applyAccessPolicy } from '../enrollment/access';
+import { findEnrollmentByIdOrThrow } from '../enrollment';
 import { inviteOrConfirmTeachizy, markEnrollmentTeachizyActive } from '../services/teachizy-access';
 import {
 	alertFinalFailure,
@@ -7,18 +7,19 @@ import {
 	notifyOps,
 	withJobLifecycleAlerts,
 } from '../services/slack';
+import { isTeachizyConfigured, unblockTeachizyCustomer } from '../teachizy';
 import { inngest } from './client';
 
 /**
  * Command: invite Teachizy + pose accessStatus=active.
- * Triggers: signature.done, access.grant (admin / policy).
+ * Triggers: nda/signature.completed, enrollment/access.grant (admin / policy).
  * Si l’invite échoue mais l’apprenant a déjà la formation → mark active quand même.
  */
 export const grantTeachizyAccess = inngest.createFunction(
 	{
 		id: 'grant-teachizy-access',
 		retries: 2,
-		triggers: [{ event: 'yousign/signature.done' }, { event: 'enrollment/access.grant' }],
+		triggers: [{ event: 'nda/signature.completed' }, { event: 'enrollment/access.grant' }],
 		onFailure: async ({ event, error }) => {
 			const original = event.data as { event?: { data?: { enrollmentId?: string } } };
 			await alertFinalFailure({
@@ -44,12 +45,8 @@ export const grantTeachizyAccess = inngest.createFunction(
 					return { skipped: true, reason: 'already_invited' };
 				}
 
-				if (event.name === 'yousign/signature.done') {
+				if (event.name === 'nda/signature.completed') {
 					await step.run('mark-contract-signed', async () => {
-						await updateEnrollmentYousignMirror(enrollment.id, {
-							yousignStatus: 'done',
-							contractStatus: 'signed',
-						});
 						await applyAccessPolicy(enrollment.id);
 					});
 				}
@@ -64,6 +61,12 @@ export const grantTeachizyAccess = inngest.createFunction(
 
 				if (fresh.contractStatus !== 'signed') {
 					return { skipped: true, reason: 'contract_not_signed' };
+				}
+
+				if (isTeachizyConfigured()) {
+					await step.run('unblock-teachizy', async () => {
+						return unblockTeachizyCustomer(fresh.user.email);
+					});
 				}
 
 				const inviteResult = await step.run('invite-teachizy', async () => {

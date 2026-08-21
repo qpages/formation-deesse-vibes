@@ -48,18 +48,21 @@ async function resolveRequestId(args) {
 		const enrollment = await prisma.enrollment.findFirst({
 			where: { user: { email: email.toLowerCase() } },
 			orderBy: { createdAt: 'desc' },
-			select: { id: true, yousignRequestId: true, yousignSignerId: true },
+			select: {
+				id: true,
+				ndaRequest: { select: { externalRequestId: true, externalSignerId: true } },
+			},
 		});
 		await prisma.$disconnect();
 		if (!enrollment) {
 			console.error(`Aucune inscription pour ${email}`);
 			process.exit(1);
 		}
-		if (!enrollment.yousignRequestId) {
-			console.error(`Inscription ${enrollment.id} : aucun yousignRequestId en base.`);
+		if (!enrollment.ndaRequest?.externalRequestId) {
+			console.error(`Inscription ${enrollment.id} : aucune demande NDA en base.`);
 			process.exit(1);
 		}
-		return enrollment.yousignRequestId;
+		return enrollment.ndaRequest.externalRequestId;
 	}
 	const requestId = args.find((a) => !a.startsWith('--'));
 	if (!requestId) {

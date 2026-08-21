@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { requireAdminApi } from '../../../lib/admin/auth';
 import { listEnrollmentsForExport } from '../../../lib/admin/enrollments';
+import { resolveExternalRequestId } from '../../../lib/signature/nda-request';
 import {
 	ACCESS_STATUS_LABELS,
 	COLLECTION_STATUS_LABELS,
@@ -31,7 +32,7 @@ export const GET: APIRoute = async ({ request }) => {
 		'contractStatusLabel',
 		'accessStatus',
 		'accessStatusLabel',
-		'yousignStatus',
+		'ndaProviderStatus',
 		'paymentPlan',
 		'paymentPlanLabel',
 		'installmentsPaid',
@@ -46,7 +47,7 @@ export const GET: APIRoute = async ({ request }) => {
 		'amountCents',
 		'stripeCheckoutSessionId',
 		'stripeSubscriptionId',
-		'yousignRequestId',
+		'ndaExternalRequestId',
 		'createdAt',
 		'updatedAt',
 	];
@@ -73,7 +74,7 @@ export const GET: APIRoute = async ({ request }) => {
 				csv(CONTRACT_STATUS_LABELS[r.contractStatus]),
 				r.accessStatus,
 				csv(ACCESS_STATUS_LABELS[r.accessStatus]),
-				r.yousignStatus ?? '',
+				r.ndaRequest?.providerStatus ?? '',
 				r.paymentPlan ?? '',
 				csv(paymentPlanLabel(r.paymentPlan)),
 				r.installmentsPaid,
@@ -93,7 +94,7 @@ export const GET: APIRoute = async ({ request }) => {
 				r.amountCents,
 				r.stripeCheckoutSessionId ?? '',
 				r.stripeSubscriptionId ?? '',
-				r.yousignRequestId ?? '',
+				resolveExternalRequestId(r) ?? '',
 				r.createdAt.toISOString(),
 				r.updatedAt.toISOString(),
 			].join(',');

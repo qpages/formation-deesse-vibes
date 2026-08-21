@@ -2,6 +2,7 @@
 import Button from '../../ui/Button.astro';
 import FormField from '../../ui/FormField.astro';
 import Input from '../../ui/Input.astro';
+import { resolveSignatureConsentCopy } from '../../../lib/signature/helpers';
 import PaymentPlanSelector from './PaymentPlanSelector.astro';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 const { lockedEmail } = Astro.props;
+const consentNdaCopy = resolveSignatureConsentCopy();
 ---
 
 <form id="checkout-form" class="space-y-5" novalidate>
@@ -51,21 +53,17 @@ const { lockedEmail } = Astro.props;
 		<label class="flex gap-3">
 			<input type="checkbox" name="consentWithdrawalWaiver" value="true" required class="mt-1" />
 			<span>
-				Je demande l’accès immédiat à la formation dès que les conditions sont remplies (paiement
-				et signature du contrat de confidentialité) et je reconnais perdre mon{' '}
+				Je demande l’accès immédiat à la formation dès que les conditions sont remplies (paiement et
+				signature du contrat de confidentialité) et je reconnais perdre mon{' '}
 				<a href="/cgv#retractation" class="hover:text-ink underline underline-offset-2"
 					>droit de rétractation</a
 				>{' '}
-				une fois l’accès Teachizy ouvert, conformément à l’article L221-28 du Code de la
-				consommation.
+				une fois l’accès Teachizy ouvert, conformément à l’article L221-28 du Code de la consommation.
 			</span>
 		</label>
 		<label class="flex gap-3">
 			<input type="checkbox" name="consentNda" value="true" required class="mt-1" />
-			<span>
-				Je m’engage à signer le contrat de confidentialité qui me sera envoyé par e-mail après
-				paiement. Sans signature, l’accès à la formation sur Teachizy ne sera pas possible.
-			</span>
+			<span>{consentNdaCopy}</span>
 		</label>
 	</div>
 

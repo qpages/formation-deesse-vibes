@@ -17,7 +17,7 @@ vi.mock('./env', () => ({
 	},
 }));
 
-import { inviteToTeachizy } from './teachizy';
+import { inviteToTeachizy, blockTeachizyCustomer, unblockTeachizyCustomer } from './teachizy';
 
 const input = {
 	enrollmentId: 'enr_1',
@@ -87,5 +87,107 @@ describe('inviteToTeachizy', () => {
 
 		expect(fetch).toHaveBeenCalledTimes(2);
 		expect(vi.mocked(fetch).mock.calls[1]?.[1]).toMatchObject({ method: 'POST' });
+	});
+});
+
+describe('blockTeachizyCustomer', () => {
+	beforeEach(() => {
+		vi.stubGlobal('fetch', vi.fn());
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('POST block si le customer a la formation active', async () => {
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(jsonResponse(customerPayload()))
+			.mockResolvedValueOnce(jsonResponse({}, 200));
+
+		const result = await blockTeachizyCustomer('quentin@example.com');
+
+		expect(result).toBe('blocked');
+		expect(fetch).toHaveBeenCalledTimes(2);
+		expect(String(vi.mocked(fetch).mock.calls[1]?.[0])).toContain('/externals/blocked-customers');
+	});
+
+	it('skip si déjà bloqué', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(
+			jsonResponse(
+				customerPayload({
+					trainings: [
+						{
+							training: { uuid: 'training-1', name: 'test' },
+							blocked_at: '2026-08-01 10:00:00',
+							progression_percent: 0,
+							training_items_count: 4,
+							training_items_completed_count: 0,
+							total_duration_in_sec: 0,
+							quiz_total_percent: -1,
+						},
+					],
+				}),
+			),
+		);
+
+		const result = await blockTeachizyCustomer('quentin@example.com');
+
+		expect(result).toBe('already_blocked');
+		expect(fetch).toHaveBeenCalledTimes(1);
+	});
+
+	it('skip si customer absent', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 404 }));
+
+		const result = await blockTeachizyCustomer('unknown@example.com');
+
+		expect(result).toBe('not_found');
+		expect(fetch).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('unblockTeachizyCustomer', () => {
+	beforeEach(() => {
+		vi.stubGlobal('fetch', vi.fn());
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('POST unblock si le customer est bloqué', async () => {
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(
+				jsonResponse(
+					customerPayload({
+						trainings: [
+							{
+								training: { uuid: 'training-1', name: 'test' },
+								blocked_at: '2026-08-01 10:00:00',
+								progression_percent: 0,
+								training_items_count: 4,
+								training_items_completed_count: 0,
+								total_duration_in_sec: 0,
+								quiz_total_percent: -1,
+							},
+						],
+					}),
+				),
+			)
+			.mockResolvedValueOnce(jsonResponse({}, 200));
+
+		const result = await unblockTeachizyCustomer('quentin@example.com');
+
+		expect(result).toBe('unblocked');
+		expect(String(vi.mocked(fetch).mock.calls[1]?.[0])).toContain('/externals/unblocked-customers');
+	});
+
+	it('skip si déjà actif', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(customerPayload()));
+
+		const result = await unblockTeachizyCustomer('quentin@example.com');
+
+		expect(result).toBe('already_active');
+		expect(fetch).toHaveBeenCalledTimes(1);
 	});
 });

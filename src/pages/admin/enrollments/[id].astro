@@ -85,7 +85,12 @@ const teachizy = await getAdminTeachizyLearner(detail.email, detail.id);
 	</Dialog>
 </AdminLayout>
 
-<script id="admin-action-meta" type="application/json" set:html={JSON.stringify(actionMeta)} />
+<script
+	is:inline
+	id="admin-action-meta"
+	type="application/json"
+	set:html={JSON.stringify(actionMeta)}
+/>
 <script>
 	import { bindAdminActions } from '../../../components/admin/admin-client';
 	import type { AdminActionMetaClient } from '../../../lib/admin/actions';

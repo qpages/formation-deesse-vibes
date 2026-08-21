@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { json, requireAdminApi } from '../../../lib/admin/auth';
 import { dispatchAdminAction } from '../../../lib/admin/dispatch';
 import { getPrisma } from '../../../lib/prisma';
-import { findEnrollmentById } from '../../../lib/services/enrollment';
+import { findEnrollmentById } from '../../../lib/enrollment';
 import { adminActionSchema } from '../../../lib/validation';
 
 /**

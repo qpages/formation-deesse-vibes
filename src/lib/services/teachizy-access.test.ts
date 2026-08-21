@@ -20,7 +20,7 @@ const {
 });
 
 vi.mock('../prisma', () => ({ getPrisma }));
-vi.mock('./enrollment', () => ({ findEnrollmentById }));
+vi.mock('../enrollment', () => ({ findEnrollmentById }));
 vi.mock('../teachizy', () => ({
 	getTeachizyCustomerByEmail,
 	inviteToTeachizy,

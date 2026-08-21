@@ -1,14 +1,11 @@
-import {
-	canResendNda,
-	findEnrollmentByIdOrThrow,
-	markNdaResent,
-	recordYousignError,
-} from '../services/enrollment';
+import { canResendNda, findEnrollmentByIdOrThrow, markNdaResent } from '../enrollment';
+import { recordNdaError } from '../signature/persist';
 import { alertFinalFailure, formatErrorDetail, withJobLifecycleAlerts } from '../services/slack';
-import { reactivateNda } from '../yousign';
+import { resolveExternalRequestId } from '../signature/nda-request';
+import { resolveSignatureProviderForEnrollment } from '../signature/providers';
 import { inngest } from './client';
 
-/** Command: resend Yousign NDA (admin resend_nda / api nda/resend). */
+/** Command: resend NDA (admin resend_nda / api nda/resend). */
 export const resendNda = inngest.createFunction(
 	{
 		id: 'resend-nda',
@@ -19,7 +16,7 @@ export const resendNda = inngest.createFunction(
 			const enrollmentId = original.event?.data?.enrollmentId;
 			const detail = formatErrorDetail(error);
 			if (enrollmentId) {
-				await recordYousignError(enrollmentId, `Renvoi NDA — ${detail}`);
+				await recordNdaError(enrollmentId, `Renvoi NDA — ${detail}`);
 			}
 			await alertFinalFailure({
 				title: 'Échec définitif renvoi NDA',
@@ -46,10 +43,15 @@ export const resendNda = inngest.createFunction(
 
 				await step.run('reactivate-and-mark', async () => {
 					const enrollment = await findEnrollmentByIdOrThrow(enrollmentId);
-					if (!enrollment.yousignRequestId) {
-						throw new Error('no_yousign_request');
+					const requestId = resolveExternalRequestId(enrollment);
+					if (!requestId) {
+						throw new Error('no_nda_request');
 					}
-					await reactivateNda(enrollment.yousignRequestId);
+					const provider = resolveSignatureProviderForEnrollment(enrollment);
+					if (!provider.reactivateNda) {
+						throw new Error('reactivateNda indisponible pour ce provider');
+					}
+					await provider.reactivateNda(requestId);
 					await markNdaResent(enrollment);
 				});
 

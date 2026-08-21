@@ -1,12 +1,14 @@
 ---
 import Button from '../../ui/Button.astro';
 import { getEnv } from '../../../lib/env';
+import { resolveSignatureMissingSignFaq } from '../../../lib/signature/helpers';
 import { whatsappHelpHref } from '../../../lib/whatsapp';
 
 const env = getEnv();
 const contactEmail = env.PUBLIC_ADMIN_CONTACT_EMAIL ?? 'contact@deesse-vibes.com';
 const mailtoHref = `mailto:${contactEmail}?subject=${encodeURIComponent('Question : Formation Matrice Évolution')}`;
 const whatsappHref = whatsappHelpHref(env.PUBLIC_WHATSAPP_NUMBER);
+const missingSignFaq = resolveSignatureMissingSignFaq(contactEmail);
 
 const items: {
 	q: string;
@@ -23,16 +25,13 @@ const items: {
 	},
 	{
 		q: 'Je ne retrouve pas l’email Teachizy, comment faire ?',
-		a: 'Ouvrez la <a href="https://jsmatriceacademy.teachizy.fr" target="_blank" rel="noopener noreferrer" class="underline underline-offset-2 hover:text-ink">page de connexion Teachizy</a>, saisissez votre adresse e-mail, puis cliquez sur <strong>Mot de passe oublié</strong>. Vous recevrez un nouveau lien pour définir votre mot de passe et accéder à la formation.',
+		a: 'Ouvrez la <a href="https://jsmatriceacademy.teachizy.fr" target="_blank" rel="noopener noreferrer" class="underline underline-offset-2 hover:text-ink">page de connexion Teachizy</a>, saissez votre adresse e-mail, puis cliquez sur <strong>Mot de passe oublié</strong>. Vous recevrez un nouveau lien pour définir votre mot de passe et accéder à la formation.',
 		image: {
 			src: '/images/teachizy-mot-de-passe-oublie.jpg',
 			alt: 'Page de connexion Teachizy avec le lien Mot de passe oublié sous le bouton Se connecter',
 		},
 	},
-	{
-		q: 'J’ai payé mais je ne reçois pas de lien pour signer',
-		a: `Pas d’inquiétude. Vérifiez d’abord vos spams, puis contactez un administrateur à <a href="mailto:${contactEmail}?subject=Lien%20de%20signature%20contrat%20de%20confidentialit%C3%A9%20manquant" class="underline underline-offset-2 hover:text-ink">${contactEmail}</a>, on débloque ça rapidement.`,
-	},
+	missingSignFaq,
 	{
 		q: 'Que se passe-t-il si je ne signe pas le contrat de confidentialité ?',
 		a: 'Sans signature, vous ne pouvez pas accéder à la formation.',
@@ -72,7 +71,12 @@ const items: {
 	<div
 		class="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center"
 	>
-		<Button href={mailtoHref} variant="primary" size="md" class="w-full whitespace-nowrap sm:w-auto">
+		<Button
+			href={mailtoHref}
+			variant="primary"
+			size="md"
+			class="w-full whitespace-nowrap sm:w-auto"
+		>
 			Contacter par e-mail
 		</Button>
 		{
@@ -83,7 +87,7 @@ const items: {
 					size="md"
 					target="_blank"
 					rel="noopener noreferrer"
-					class="border-[#1f8a4c]/30 text-[#1f8a4c] hover:border-[#1f8a4c]/50 hover:bg-[#1f8a4c]/8 w-full whitespace-nowrap sm:w-auto"
+					class="w-full border-[#1f8a4c]/30 whitespace-nowrap text-[#1f8a4c] hover:border-[#1f8a4c]/50 hover:bg-[#1f8a4c]/8 sm:w-auto"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

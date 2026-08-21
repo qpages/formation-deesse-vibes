@@ -1,14 +1,17 @@
 import type Stripe from 'stripe';
 import { decryptPayload } from '../crypto';
-import { findEnrollmentById, findEnrollmentIdByPaymentIntentId } from './enrollment';
+import { findEnrollmentById, findEnrollmentIdByPaymentIntentId } from '../enrollment';
+import { stripeId } from '../payments/stripe-id';
 import {
 	confirmPaidCheckout,
 	ensureNdaAfterPayment,
 	markEnrollmentRefunded,
 	markSubscriptionScheduleCompleted,
 	syncStripeInvoice,
+	syncEnrollmentSubscriptionDates,
+	syncSubscriptionScheduleState,
 	syncSubscriptionState,
-} from './payments';
+} from '../payments';
 
 const PAID_CHECKOUT_EVENTS = new Set([
 	'checkout.session.completed',
@@ -17,11 +20,15 @@ const PAID_CHECKOUT_EVENTS = new Set([
 
 const HANDLED = new Set([
 	...PAID_CHECKOUT_EVENTS,
+	'invoice.created',
+	'invoice.finalized',
+	'invoice.upcoming',
 	'invoice.paid',
 	'invoice.payment_failed',
 	'invoice.payment_action_required',
 	'customer.subscription.updated',
 	'customer.subscription.deleted',
+	'subscription_schedule.updated',
 	'subscription_schedule.completed',
 	'charge.refunded',
 	'charge.dispute.created',
@@ -29,15 +36,6 @@ const HANDLED = new Set([
 
 export function isHandledStripeEventType(eventType: string) {
 	return HANDLED.has(eventType);
-}
-
-function stripeRefId(ref: unknown): string | undefined {
-	if (!ref) return undefined;
-	if (typeof ref === 'string') return ref;
-	if (typeof ref === 'object' && 'id' in ref && typeof (ref as { id: unknown }).id === 'string') {
-		return (ref as { id: string }).id;
-	}
-	return undefined;
 }
 
 /** Corrélation refund/dispute : metadata.enrollmentId d'abord, sinon PaymentIntent. */
@@ -49,7 +47,7 @@ async function resolveEnrollmentIdFromPaymentIntent(
 		const byMeta = await findEnrollmentById(metadata.enrollmentId);
 		if (byMeta) return byMeta.id;
 	}
-	const paymentIntentId = stripeRefId(paymentIntentRef);
+	const paymentIntentId = stripeId(paymentIntentRef);
 	if (paymentIntentId) {
 		return findEnrollmentIdByPaymentIntentId(paymentIntentId);
 	}
@@ -99,6 +97,24 @@ export async function handleStripeProviderEvent(input: {
 		await ensureNdaAfterPayment(result.enrollmentId, invoice.id ?? input.providerEventId, {
 			soft: true,
 		});
+		if (result.enrollmentId) {
+			await syncEnrollmentSubscriptionDates(result.enrollmentId);
+		}
+		return { enrollmentId: result.enrollmentId };
+	}
+
+	if (
+		eventType === 'invoice.created' ||
+		eventType === 'invoice.finalized' ||
+		eventType === 'invoice.upcoming'
+	) {
+		const invoice = object as Stripe.Invoice;
+		const result = await syncStripeInvoice(invoice);
+		if (!result.ok && result.reason === 'enrollment_not_found') {
+			return { ignored: true };
+		}
+		if (!result.ok) throw new Error(result.reason);
+		await syncEnrollmentSubscriptionDates(result.enrollmentId);
 		return { enrollmentId: result.enrollmentId };
 	}
 
@@ -111,6 +127,7 @@ export async function handleStripeProviderEvent(input: {
 			return { ignored: true };
 		}
 		if (!result.ok) throw new Error(result.reason);
+		await syncEnrollmentSubscriptionDates(result.enrollmentId);
 		return { enrollmentId: result.enrollmentId };
 	}
 
@@ -120,6 +137,13 @@ export async function handleStripeProviderEvent(input: {
 	) {
 		const subscription = object as Stripe.Subscription;
 		const result = await syncSubscriptionState(subscription);
+		if (!result.ok) return { ignored: true };
+		return { enrollmentId: result.enrollmentId };
+	}
+
+	if (eventType === 'subscription_schedule.updated') {
+		const schedule = object as Stripe.SubscriptionSchedule;
+		const result = await syncSubscriptionScheduleState(schedule);
 		if (!result.ok) return { ignored: true };
 		return { enrollmentId: result.enrollmentId };
 	}

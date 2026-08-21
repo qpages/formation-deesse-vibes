@@ -1,38 +1,40 @@
 ---
 import type { Enrollment } from '../../../generated/prisma/client';
-import { isPaidEnough } from '../../../lib/enrollment-gates';
+import { resolveSignatureStatusCopy } from '../../../lib/signature/helpers';
+import type { SignSurface } from '../../../lib/signature/types';
 import {
 	ENROLLMENT_POLL_INTERVAL_MS,
 	ENROLLMENT_POLL_MAX_MS,
-	primaryAction,
 	shouldPollEnrollment,
-	statusMessage,
 } from '../../../lib/status';
+import {
+	buildStatusPanelView,
+	enrollmentFingerprint,
+} from '../../../lib/enrollment/status-payload';
 import Alert from '../../ui/Alert.astro';
 import Button from '../../ui/Button.astro';
+import DocusealEmbedCard from './DocusealEmbedCard.astro';
 import SignLinkCard from './SignLinkCard.astro';
 
 interface Props {
 	enrollment: Enrollment;
-	ndaSignUrl?: string | null;
+	ndaSignSurface?: SignSurface | null;
 }
 
-const { enrollment, ndaSignUrl } = Astro.props;
+const { enrollment, ndaSignSurface = null } = Astro.props;
+const signatureStatusCopy = resolveSignatureStatusCopy();
 const orthogonal = {
 	collectionStatus: enrollment.collectionStatus,
 	contractStatus: enrollment.contractStatus,
 	accessStatus: enrollment.accessStatus,
 };
-const action = primaryAction(orthogonal, ndaSignUrl);
-const message = statusMessage(orthogonal);
-const showSignCard = Boolean(ndaSignUrl);
+const view = buildStatusPanelView(enrollment, ndaSignSurface);
 const poll = shouldPollEnrollment({
 	...orthogonal,
 	hasCheckoutSession: Boolean(enrollment.stripeCheckoutSessionId),
-	hasNdaSignUrl: showSignCard,
+	hasNdaSignSurface: view.showSignSurfaceReady,
 });
-const closed = enrollment.accessStatus === 'revoked' || enrollment.collectionStatus === 'refunded';
-const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractStatus}|${enrollment.accessStatus}`;
+const pollFingerprint = enrollmentFingerprint(orthogonal);
 ---
 
 <div
@@ -42,214 +44,179 @@ const pollFingerprint = `${enrollment.collectionStatus}|${enrollment.contractSta
 	data-poll={poll ? 'true' : 'false'}
 	data-poll-interval={ENROLLMENT_POLL_INTERVAL_MS}
 	data-poll-max={ENROLLMENT_POLL_MAX_MS}
+	data-collection-status={enrollment.collectionStatus}
+	data-contract-status={enrollment.contractStatus}
+	data-access-status={enrollment.accessStatus}
+	data-sign-surface={view.showSignSurfaceReady ? 'true' : 'false'}
+	data-sign-surface-kind={ndaSignSurface?.kind ?? ''}
+	data-sign-surface-provider={ndaSignSurface?.kind === 'embed' ? ndaSignSurface.provider : ''}
 >
-	{showSignCard && <p class="text-ink-soft">Le lien de signature est prêt.</p>}
+	<p id="status-sign-ready" class:list={['text-ink-soft', !view.showSignSurfaceReady && 'hidden']}>
+		{signatureStatusCopy.signSurfaceReady}
+	</p>
 
-	{
-		enrollment.collectionStatus === 'pending' && enrollment.stripeCheckoutSessionId && (
-			<p class="text-ink-soft">
-				Paiement en cours de confirmation. Cette page se met à jour automatiquement.
-			</p>
-		)
-	}
-	{
-		isPaidEnough(enrollment.collectionStatus) &&
-			enrollment.contractStatus === 'pending' &&
-			!showSignCard && (
-				<p class="text-ink-soft">
-					Votre paiement est bien confirmé. Le lien de signature apparaît ici dès qu’il est prêt.
-				</p>
-			)
-	}
-	{
-		enrollment.contractStatus === 'sent' && !showSignCard && (
-			<p class="text-ink-soft">
-				Votre accord est prêt, mais le lien n’est pas encore disponible. Actualisez la page ou
-				contactez un administrateur.
-			</p>
-		)
-	}
-	{
-		!showSignCard && action.kind === 'open_platform' ? (
-			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
-				{message && (
-					<div class="max-w-prose space-y-1.5">
-						<p class="text-ink-soft text-lg leading-snug font-normal sm:text-xl">{message[0]}</p>
-						{message[1] && (
-							<p class="text-ink-soft text-sm leading-relaxed sm:text-[0.9375rem]">{message[1]}</p>
-						)}
-					</div>
-				)}
+	<p
+		id="status-payment-pending"
+		class:list={['text-ink-soft', !view.showPaymentPending && 'hidden']}
+	>
+		Paiement en cours de confirmation. Cette page se met à jour automatiquement.
+	</p>
+
+	<p id="status-sign-waiting" class:list={['text-ink-soft', !view.showSignWaiting && 'hidden']}>
+		{signatureStatusCopy.signSurfaceWaiting}
+	</p>
+
+	<p
+		id="status-sign-unavailable"
+		class:list={['text-ink-soft', !view.showSignUnavailable && 'hidden']}
+	>
+		{signatureStatusCopy.signSurfaceUnavailable}
+	</p>
+
+	<div id="status-message-block">
+		{
+			!view.showSignSurfaceReady && view.action.kind === 'open_platform'
+				? view.message && (
+						<div class="max-w-prose space-y-1.5">
+							<p class="text-ink-soft text-lg leading-snug font-normal sm:text-xl">
+								{view.message[0]}
+							</p>
+							{view.message[1] && (
+								<p class="text-ink-soft text-sm leading-relaxed sm:text-[0.9375rem]">
+									{view.message[1]}
+								</p>
+							)}
+						</div>
+					)
+				: view.message && (
+						<div class="max-w-prose space-y-1.5">
+							{view.message.map((line) => (
+								<p class="text-ink-soft text-sm">{line}</p>
+							))}
+						</div>
+					)
+		}
+	</div>
+
+	<div id="status-action-block">
+		{
+			!view.showSignSurfaceReady && view.action.kind === 'open_platform' && (
 				<Button
-					href={action.href}
+					href={view.action.href}
 					size="md"
 					variant="primary"
-					class="shrink-0 self-start sm:self-center"
 					target="_blank"
 					rel="noopener noreferrer"
+					class="w-full whitespace-nowrap sm:w-auto"
 				>
-					{action.label}
+					{view.action.label}
 				</Button>
-			</div>
-		) : (
-			message && (
-				<div class="max-w-prose space-y-1.5">
-					{message.map((line) => (
-						<p class="text-ink-soft text-sm">{line}</p>
-					))}
-				</div>
 			)
-		)
-	}
-
-	{
-		!showSignCard && action.kind === 'refresh' && (
-			<Button href="/#acces" size="md" variant="primary" id="status-refresh">
-				{action.label}
-			</Button>
-		)
-	}
-	{
-		closed && (
-			<Alert variant="info">
-				Cette inscription est clôturée. Contactez un administrateur si besoin.
-			</Alert>
-		)
-	}
-
-	{showSignCard && ndaSignUrl && <SignLinkCard signUrl={ndaSignUrl} />}
-
-	{
-		enrollment.contractStatus === 'sent' && !closed && (
-			<div class="space-y-3">
-				<p class="text-ink-soft text-sm">
-					Après signature, cette page se met à jour automatiquement. Si ce n’est pas le cas, cliquez
-					ci-dessous.
-				</p>
-				<Button id="nda-confirm-signed" type="button" size="md" variant="secondary">
-					J’ai signé le contrat de confidentialité
+		}
+		{
+			!view.showSignSurfaceReady && view.action.kind === 'refresh' && (
+				<Button
+					href="/#acces"
+					size="md"
+					variant="primary"
+					id="status-refresh"
+					class="w-full whitespace-nowrap sm:w-auto"
+				>
+					{view.action.label}
 				</Button>
-				<p id="nda-confirm-feedback" class="text-ink-soft text-sm" aria-live="polite" />
-			</div>
-		)
-	}
+			)
+		}
+	</div>
+
+	<div id="status-closed-alert" class:list={[!view.closed && 'hidden']}>
+		{
+			view.closed && (
+				<Alert variant="info">
+					Cette inscription est clôturée. Contactez un administrateur si besoin.
+				</Alert>
+			)
+		}
+	</div>
+
+	<div id="status-sign-surface" class:list={[!view.showSignSurfaceReady && 'hidden']}>
+		{ndaSignSurface?.kind === 'redirect' && <SignLinkCard signUrl={ndaSignSurface.url} />}
+		{
+			ndaSignSurface?.kind === 'embed' && ndaSignSurface.provider === 'docuseal' && (
+				<DocusealEmbedCard src={ndaSignSurface.src} email={ndaSignSurface.email} />
+			)
+		}
+		{
+			ndaSignSurface?.kind === 'embed' && ndaSignSurface.provider !== 'docuseal' && (
+				<Alert variant="info">
+					La signature est prête. Actualisez cette page ou contactez-nous si le formulaire ne
+					s’affiche pas.
+				</Alert>
+			)
+		}
+	</div>
+
+	<div id="status-nda-confirm" class:list={['space-y-3', !view.showNdaConfirm && 'hidden']}>
+		{
+			view.showNdaConfirm && (
+				<>
+					<p class="text-ink-soft text-sm">
+						Après signature, cette page se met à jour automatiquement. Si ce n’est pas le cas,
+						cliquez ci-dessous.
+					</p>
+					<Button
+						id="nda-confirm-signed"
+						type="button"
+						size="md"
+						variant="secondary"
+						class="w-full whitespace-nowrap sm:w-auto"
+					>
+						J’ai signé le contrat de confidentialité
+					</Button>
+					<p id="nda-confirm-feedback" class="text-ink-soft text-sm" aria-live="polite" />
+				</>
+			)
+		}
+	</div>
 </div>
 
 <script>
+	import { lockButton } from '../../../lib/client/lock-button';
+	import {
+		refreshEnrollmentAfterNdaSigned,
+		reloadEnrollmentStatus,
+		startEnrollmentPolling,
+	} from '../../../lib/client/enrollment-status-client';
+	import { requestNdaSignatureRefresh } from '../../../lib/client/refresh-nda-signature';
+
 	document.getElementById('status-refresh')?.addEventListener('click', (event) => {
 		event.preventDefault();
-		window.location.hash = 'acces';
-		window.location.reload();
+		reloadEnrollmentStatus();
 	});
 
 	const confirmBtn = document.getElementById('nda-confirm-signed') as HTMLButtonElement | null;
 	const confirmFeedback = document.getElementById('nda-confirm-feedback');
-	const confirmLabel = confirmBtn?.textContent ?? 'J’ai signé le contrat de confidentialité';
 
 	confirmBtn?.addEventListener('click', async () => {
-		if (!confirmBtn || confirmBtn.disabled) return;
-		confirmBtn.disabled = true;
-		confirmBtn.textContent = 'Vérification…';
+		if (!confirmBtn) return;
+		const lock = lockButton(confirmBtn, { busyLabel: 'Vérification…' });
+		if (!lock.locked) return;
 		if (confirmFeedback) confirmFeedback.textContent = '';
 		try {
-			const res = await fetch('/api/enrollment/nda-sync', {
-				method: 'POST',
-				headers: { Accept: 'application/json' },
-				credentials: 'same-origin',
-			});
-			const data = (await res.json().catch(() => ({}))) as {
-				ok?: boolean;
-				signed?: boolean;
-				error?: string;
-				message?: string;
-			};
-			if (res.ok && data.signed) {
-				window.location.hash = 'acces';
-				window.location.reload();
+			const result = await requestNdaSignatureRefresh();
+			if (result.signed) {
+				await refreshEnrollmentAfterNdaSigned();
 				return;
 			}
-			if (confirmFeedback) {
-				confirmFeedback.textContent =
-					data.message ??
-					data.error ??
-					'La signature n’est pas encore enregistrée. Réessaie dans quelques secondes.';
-			}
+			if (confirmFeedback) confirmFeedback.textContent = result.message;
 		} catch {
 			if (confirmFeedback) {
 				confirmFeedback.textContent =
 					'Impossible de vérifier la signature pour le moment. Réessaie dans quelques secondes.';
 			}
 		}
-		confirmBtn.disabled = false;
-		confirmBtn.textContent = confirmLabel;
+		lock.unlock();
 	});
 
 	const panel = document.getElementById('status-panel');
-	if (panel?.dataset.poll === 'true') {
-		const initialFingerprint = panel.dataset.fingerprint ?? '';
-		const intervalMs = Number(panel.dataset.pollInterval) || 2000;
-		const maxMs = Number(panel.dataset.pollMax) || 180_000;
-		const startedAt = Date.now();
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		let stopped = false;
-		let inFlight = false;
-
-		const stop = () => {
-			stopped = true;
-			if (timer !== undefined) clearTimeout(timer);
-		};
-
-		const schedule = () => {
-			if (stopped) return;
-			if (timer !== undefined) clearTimeout(timer);
-			timer = setTimeout(() => {
-				void tick();
-			}, intervalMs);
-		};
-
-		const tick = async () => {
-			if (stopped || inFlight) return;
-			if (Date.now() - startedAt >= maxMs) {
-				stop();
-				return;
-			}
-			if (document.visibilityState === 'hidden') {
-				schedule();
-				return;
-			}
-			inFlight = true;
-			try {
-				const res = await fetch('/api/enrollment/status', {
-					headers: { Accept: 'application/json' },
-					credentials: 'same-origin',
-				});
-				if (res.ok) {
-					const data = (await res.json()) as {
-						collectionStatus?: string;
-						contractStatus?: string;
-						accessStatus?: string;
-					};
-					const next = `${data.collectionStatus ?? ''}|${data.contractStatus ?? ''}|${data.accessStatus ?? ''}`;
-					if (next && next !== initialFingerprint) {
-						stop();
-						window.location.reload();
-						return;
-					}
-				}
-			} catch {
-				// ignore transient network errors; keep polling until max
-			} finally {
-				inFlight = false;
-			}
-			schedule();
-		};
-
-		document.addEventListener('visibilitychange', () => {
-			if (document.visibilityState === 'visible' && !stopped) {
-				void tick();
-			}
-		});
-
-		schedule();
-	}
+	if (panel) startEnrollmentPolling(panel);
 </script>

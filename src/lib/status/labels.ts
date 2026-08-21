@@ -3,9 +3,8 @@ import type {
 	CollectionStatus,
 	ContractStatus,
 	PaymentStatus,
-	YousignRequestStatus,
-	YousignSignerStatus,
 } from '../../generated/prisma/client';
+import type { YousignRequestStatus, YousignSignerStatus } from './yousign';
 
 export const COLLECTION_STATUS_LABELS: Record<CollectionStatus, string> = {
 	pending: 'En attente',

@@ -6,7 +6,7 @@ interface Props {
 	as?: 'div' | 'section' | 'main' | 'header' | 'footer';
 }
 
-const { class: className, as: Tag = 'div' } = Astro.props;
+const { class: className, as: Tag = 'div' }: Props = Astro.props;
 ---
 
 <Tag class={cn('mx-auto w-full max-w-5xl px-5 sm:px-8', className)}>

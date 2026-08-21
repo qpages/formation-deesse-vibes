@@ -56,8 +56,8 @@ export type AppEvents = {
 	'stripe/payment.confirmed': {
 		data: { enrollmentId: string; stripeEventId: string };
 	};
-	'yousign/signature.done': {
-		data: { enrollmentId: string; yousignEventId: string; requestId: string };
+	'nda/signature.completed': {
+		data: { enrollmentId: string; providerEventId: string; requestId: string };
 	};
 	'provider/stripe-event.received': {
 		data: { providerEventId: string };
@@ -65,7 +65,16 @@ export type AppEvents = {
 	'provider/yousign-event.received': {
 		data: { providerEventId: string };
 	};
+	'provider/docuseal-event.received': {
+		data: { providerEventId: string };
+	};
 	'enrollment/access.grant': {
+		data: { enrollmentId: string };
+	};
+	'enrollment/access.suspend': {
+		data: { enrollmentId: string; reason: 'OVERDUE_INSTALLMENT' };
+	};
+	'enrollment/access.revoke': {
 		data: { enrollmentId: string };
 	};
 	'admin/resend-nda': {

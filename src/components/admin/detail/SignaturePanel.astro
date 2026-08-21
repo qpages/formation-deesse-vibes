@@ -3,7 +3,13 @@ import StatusBadge from '../../ui/StatusBadge.astro';
 import type { AdminActionDef } from '../../../lib/admin/actions';
 import type { AdminEnrollmentDetail } from '../../../lib/admin/enrollments';
 import { signatureDiagnostic } from '../../../lib/admin/pipeline-detail';
-import { CONTRACT_STATUS_LABELS, YOUSIGN_SIGNER_STATUS_LABELS } from '../../../lib/status';
+import { CONTRACT_STATUS_LABELS } from '../../../lib/status';
+import {
+	resolveNdaProvider,
+	signatureProviderAppUrl,
+	signatureProviderLabel,
+} from '../../../lib/signature/helpers';
+import { mapSignatureRequestPhase } from '../../../lib/signature/status-phase';
 
 interface Props {
 	detail: AdminEnrollmentDetail;
@@ -48,10 +54,23 @@ type TimelineStep = {
 	meta: string | null;
 };
 
+const provider = resolveNdaProvider(detail);
+const providerLabel = signatureProviderLabel(provider);
+const providerAppUrl = signatureProviderAppUrl(provider, detail.externalRequestId);
+const isEmbed = detail.ndaRequest?.signKind === 'embed';
+
 const signed = detail.contractStatus === 'signed' || Boolean(detail.ndaSignedAt);
 const opened = Boolean(detail.ndaLinkOpenedAt);
+const providerPhase = mapSignatureRequestPhase(
+	detail.ndaRequest?.provider,
+	detail.ndaRequest?.providerStatus,
+);
 const notified =
-	Boolean(detail.ndaNotifiedAt) || detail.yousignSignerStatus === 'notified' || opened || signed;
+	Boolean(detail.ndaNotifiedAt) ||
+	providerPhase === 'awaiting_signature' ||
+	(isEmbed && detail.contractStatus === 'sent') ||
+	opened ||
+	signed;
 const deliveryFailed = Boolean(detail.ndaDeliveryFailedAt);
 
 const expiresAt = detail.signatureLinkExpiresAt;
@@ -69,15 +88,17 @@ const expiresSoon =
 const timeline: TimelineStep[] = [
 	{
 		key: 'notified',
-		label: 'Notifié',
+		label: isEmbed ? 'Prêt' : 'Notifié',
 		state: deliveryFailed ? 'error' : notified ? 'done' : 'todo',
 		meta: deliveryFailed
 			? formatDateTime(detail.ndaDeliveryFailedAt)
-			: formatDateTime(detail.ndaNotifiedAt),
+			: isEmbed && detail.contractStatus === 'sent' && !detail.ndaNotifiedAt
+				? formatDateTime(detail.updatedAt)
+				: formatDateTime(detail.ndaNotifiedAt),
 	},
 	{
 		key: 'opened',
-		label: 'Lien ouvert',
+		label: isEmbed ? 'Consulté' : 'Lien ouvert',
 		state: opened ? 'done' : notified && !signed ? 'current' : signed ? 'done' : 'todo',
 		meta: formatDateTime(detail.ndaLinkOpenedAt),
 	},
@@ -90,15 +111,14 @@ const timeline: TimelineStep[] = [
 ];
 
 const diagnostic = signatureDiagnostic(detail);
-const lastErrorAtLabel = formatDateTime(detail.yousignLastErrorAt);
+const lastErrorAtLabel = formatDateTime(detail.ndaRequest?.lastErrorAt);
 
 const techRows: Array<{ label: string; value: string }> = [
+	{ label: 'Provider', value: providerLabel },
 	{ label: 'Statut métier', value: CONTRACT_STATUS_LABELS[detail.contractStatus] },
 	{
-		label: 'Signataire Yousign',
-		value: detail.yousignSignerStatus
-			? YOUSIGN_SIGNER_STATUS_LABELS[detail.yousignSignerStatus]
-			: '—',
+		label: 'Statut provider',
+		value: detail.ndaRequest?.providerStatus ?? '—',
 	},
 	{ label: 'Lien expire', value: expiresLabel ?? '—' },
 	{
@@ -108,12 +128,12 @@ const techRows: Array<{ label: string; value: string }> = [
 				? `${detail.ndaResendCount} · dernier ${formatDateTime(detail.ndaLastResendAt) ?? '—'}`
 				: 'Aucun',
 	},
-	{ label: 'Request ID', value: detail.yousignRequestId ?? '—' },
-	{ label: 'Signer ID', value: detail.yousignSignerId ?? '—' },
+	{ label: 'Request ID', value: detail.externalRequestId ?? '—' },
+	{ label: 'Signer ID', value: detail.externalSignerId ?? '—' },
 	{
 		label: 'Dernière erreur',
-		value: detail.yousignLastError
-			? `${detail.yousignLastError}${lastErrorAtLabel ? ` · ${lastErrorAtLabel}` : ''}`
+		value: detail.ndaRequest?.lastError
+			? `${detail.ndaRequest.lastError}${lastErrorAtLabel ? ` · ${lastErrorAtLabel}` : ''}`
 			: '—',
 	},
 ];
@@ -229,14 +249,14 @@ const linkClass =
 			</summary>
 		</details>
 		{
-			detail.yousignUrl ? (
-				<a href={detail.yousignUrl} target="_blank" rel="noopener noreferrer" class={linkClass}>
-					Yousign ↗
+			providerAppUrl ? (
+				<a href={providerAppUrl} target="_blank" rel="noopener noreferrer" class={linkClass}>
+					{providerLabel} ↗
 				</a>
 			) : null
 		}
 		{
-			signed && detail.yousignRequestId ? (
+			signed && detail.externalRequestId ? (
 				<a href={`/api/admin/enrollment/${enrollmentId}/nda`} class={linkClass}>
 					Télécharger le contrat
 				</a>

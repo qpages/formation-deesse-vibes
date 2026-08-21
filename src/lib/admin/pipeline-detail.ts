@@ -1,6 +1,8 @@
 import type { AdminEnrollmentDetail } from './enrollments';
 import type { AdminPaymentSummary } from './payments';
 import { formatMoney } from '../payment-plans';
+import { resolveExternalRequestId, resolveExternalSignerId } from '../signature/nda-request';
+import { mapSignatureRequestPhase } from '../signature/status-phase';
 import type { BadgeTone } from '../status';
 import { COLLECTION_STATUS_LABELS, CONTRACT_STATUS_LABELS, ACCESS_STATUS_LABELS } from '../status';
 
@@ -24,7 +26,7 @@ export type EnrollmentHeadline = {
 
 type BottleneckInput = Pick<
 	AdminEnrollmentDetail,
-	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'yousignLastError'
+	'collectionStatus' | 'contractStatus' | 'accessStatus' | 'ndaRequest'
 >;
 
 /** Première étape qui bloque paiement → signature → accès. null = dossier fluide. */
@@ -71,7 +73,7 @@ export function enrollmentHeadline(detail: BottleneckInput): EnrollmentHeadline 
 	}
 
 	if (bottleneck === 'signature') {
-		if (detail.contractStatus === 'pending' && detail.yousignLastError) {
+		if (detail.contractStatus === 'pending' && detail.ndaRequest?.lastError) {
 			return { label: 'Signature en erreur', tone: 'action' };
 		}
 
@@ -110,7 +112,7 @@ export type SignatureDiagnosticLevel = 'error' | 'warn' | 'info';
 
 export type SignatureDiagnostic = {
 	level: SignatureDiagnosticLevel;
-	/** Fait brut : soit l'erreur Yousign verbatim, soit l'état constaté. */
+	/** Fait brut : soit l'erreur provider verbatim, soit l'état constaté. */
 	title: string;
 	/** Une seule action concrète, quand elle apporte de l'info. Optionnel. */
 	action?: string;
@@ -118,26 +120,21 @@ export type SignatureDiagnostic = {
 
 type SignatureDiagnosticInput = Pick<
 	AdminEnrollmentDetail,
-	| 'collectionStatus'
-	| 'contractStatus'
-	| 'yousignRequestId'
-	| 'yousignSignerId'
-	| 'yousignLastError'
-	| 'ndaDeliveryFailedAt'
+	'collectionStatus' | 'contractStatus' | 'ndaDeliveryFailedAt' | 'ndaRequest'
 >;
 
 /**
  * Diagnostic signature = faits, pas de narratif.
- * Priorité absolue à l'erreur Yousign brute si on l'a captée ; sinon on nomme
- * l'état constaté et l'action qui ira chercher le vrai motif côté Yousign.
+ * Priorité absolue à l'erreur provider brute si on l'a captée ; sinon on nomme
+ * l'état constaté et l'action qui ira chercher le vrai motif côté provider.
  * `null` = rien à signaler (signé, ou signature pas encore due car impayé).
  */
 export function signatureDiagnostic(detail: SignatureDiagnosticInput): SignatureDiagnostic | null {
 	if (detail.contractStatus === 'signed') return null;
 
-	// 1. Erreur réelle remontée par un job / webhook / sync Yousign → affichée verbatim.
-	if (detail.yousignLastError) {
-		return { level: 'error', title: `Yousign : ${detail.yousignLastError}` };
+	// 1. Erreur réelle remontée par un job / webhook / sync → affichée verbatim.
+	if (detail.ndaRequest?.lastError) {
+		return { level: 'error', title: `Signature : ${detail.ndaRequest.lastError}` };
 	}
 
 	const paid =
@@ -148,21 +145,23 @@ export function signatureDiagnostic(detail: SignatureDiagnosticInput): Signature
 	// Signature pas encore due : pas un problème à signaler ici.
 	if (!paid) return null;
 
+	const requestId = resolveExternalRequestId(detail);
+	const signerId = resolveExternalSignerId(detail);
+
 	// 2. Pas d'erreur captée : on décrit l'état et on pointe l'action qui révèle le motif.
-	if (!detail.yousignRequestId) {
+	if (!requestId) {
 		return {
 			level: 'warn',
-			title: 'Aucune demande Yousign créée.',
-			action: '« Recréer un lien Yousign » pour lancer la création.',
+			title: 'Aucune demande de signature créée.',
+			action: '« Recréer un lien de signature » pour lancer la création.',
 		};
 	}
 
-	if (!detail.yousignSignerId && detail.contractStatus === 'pending') {
+	if (!signerId && detail.contractStatus === 'pending') {
 		return {
 			level: 'warn',
-			title: 'Demande Yousign présente mais sans signataire, et aucune erreur enregistrée.',
-			action:
-				'« Sync statut Yousign » interroge Yousign en direct et affiche le statut/motif réel ici.',
+			title: 'Demande de signature présente mais sans signataire, et aucune erreur enregistrée.',
+			action: '« Sync NDA » interroge le provider en direct et affiche le statut/motif réel ici.',
 		};
 	}
 
@@ -192,12 +191,16 @@ function formatShortDateTime(value: Date | null | undefined): string | null {
 }
 
 function buildSignatureHint(detail: AdminEnrollmentDetail): string {
+	const providerPhase = mapSignatureRequestPhase(
+		detail.ndaRequest?.provider,
+		detail.ndaRequest?.providerStatus,
+	);
 	if (detail.collectionStatus === 'pending' || detail.collectionStatus === 'canceled') {
 		return 'Bloqué — paiement requis';
 	}
 
-	if (detail.yousignLastError) {
-		return 'Échec Yousign · recréer le lien';
+	if (detail.ndaRequest?.lastError) {
+		return 'Échec signature · recréer le lien';
 	}
 
 	if (detail.contractStatus === 'signed') {
@@ -212,15 +215,15 @@ function buildSignatureHint(detail: AdminEnrollmentDetail): string {
 		if (detail.ndaLinkOpenedAt) {
 			return 'Lien ouvert · pas encore signé';
 		}
-		if (detail.ndaNotifiedAt || detail.yousignSignerStatus === 'notified') {
+		if (detail.ndaNotifiedAt || providerPhase === 'awaiting_signature') {
 			const expires = formatShortDate(detail.signatureLinkExpiresAt);
 			return expires ? `E-mail envoyé · expire le ${expires}` : 'E-mail envoyé';
 		}
 		return 'En attente de signature';
 	}
 
-	if (detail.yousignRequestId) {
-		return `Yousign · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
+	if (resolveExternalRequestId(detail)) {
+		return `Signature · ${CONTRACT_STATUS_LABELS[detail.contractStatus]}`;
 	}
 
 	return 'NDA pas encore créé';
