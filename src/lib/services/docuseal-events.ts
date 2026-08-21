@@ -1,8 +1,8 @@
 import { decryptPayload } from '../crypto';
+import { confirmNdaSignatureFromWebhook } from '../enrollment/confirm-nda-signature';
+import { findEnrollmentByExternalRequestOrEnrollmentId } from '../enrollment/queries';
 import { resolveSignatureProvider } from '../signature/providers';
 import type { DocusealWebhookPayload } from '../signature/adapters/docuseal-types';
-import { confirmLearnerNdaSignatureFromWebhook } from '../signature/nda-sync';
-import { findEnrollmentByExternalRequestOrEnrollmentId } from '../enrollment/queries';
 
 export type { DocusealWebhookPayload } from '../signature/adapters/docuseal-types';
 
@@ -51,5 +51,5 @@ export async function handleDocusealProviderEvent(input: {
 		throw new Error(`Enrollment introuvable pour DocuSeal ${completed.requestId}`);
 	}
 
-	return confirmLearnerNdaSignatureFromWebhook(enrollment.id);
+	return confirmNdaSignatureFromWebhook(enrollment.id);
 }

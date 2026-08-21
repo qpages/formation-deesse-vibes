@@ -1,6 +1,8 @@
-import type { ContractStatus } from '../../generated/prisma/client';
+import type { ContractStatus, SignatureProvider, SignKind } from '../../generated/prisma/client';
 import { getPrisma } from '../prisma';
-import { resolveSignatureConfig } from './config';
+import type { EnrollmentWithUser } from '../enrollment/queries';
+import { findEnrollmentById } from '../enrollment/queries';
+import { isNdaFullyProvisioned } from './nda-request';
 
 const ERROR_MAX_LEN = 1000;
 
@@ -10,8 +12,16 @@ function truncateError(message: string): string {
 
 const withUserAndNda = { include: { user: true, ndaRequest: true } } as const;
 
-export async function persistNdaDraftRequestId(enrollmentId: string, requestId: string) {
-	const { provider, signKind } = resolveSignatureConfig();
+export type NdaProvisioningContext = {
+	provider: SignatureProvider;
+	signKind: SignKind;
+};
+
+export async function persistNdaDraftRequestId(
+	enrollmentId: string,
+	requestId: string,
+	{ provider, signKind }: NdaProvisioningContext,
+) {
 	const prisma = getPrisma();
 
 	return prisma.$transaction(async (tx) => {
@@ -44,8 +54,8 @@ export async function persistNdaDraftRequestId(enrollmentId: string, requestId: 
 export async function persistNdaProvisioned(
 	enrollmentId: string,
 	nda: { requestId: string; signerId: string; signatureLink?: string },
+	{ provider, signKind }: NdaProvisioningContext,
 ) {
-	const { provider, signKind } = resolveSignatureConfig();
 	const metadata =
 		signKind === 'embed' && nda.signatureLink ? { embed_src: nda.signatureLink } : undefined;
 	const prisma = getPrisma();
@@ -87,6 +97,25 @@ export async function persistNdaProvisioned(
 
 		return enrollment;
 	});
+}
+
+/**
+ * Filet miroir : NDA activé côté provider (IDs persistés) mais contractStatus encore pending.
+ * Peut arriver si persist-nda a été interrompu après l’upsert nda_requests.
+ */
+export async function ensureNdaContractSentIfProvisioned(
+	enrollment: EnrollmentWithUser,
+): Promise<EnrollmentWithUser> {
+	if (!isNdaFullyProvisioned(enrollment) || enrollment.contractStatus !== 'pending') {
+		return enrollment;
+	}
+
+	await getPrisma().enrollment.update({
+		where: { id: enrollment.id },
+		data: { contractStatus: 'sent' },
+	});
+
+	return (await findEnrollmentById(enrollment.id)) ?? enrollment;
 }
 
 /** Clear NDA ids without calling provider cancel (recreate NDA). */

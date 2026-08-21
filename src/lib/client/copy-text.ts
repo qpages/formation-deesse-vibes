@@ -12,7 +12,8 @@ export async function copyText(value: string): Promise<'copied' | 'failed'> {
 			textarea.style.left = '-9999px';
 			document.body.appendChild(textarea);
 			textarea.select();
-			const ok = document.execCommand('copy');
+			const doc = document as unknown as { execCommand: (commandId: string) => boolean };
+			const ok = doc.execCommand('copy');
 			document.body.removeChild(textarea);
 			return ok ? 'copied' : 'failed';
 		} catch {

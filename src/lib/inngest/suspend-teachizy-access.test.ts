@@ -21,7 +21,7 @@ vi.mock('../services/slack', () => ({
 	withJobLifecycleAlerts: vi.fn(({ run }: { run: () => Promise<unknown> }) => run()),
 }));
 
-import { suspendTeachizyAccess } from './suspend-teachizy-access';
+import { handleSuspendTeachizyAccess, suspendTeachizyAccess } from './suspend-teachizy-access';
 
 const enrollment = {
 	id: 'enr_1',
@@ -30,16 +30,15 @@ const enrollment = {
 };
 
 function invokeSuspend() {
-	return suspendTeachizyAccess.fn({
+	return handleSuspendTeachizyAccess({
 		event: {
-			name: 'enrollment/access.suspend',
-			data: { enrollmentId: 'enr_1', reason: 'OVERDUE_INSTALLMENT' },
+			data: { enrollmentId: 'enr_1' },
 		},
 		step: {
-			run: vi.fn(async (_id: string, fn: () => unknown) => fn()),
+			run: async <T>(_id: string, fn: () => T | Promise<T>) => fn(),
 		},
 		attempt: 0,
-	} as Parameters<typeof suspendTeachizyAccess.fn>[0]);
+	});
 }
 
 beforeEach(() => {

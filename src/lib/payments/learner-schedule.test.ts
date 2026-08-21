@@ -55,7 +55,7 @@ describe('buildLearnerPaymentSchedule', () => {
 	it('expose le plan, le récap et les échéances projetées', () => {
 		const schedule = buildLearnerPaymentSchedule(enrollment(), [payment()]);
 
-		expect(schedule.planLabel).toBe('Paiement en 4 fois');
+		expect(schedule.planLabel).toBe('Paiement de 1 999,00 € en 4 mensualités de 499,75 €');
 		expect(schedule.installments).toHaveLength(4);
 		expect(schedule.installments[0]).toMatchObject({
 			installmentNumber: 1,

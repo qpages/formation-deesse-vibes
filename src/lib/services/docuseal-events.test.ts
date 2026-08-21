@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { decryptPayload, findEnrollmentByExternalRequestOrEnrollmentId, confirmLearnerNdaSignatureFromWebhook } =
+const { decryptPayload, findEnrollmentByExternalRequestOrEnrollmentId, confirmNdaSignatureFromWebhook } =
 	vi.hoisted(() => ({
 		decryptPayload: vi.fn(),
 		findEnrollmentByExternalRequestOrEnrollmentId: vi.fn(),
-		confirmLearnerNdaSignatureFromWebhook: vi.fn(),
+		confirmNdaSignatureFromWebhook: vi.fn(),
 	}));
 
 vi.mock('../crypto', () => ({ decryptPayload }));
 vi.mock('../enrollment/queries', () => ({ findEnrollmentByExternalRequestOrEnrollmentId }));
-vi.mock('../signature/nda-sync', () => ({ confirmLearnerNdaSignatureFromWebhook }));
+vi.mock('../enrollment/confirm-nda-signature', () => ({ confirmNdaSignatureFromWebhook }));
 
 import { handleDocusealProviderEvent, isHandledDocusealEventType } from './docuseal-events';
 
@@ -22,7 +22,7 @@ beforeEach(() => {
 		}),
 	);
 	findEnrollmentByExternalRequestOrEnrollmentId.mockResolvedValue({ id: 'enr_1' });
-	confirmLearnerNdaSignatureFromWebhook.mockResolvedValue({ enrollmentId: 'enr_1' });
+	confirmNdaSignatureFromWebhook.mockResolvedValue({ enrollmentId: 'enr_1' });
 });
 
 describe('isHandledDocusealEventType', () => {
@@ -42,10 +42,10 @@ describe('handleDocusealProviderEvent', () => {
 				payloadCipherText: 'cipher',
 			}),
 		).resolves.toEqual({ ignored: true });
-		expect(confirmLearnerNdaSignatureFromWebhook).not.toHaveBeenCalled();
+		expect(confirmNdaSignatureFromWebhook).not.toHaveBeenCalled();
 	});
 
-	it('délègue la confirmation à confirmLearnerNdaSignatureFromWebhook', async () => {
+	it('délègue la confirmation à confirmNdaSignatureFromWebhook', async () => {
 		await expect(
 			handleDocusealProviderEvent({
 				providerEventId: 'evt_1',
@@ -59,6 +59,6 @@ describe('handleDocusealProviderEvent', () => {
 			'sub_1',
 			undefined,
 		);
-		expect(confirmLearnerNdaSignatureFromWebhook).toHaveBeenCalledWith('enr_1');
+		expect(confirmNdaSignatureFromWebhook).toHaveBeenCalledWith('enr_1');
 	});
 });

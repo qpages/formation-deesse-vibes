@@ -1,4 +1,5 @@
 import type { EnqueueResult } from '../inngest/client';
+import type { SignatureProvider as SignatureProviderId } from '../../generated/prisma/client';
 
 export type SignedDocument = {
 	bytes: Uint8Array;
@@ -40,7 +41,7 @@ export type SignSurfaceInput = {
 
 export type SignSurface =
 	| { kind: 'redirect'; url: string }
-	| { kind: 'embed'; src: string; email: string };
+	| { kind: 'embed'; provider: SignatureProviderId; src: string; email: string };
 
 export type SignatureCompletedEvent = {
 	requestId: string;

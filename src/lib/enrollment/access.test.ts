@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { enrollmentUpdate, getPrisma, sendInngestSafe, findEnrollmentForAccessPolicy } =
+const { enrollmentUpdate, sendInngestSafe, findEnrollmentForAccessPolicy } =
 	vi.hoisted(() => ({
 		enrollmentUpdate: vi.fn(),
-		getPrisma: vi.fn(),
 		sendInngestSafe: vi.fn(),
 		findEnrollmentForAccessPolicy: vi.fn(),
 	}));

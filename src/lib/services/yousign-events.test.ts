@@ -3,18 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
 	decryptPayload,
 	findEnrollmentByExternalRequestOrEnrollmentId,
-	confirmLearnerNdaSignatureFromWebhook,
+	confirmNdaSignatureFromWebhook,
 	persistNdaSyncMirror,
 } = vi.hoisted(() => ({
 	decryptPayload: vi.fn(),
 	findEnrollmentByExternalRequestOrEnrollmentId: vi.fn(),
-	confirmLearnerNdaSignatureFromWebhook: vi.fn(),
+	confirmNdaSignatureFromWebhook: vi.fn(),
 	persistNdaSyncMirror: vi.fn(),
 }));
 
 vi.mock('../crypto', () => ({ decryptPayload }));
 vi.mock('../enrollment/queries', () => ({ findEnrollmentByExternalRequestOrEnrollmentId }));
-vi.mock('../signature/nda-sync', () => ({ confirmLearnerNdaSignatureFromWebhook }));
+vi.mock('../enrollment/confirm-nda-signature', () => ({ confirmNdaSignatureFromWebhook }));
 vi.mock('../signature/persist', () => ({ persistNdaSyncMirror }));
 vi.mock('./slack', () => ({ notifyOps: vi.fn() }));
 
@@ -24,11 +24,11 @@ const enrollment = { id: 'enr_1', ndaNotifiedAt: null, ndaLinkOpenedAt: null };
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	confirmLearnerNdaSignatureFromWebhook.mockResolvedValue({ enrollmentId: 'enr_1' });
+	confirmNdaSignatureFromWebhook.mockResolvedValue({ enrollmentId: 'enr_1' });
 });
 
 describe('handleYousignProviderEvent signature_request.done', () => {
-	it('délègue à confirmLearnerNdaSignatureFromWebhook', async () => {
+	it('délègue à confirmNdaSignatureFromWebhook', async () => {
 		decryptPayload.mockReturnValue(
 			JSON.stringify({
 				event_name: 'signature_request.done',
@@ -45,7 +45,7 @@ describe('handleYousignProviderEvent signature_request.done', () => {
 			}),
 		).resolves.toEqual({ enrollmentId: 'enr_1' });
 
-		expect(confirmLearnerNdaSignatureFromWebhook).toHaveBeenCalledWith('enr_1');
+		expect(confirmNdaSignatureFromWebhook).toHaveBeenCalledWith('enr_1');
 		expect(persistNdaSyncMirror).not.toHaveBeenCalled();
 	});
 });
@@ -70,6 +70,6 @@ describe('handleYousignProviderEvent engagement', () => {
 		).resolves.toEqual({ enrollmentId: 'enr_1' });
 
 		expect(persistNdaSyncMirror).toHaveBeenCalled();
-		expect(confirmLearnerNdaSignatureFromWebhook).not.toHaveBeenCalled();
+		expect(confirmNdaSignatureFromWebhook).not.toHaveBeenCalled();
 	});
 });

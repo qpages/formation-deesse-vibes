@@ -9,6 +9,7 @@ import {
 	signatureProviderAppUrl,
 	signatureProviderLabel,
 } from '../../../lib/signature/helpers';
+import { mapSignatureRequestPhase } from '../../../lib/signature/status-phase';
 
 interface Props {
 	detail: AdminEnrollmentDetail;
@@ -60,9 +61,13 @@ const isEmbed = detail.ndaRequest?.signKind === 'embed';
 
 const signed = detail.contractStatus === 'signed' || Boolean(detail.ndaSignedAt);
 const opened = Boolean(detail.ndaLinkOpenedAt);
+const providerPhase = mapSignatureRequestPhase(
+	detail.ndaRequest?.provider,
+	detail.ndaRequest?.providerStatus,
+);
 const notified =
 	Boolean(detail.ndaNotifiedAt) ||
-	detail.ndaRequest?.providerStatus === 'notified' ||
+	providerPhase === 'awaiting_signature' ||
 	(isEmbed && detail.contractStatus === 'sent') ||
 	opened ||
 	signed;

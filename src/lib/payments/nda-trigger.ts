@@ -22,7 +22,7 @@ export async function ensureNdaAfterPayment(
 	if (isNdaFullyProvisioned(enrollment)) return { status: 'skipped' };
 
 	const result = await sendInngestSafe({
-		id: `nda-after-payment:${enrollmentId}`,
+		id: `nda-after-payment:${enrollmentId}:${sourceId}`,
 		name: 'stripe/payment.confirmed',
 		data: { enrollmentId, stripeEventId: sourceId },
 	});

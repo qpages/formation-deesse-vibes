@@ -4,7 +4,10 @@ const { reconcileEnrollment } = vi.hoisted(() => ({
 	reconcileEnrollment: vi.fn(),
 }));
 
-vi.mock('../enrollment/reconcile', () => ({ reconcileEnrollment }));
+vi.mock('../enrollment/reconcile', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../enrollment/reconcile')>();
+	return { ...actual, reconcileEnrollment };
+});
 vi.mock('../enrollment', () => ({
 	canResendNda: vi.fn(),
 	findEnrollmentById: vi.fn(),
@@ -37,6 +40,24 @@ describe('dispatchAdminAction sync NDA', () => {
 
 		expect(reconcileEnrollment).toHaveBeenCalledWith('enr_1', 'admin.sync_nda', 'nda_signature');
 		expect(result).toEqual({ ok: true });
+	});
+
+	it('not_awaiting skipped → erreur admin', async () => {
+		reconcileEnrollment.mockResolvedValue({
+			enrollmentId: 'enr_1',
+			trigger: 'admin.sync_nda',
+			scope: 'nda_signature',
+			steps: [{ step: 'nda_signature', status: 'skipped', reason: 'not_awaiting' }],
+			mutated: false,
+		});
+
+		const result = await dispatchAdminAction('sync_nda', enrollment);
+
+		expect(result).toEqual({
+			ok: false,
+			error: 'Le contrat n’est pas en attente de signature.',
+			status: 400,
+		});
 	});
 });
 

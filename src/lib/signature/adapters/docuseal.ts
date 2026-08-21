@@ -286,7 +286,7 @@ async function getSignSurface(input: SignSurfaceInput): Promise<SignSurface | nu
 			return { kind: 'redirect', url };
 		}
 		if (!input.email) return null;
-		return { kind: 'embed', src: url, email: input.email };
+		return { kind: 'embed', provider: 'docuseal', src: url, email: input.email };
 	}
 
 	const submission = await getSubmission(input.requestId);
@@ -299,7 +299,7 @@ async function getSignSurface(input: SignSurfaceInput): Promise<SignSurface | nu
 	}
 
 	if (!input.email) return null;
-	return { kind: 'embed', src: url, email: input.email };
+	return { kind: 'embed', provider: 'docuseal', src: url, email: input.email };
 }
 
 async function downloadSignedPdf(requestId: string): Promise<SignedDocument> {
@@ -332,5 +332,6 @@ export const docusealAdapter: DocusealAdapter = {
 	mapCompletedEvent: mapDocusealCompletedEvent,
 	getSubmission,
 	getSubmitter,
-	syncStatus: (enrollmentId) => syncDocusealNda(enrollmentId, { getSubmission }),
+	syncStatus: (enrollmentId) =>
+		syncDocusealNda(enrollmentId, { getSubmission, getSubmitter }),
 };

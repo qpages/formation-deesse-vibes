@@ -1,10 +1,8 @@
 import type { AdminEnrollmentDetail } from './enrollments';
 import type { AdminPaymentSummary } from './payments';
 import { formatMoney } from '../payment-plans';
-import {
-	resolveExternalRequestId,
-	resolveExternalSignerId,
-} from '../signature/nda-request';
+import { resolveExternalRequestId, resolveExternalSignerId } from '../signature/nda-request';
+import { mapSignatureRequestPhase } from '../signature/status-phase';
 import type { BadgeTone } from '../status';
 import { COLLECTION_STATUS_LABELS, CONTRACT_STATUS_LABELS, ACCESS_STATUS_LABELS } from '../status';
 
@@ -122,10 +120,7 @@ export type SignatureDiagnostic = {
 
 type SignatureDiagnosticInput = Pick<
 	AdminEnrollmentDetail,
-	| 'collectionStatus'
-	| 'contractStatus'
-	| 'ndaDeliveryFailedAt'
-	| 'ndaRequest'
+	'collectionStatus' | 'contractStatus' | 'ndaDeliveryFailedAt' | 'ndaRequest'
 >;
 
 /**
@@ -166,8 +161,7 @@ export function signatureDiagnostic(detail: SignatureDiagnosticInput): Signature
 		return {
 			level: 'warn',
 			title: 'Demande de signature présente mais sans signataire, et aucune erreur enregistrée.',
-			action:
-				'« Sync NDA » interroge le provider en direct et affiche le statut/motif réel ici.',
+			action: '« Sync NDA » interroge le provider en direct et affiche le statut/motif réel ici.',
 		};
 	}
 
@@ -197,6 +191,10 @@ function formatShortDateTime(value: Date | null | undefined): string | null {
 }
 
 function buildSignatureHint(detail: AdminEnrollmentDetail): string {
+	const providerPhase = mapSignatureRequestPhase(
+		detail.ndaRequest?.provider,
+		detail.ndaRequest?.providerStatus,
+	);
 	if (detail.collectionStatus === 'pending' || detail.collectionStatus === 'canceled') {
 		return 'Bloqué — paiement requis';
 	}
@@ -217,7 +215,7 @@ function buildSignatureHint(detail: AdminEnrollmentDetail): string {
 		if (detail.ndaLinkOpenedAt) {
 			return 'Lien ouvert · pas encore signé';
 		}
-		if (detail.ndaNotifiedAt || detail.ndaRequest?.providerStatus === 'notified') {
+		if (detail.ndaNotifiedAt || providerPhase === 'awaiting_signature') {
 			const expires = formatShortDate(detail.signatureLinkExpiresAt);
 			return expires ? `E-mail envoyé · expire le ${expires}` : 'E-mail envoyé';
 		}

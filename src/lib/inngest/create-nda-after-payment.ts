@@ -2,6 +2,7 @@ import { isPaidEnough } from '../enrollment-gates';
 import { findEnrollmentByIdOrThrow } from '../enrollment';
 import {
 	clearNdaFields,
+	ensureNdaContractSentIfProvisioned,
 	persistNdaDraftRequestId,
 	persistNdaProvisioned,
 	recordNdaError,
@@ -12,7 +13,8 @@ import {
 	notifyOps,
 	withJobLifecycleAlerts,
 } from '../services/slack';
-import { resolveDefaultSignatureProvider } from '../signature/providers';
+import { resolveSignatureConfig } from '../signature/config';
+import { resolveSignatureProvider } from '../signature/providers';
 import { isNdaFullyProvisioned } from '../signature/helpers';
 import { resolveExternalRequestId } from '../signature/nda-request';
 import { inngest } from './client';
@@ -51,11 +53,17 @@ export const createNdaAfterPayment = inngest.createFunction(
 				});
 
 				if (!isRecreate && isNdaFullyProvisioned(enrollment)) {
+					await step.run('mirror-contract-sent-if-provisioned', async () => {
+						const fresh = await findEnrollmentByIdOrThrow(enrollmentId);
+						await ensureNdaContractSentIfProvisioned(fresh);
+					});
 					return { skipped: true, reason: 'nda_already_created' };
 				}
 
 				if (!isPaidEnough(enrollment.collectionStatus)) {
-					return { skipped: true, reason: `collection_${enrollment.collectionStatus}` };
+					throw new Error(
+						`Paiement pas encore confirmé (collection_${enrollment.collectionStatus}) — retry`,
+					);
 				}
 
 				if (isRecreate) {
@@ -64,7 +72,8 @@ export const createNdaAfterPayment = inngest.createFunction(
 					});
 				}
 
-				const signature = resolveDefaultSignatureProvider();
+				const signatureConfig = resolveSignatureConfig();
+				const signature = resolveSignatureProvider(signatureConfig.provider);
 				const existingRequestId = resolveExternalRequestId(enrollment);
 				const requestId =
 					(!isRecreate && existingRequestId) ||
@@ -81,7 +90,7 @@ export const createNdaAfterPayment = inngest.createFunction(
 
 				if (isRecreate || !existingRequestId) {
 					await step.run('persist-nda-draft-id', async () => {
-						await persistNdaDraftRequestId(enrollment.id, requestId);
+						await persistNdaDraftRequestId(enrollment.id, requestId, signatureConfig);
 					});
 				}
 
@@ -94,11 +103,20 @@ export const createNdaAfterPayment = inngest.createFunction(
 				});
 
 				await step.run('persist-nda', async () => {
-					await persistNdaProvisioned(enrollment.id, {
-						requestId: nda.requestId,
-						signerId: nda.signerId,
-						signatureLink: 'signatureLink' in nda ? nda.signatureLink : undefined,
-					});
+					await persistNdaProvisioned(
+						enrollment.id,
+						{
+							requestId: nda.requestId,
+							signerId: nda.signerId,
+							signatureLink: 'signatureLink' in nda ? nda.signatureLink : undefined,
+						},
+						signatureConfig,
+					);
+				});
+
+				await step.run('mirror-contract-sent-if-provisioned', async () => {
+					const fresh = await findEnrollmentByIdOrThrow(enrollmentId);
+					await ensureNdaContractSentIfProvisioned(fresh);
 				});
 
 				await step.run('notify-nda-sent', async () => {

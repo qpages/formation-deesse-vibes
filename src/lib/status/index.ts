@@ -29,6 +29,7 @@ export {
 	checkoutSuccessFlash,
 	ENROLLMENT_POLL_INTERVAL_MS,
 	ENROLLMENT_POLL_MAX_MS,
+	ENROLLMENT_RECONCILE_INTERVAL_MS,
 	primaryAction,
 	shouldPollEnrollment,
 	statusMessage,

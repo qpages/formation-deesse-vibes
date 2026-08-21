@@ -1,7 +1,12 @@
 import Stripe from 'stripe';
 import { e2eMockProviders } from './e2e-providers';
 import { getEnv, requireEnv } from './env';
-import { getPaymentPlan, type PaymentPlanId, stripePriceIdForPlan } from './payment-plans';
+import {
+	getPaymentPlan,
+	installmentCheckoutMessage,
+	type PaymentPlanId,
+	stripePriceIdForPlan,
+} from './payment-plans';
 import { stripeId } from './payments/stripe-id';
 
 let stripe: Stripe | null = null;
@@ -90,7 +95,7 @@ export async function createCheckoutSession(input: {
 		metadata,
 		custom_text: {
 			submit: {
-				message: `Paiement en ${plan.installments} fois — arrêt automatique après ${plan.installments} mois.`,
+				message: installmentCheckoutMessage(plan),
 			},
 		},
 		subscription_data: {

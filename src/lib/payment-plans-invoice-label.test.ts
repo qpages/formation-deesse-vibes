@@ -1,5 +1,30 @@
 import { describe, expect, test } from 'vitest';
-import { paidInvoiceLabel } from './payment-plans';
+import {
+	installmentCheckoutMessage,
+	installmentPlanSummary,
+	paidInvoiceLabel,
+	PAYMENT_PLANS,
+} from './payment-plans';
+
+describe('installmentPlanSummary', () => {
+	test('plan échelonné avec montant total', () => {
+		expect(installmentPlanSummary(PAYMENT_PLANS.x4)).toBe(
+			'Paiement de 1 999,00 € en 4 mensualités de 499,75 €',
+		);
+	});
+
+	test('paiement unique', () => {
+		expect(installmentPlanSummary(PAYMENT_PLANS.unique)).toBe('Paiement unique');
+	});
+});
+
+describe('installmentCheckoutMessage', () => {
+	test('inclut le total, le nombre de fois et l’arrêt automatique', () => {
+		expect(installmentCheckoutMessage(PAYMENT_PLANS.x4)).toBe(
+			"Paiement de 1 999,00 € en 4 mensualités de 499,75 €. Arrêt automatique de l'abonnement à l'issue de la dernière échéance.",
+		);
+	});
+});
 
 describe('paidInvoiceLabel', () => {
 	test('montant + date de paiement', () => {

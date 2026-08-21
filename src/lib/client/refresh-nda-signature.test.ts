@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { reloadAfterNdaSigned, syncNdaSignature } from './nda-sync';
+import { requestNdaSignatureRefresh } from './refresh-nda-signature';
 
-describe('syncNdaSignature', () => {
+describe('requestNdaSignatureRefresh', () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
 	});
@@ -15,8 +15,8 @@ describe('syncNdaSignature', () => {
 			}),
 		);
 
-		await expect(syncNdaSignature()).resolves.toEqual({ signed: true });
-		expect(fetch).toHaveBeenCalledWith('/api/enrollment/nda-sync', {
+		await expect(requestNdaSignatureRefresh()).resolves.toEqual({ signed: true });
+		expect(fetch).toHaveBeenCalledWith('/api/enrollment/nda-signature/refresh', {
 			method: 'POST',
 			headers: { Accept: 'application/json' },
 			credentials: 'same-origin',
@@ -32,7 +32,7 @@ describe('syncNdaSignature', () => {
 			}),
 		);
 
-		const result = await syncNdaSignature();
+		const result = await requestNdaSignatureRefresh();
 		expect(result).toEqual({
 			signed: false,
 			message: 'La signature n’est pas encore enregistrée. Réessaie dans quelques secondes.',
@@ -48,20 +48,7 @@ describe('syncNdaSignature', () => {
 			}),
 		);
 
-		const result = await syncNdaSignature();
+		const result = await requestNdaSignatureRefresh();
 		expect(result).toEqual({ signed: false, message: 'Session requise.' });
-	});
-});
-
-describe('reloadAfterNdaSigned', () => {
-	it('positionne le hash acces et recharge', () => {
-		const reload = vi.fn();
-		const location = { hash: '', reload };
-		vi.stubGlobal('window', { location });
-
-		reloadAfterNdaSigned();
-
-		expect(location.hash).toBe('acces');
-		expect(reload).toHaveBeenCalled();
 	});
 });

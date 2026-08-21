@@ -21,6 +21,7 @@ describe('primaryAction SignSurface mapping', () => {
 	it('embed → refresh (formulaire inline)', () => {
 		const surface: SignSurface = {
 			kind: 'embed',
+			provider: 'docuseal',
 			src: 'https://docuseal.eu/s/abc',
 			email: 'a@b.c',
 		};

@@ -6,9 +6,9 @@ import { hydrateInvoiceUrls } from '../payments/invoice-links';
 import { recomputeEnrollmentCollectionState } from '../payments/invoice-sync';
 import { syncAllSubscriptionInvoices } from '../payments/subscription-sync';
 import { retrieveCheckoutSession } from '../stripe';
-import { confirmLearnerNdaSignature } from '../signature/nda-sync';
 import { isNdaFullyProvisioned } from '../signature/helpers';
 import { applyAccessPolicy } from './access';
+import { confirmNdaSignature } from './confirm-nda-signature';
 import { findEnrollmentById } from './queries';
 
 export type ReconcileTriggerSource =
@@ -18,6 +18,7 @@ export type ReconcileTriggerSource =
 	| 'admin.sync_payment'
 	| 'admin.sync_nda'
 	| 'client.nda_sync'
+	| 'client.status_poll'
 	| 'checkout.start'
 	| 'cron.access_policy';
 
@@ -66,6 +67,29 @@ export type ReconcileResult = {
 	steps: ReconcileStepResult[];
 	mutated: boolean;
 };
+
+export type NdaSignatureErrorReason =
+	| 'enrollment_not_found'
+	| 'not_awaiting'
+	| 'no_nda_request'
+	| 'provider_error';
+
+const NDA_SIGNATURE_ERROR_REASONS = new Set<NdaSignatureErrorReason>([
+	'enrollment_not_found',
+	'not_awaiting',
+	'no_nda_request',
+	'provider_error',
+]);
+
+/** reconcile returns some client errors as `skipped`, not only `failed`. */
+export function ndaSignatureStepError(
+	step: ReconcileStepResult | undefined,
+): { reason: NdaSignatureErrorReason } | null {
+	if (!step || step.step !== 'nda_signature' || !step.reason) return null;
+	if (step.status !== 'failed' && step.status !== 'skipped') return null;
+	if (!NDA_SIGNATURE_ERROR_REASONS.has(step.reason as NdaSignatureErrorReason)) return null;
+	return { reason: step.reason as NdaSignatureErrorReason };
+}
 
 function resolveTriggerSource(trigger: ReconcileTrigger): ReconcileTriggerSource {
 	return typeof trigger === 'string' ? trigger : trigger.source;
@@ -255,8 +279,15 @@ async function runNdaSignatureStep(
 		return { step: 'nda_signature', status: 'skipped', reason: 'not_awaiting' };
 	}
 
-	const result = await confirmLearnerNdaSignature(enrollmentId);
+	const result = await confirmNdaSignature(enrollmentId);
 	if (!result.ok) {
+		if (result.reason === 'no_nda_request') {
+			return {
+				step: 'nda_signature',
+				status: 'skipped',
+				reason: result.reason,
+			};
+		}
 		return {
 			step: 'nda_signature',
 			status: 'failed',
@@ -313,7 +344,7 @@ export async function reconcileEnrollment(
 		return { enrollmentId: '', trigger: source, scope, steps, mutated };
 	}
 
-	if (stepInScope(scope, 'nda_provision') && (!paymentRanConfirm || paymentAlreadyConfirmed)) {
+	if (stepInScope(scope, 'nda_provision')) {
 		const ndaProvision = await runNdaProvisionStep(resolvedEnrollmentId, source);
 		steps.push(ndaProvision);
 	}

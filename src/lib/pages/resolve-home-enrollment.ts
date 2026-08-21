@@ -11,11 +11,12 @@ import {
 	findEnrollmentByCheckoutSession,
 	findEnrollmentById,
 	peekMagicLink,
-	resolveNdaSignSurface,
+	resolveAwaitingNdaSignSurface,
 	type EnrollmentWithUser,
 } from '../enrollment';
 import { reconcileEnrollment } from '../enrollment/reconcile';
 import { getLearnerPaymentSchedule, type LearnerPaymentSchedule } from '../payments';
+import { ensureNdaContractSentIfProvisioned } from '../signature/persist';
 import { notifyOps } from '../services/slack';
 import { checkoutSuccessFlash, stepStates } from '../status';
 import type { SignSurface } from '../signature/types';
@@ -194,14 +195,16 @@ export async function resolveHomeEnrollment(input: {
 			})
 		: { paiement: 'a_faire' as const, nda: 'a_faire' as const, acces: 'a_faire' as const };
 
-	let ndaSignSurface: SignSurface | null = null;
 	if (enrollment && isAwaitingNda(enrollment)) {
-		try {
-			ndaSignSurface = await resolveNdaSignSurface(enrollment);
-		} catch {
-			ndaSignSurface = null;
+		const fresh = await findEnrollmentById(enrollment.id);
+		if (fresh) {
+			enrollment = await ensureNdaContractSentIfProvisioned(fresh);
 		}
 	}
+
+	const ndaSignSurface = enrollment && isAwaitingNda(enrollment)
+		? await resolveAwaitingNdaSignSurface(enrollment)
+		: null;
 
 	const paymentSchedule =
 		enrollment && isPaidEnough(enrollment.collectionStatus)

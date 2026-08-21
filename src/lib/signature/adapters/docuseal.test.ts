@@ -205,6 +205,7 @@ describe('DocuSeal adapter', () => {
 
 		expect(surface).toEqual({
 			kind: 'embed',
+			provider: 'docuseal',
 			src: 'https://docuseal.eu/s/NLp5rn3W8tEtnj',
 			email: 'a@b.c',
 		});
@@ -247,6 +248,7 @@ describe('DocuSeal adapter', () => {
 
 		expect(surface).toEqual({
 			kind: 'embed',
+			provider: 'docuseal',
 			src: 'https://docuseal.eu/s/NLp5rn3W8tEtnj',
 			email: 'a@b.c',
 		});
@@ -381,6 +383,7 @@ describe('DocuSeal adapter', () => {
 
 		expect(surface).toEqual({
 			kind: 'embed',
+			provider: 'docuseal',
 			src: 'https://docuseal.eu/s/abc',
 			email: 'a@b.c',
 		});

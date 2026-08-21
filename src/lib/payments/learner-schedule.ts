@@ -1,6 +1,11 @@
 import type { Enrollment, Payment, PaymentStatus } from '../../generated/prisma/client';
 import { findEnrollmentById } from '../enrollment';
-import { formatMoney, PAYMENT_PLANS, type PaymentPlanId } from '../payment-plans';
+import {
+	formatMoney,
+	installmentPlanSummary,
+	PAYMENT_PLANS,
+	type PaymentPlanId,
+} from '../payment-plans';
 import { getPrisma } from '../prisma';
 import { hydrateInvoiceUrls } from './invoice-links';
 import {
@@ -46,8 +51,7 @@ function learnerPlanLabel(plan: PaymentPlanId | null | undefined): string {
 	if (!plan) return '—';
 	const config = PAYMENT_PLANS[plan];
 	if (!config) return plan;
-	if (config.installments <= 1) return 'Paiement unique';
-	return `Paiement en ${config.installments} fois`;
+	return installmentPlanSummary(config);
 }
 
 function installmentDateLabel(input: {

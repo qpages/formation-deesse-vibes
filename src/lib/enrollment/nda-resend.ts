@@ -17,7 +17,10 @@ export async function canResendNda(
 	enrollment: EnrollmentWithUser,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
 	if (!isAwaitingNda(enrollment)) {
-		return { ok: false, reason: 'Le contrat de confidentialité n’est pas en attente de signature.' };
+		return {
+			ok: false,
+			reason: 'Le contrat de confidentialité n’est pas en attente de signature.',
+		};
 	}
 	if (!resolveExternalRequestId(enrollment)) {
 		return { ok: false, reason: 'Aucune demande de signature associée.' };
@@ -82,7 +85,12 @@ export async function resolveNdaSignSurface(
 		const metadata = enrollment.ndaRequest.metadata as NdaRequestMetadata | null;
 		const src = metadata?.embed_src;
 		if (src) {
-			return { kind: 'embed', src, email: enrollment.user.email };
+			return {
+				kind: 'embed',
+				provider: resolveNdaProvider(enrollment),
+				src,
+				email: enrollment.user.email,
+			};
 		}
 	}
 

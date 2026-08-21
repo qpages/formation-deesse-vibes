@@ -32,6 +32,7 @@ export {
 	markNdaResent,
 	resolveNdaSignSurface,
 } from './nda-resend';
+export { resolveAwaitingNdaSignSurface } from './awaiting-nda-sign-surface';
 
 export {
 	markProviderEventFailed,

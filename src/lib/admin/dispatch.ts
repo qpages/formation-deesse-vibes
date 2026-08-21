@@ -1,7 +1,7 @@
 import type { EnrollmentWithUser } from '../enrollment';
 import { sendInngestSafe } from '../inngest/client';
 import { canResendNda, findEnrollmentById } from '../enrollment';
-import { reconcileEnrollment } from '../enrollment/reconcile';
+import { reconcileEnrollment, ndaSignatureStepError } from '../enrollment/reconcile';
 import { notifyOps, type OpsSeverity } from '../services/slack';
 import { syncTeachizyAccess } from '../services/teachizy-access';
 import {
@@ -37,7 +37,8 @@ async function runSyncNda(enrollment: EnrollmentWithUser): Promise<AdminDispatch
 	if (!ndaStep || ndaStep.step !== 'nda_signature') {
 		return { ok: false, error: 'Synchronisation NDA incomplète.', status: 500 };
 	}
-	if (ndaStep.status === 'failed') {
+	const stepError = ndaSignatureStepError(ndaStep);
+	if (stepError) {
 		const messages: Record<string, string> = {
 			enrollment_not_found: 'Inscription introuvable.',
 			no_nda_request: 'Aucune demande de signature NDA associée.',
@@ -46,7 +47,14 @@ async function runSyncNda(enrollment: EnrollmentWithUser): Promise<AdminDispatch
 		};
 		return {
 			ok: false,
-			error: messages[ndaStep.reason ?? ''] ?? ndaStep.reason ?? 'Synchronisation NDA échouée.',
+			error: messages[stepError.reason] ?? stepError.reason,
+			status: 400,
+		};
+	}
+	if (ndaStep.status === 'failed') {
+		return {
+			ok: false,
+			error: ndaStep.reason ?? 'Synchronisation NDA échouée.',
 			status: 400,
 		};
 	}

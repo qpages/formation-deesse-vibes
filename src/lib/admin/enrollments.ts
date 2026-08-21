@@ -12,14 +12,8 @@ import type {
 import { getPrisma } from '../prisma';
 import { paginate, type Pagination } from '../pagination';
 import { stripeDashboardUrl } from '../stripe';
-import {
-	resolveNdaProvider,
-	signatureProviderAppUrl,
-} from '../signature/helpers';
-import {
-	resolveExternalRequestId,
-	resolveExternalSignerId,
-} from '../signature/nda-request';
+import { resolveNdaProvider, signatureProviderAppUrl } from '../signature/helpers';
+import { resolveExternalRequestId, resolveExternalSignerId } from '../signature/nda-request';
 import { adminPipelineBadges } from '../status';
 import { adminActionLabel } from './action-labels';
 import { visibleActions, type AdminActionKey } from './actions';
@@ -145,6 +139,7 @@ export function toAdminEnrollmentRow(
 			contractStatus: row.contractStatus,
 			accessStatus: row.accessStatus,
 			ndaLastError: row.ndaRequest?.lastError,
+			ndaProvider: row.ndaRequest?.provider,
 			ndaProviderStatus: row.ndaRequest?.providerStatus,
 		}),
 		paymentSummary,

@@ -8,18 +8,18 @@ const { findEnrollmentById, persistNdaSyncMirror, ensureTeachizyAfterSignature }
 	}),
 );
 
-vi.mock('../enrollment', () => ({ findEnrollmentById }));
-vi.mock('./persist', () => ({
+vi.mock('../../enrollment/queries', () => ({ findEnrollmentById }));
+vi.mock('../persist', () => ({
 	persistNdaSyncMirror,
 	recordNdaError: vi.fn(),
 }));
-vi.mock('../services/slack', () => ({
+vi.mock('../../services/slack', () => ({
 	formatErrorDetail: vi.fn(),
 	notifyOps: vi.fn(),
 }));
-vi.mock('./after-signature', () => ({ ensureTeachizyAfterSignature }));
+vi.mock('../after-signature', () => ({ ensureTeachizyAfterSignature }));
 
-import { syncYousignNda } from './adapters/yousign-sync';
+import { syncYousignNda } from './yousign-sync';
 
 const enrollment = {
 	id: 'enr_1',

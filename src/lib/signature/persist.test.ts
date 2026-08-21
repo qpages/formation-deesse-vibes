@@ -4,9 +4,6 @@ const { getPrisma } = vi.hoisted(() => ({
 	getPrisma: vi.fn(),
 }));
 
-vi.mock('../env', () => ({
-	getEnv: () => ({ SIGNATURE_PROVIDER: 'yousign' }),
-}));
 vi.mock('../prisma', () => ({ getPrisma }));
 
 import {
@@ -21,6 +18,7 @@ import {
 } from './persist';
 
 const enrollment = { id: 'enr_1', user: { email: 'a@b.c' } };
+const yousignRedirect = { provider: 'yousign' as const, signKind: 'redirect' as const };
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -91,7 +89,7 @@ describe('NDA persist (nda_requests only)', () => {
 	it('persistNdaDraftRequestId écrit nda_requests', async () => {
 		const { upsert, update } = mockTransaction();
 
-		await persistNdaDraftRequestId('enr_1', 'req_draft');
+		await persistNdaDraftRequestId('enr_1', 'req_draft', yousignRedirect);
 
 		expect(update).not.toHaveBeenCalled();
 		expect(upsert).toHaveBeenCalledWith(
@@ -113,7 +111,7 @@ describe('NDA persist (nda_requests only)', () => {
 			requestId: 'req_1',
 			signerId: 'sig_1',
 			signatureLink: 'https://sign',
-		});
+		}, yousignRedirect);
 
 		expect(update).toHaveBeenCalledWith(
 			expect.objectContaining({

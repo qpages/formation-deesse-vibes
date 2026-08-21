@@ -10,7 +10,7 @@ import { paymentPlanIdSchema } from './payment-plans';
 export const checkoutSchema = z.object({
 	firstName: z.string().trim().min(1, 'Prénom requis').max(80),
 	lastName: z.string().trim().min(1, 'Nom requis').max(80),
-	email: z.string().trim().email('E-mail invalide').max(254),
+	email: z.string().trim().max(254).pipe(z.email('E-mail invalide')),
 	paymentPlan: paymentPlanIdSchema,
 	consentCgv: z.literal(true, { error: 'Acceptation des CGV requise' }),
 	consentNda: z.literal(true, {
@@ -25,11 +25,11 @@ export const checkoutSchema = z.object({
 });
 
 export const magicLinkSchema = z.object({
-	email: z.string().trim().email('E-mail invalide').max(254),
+	email: z.string().trim().max(254).pipe(z.email('E-mail invalide')),
 });
 
 export const adminLoginSchema = z.object({
-	email: z.string().trim().email(),
+	email: z.string().trim().pipe(z.email()),
 	password: z.string().min(8),
 });
 

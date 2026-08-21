@@ -59,7 +59,7 @@ describe('ensureNdaAfterPayment', () => {
 		const result = await ensureNdaAfterPayment('enr_1', 'cs_123');
 
 		expect(sendInngestSafe).toHaveBeenCalledWith({
-			id: 'nda-after-payment:enr_1',
+			id: 'nda-after-payment:enr_1:cs_123',
 			name: 'stripe/payment.confirmed',
 			data: { enrollmentId: 'enr_1', stripeEventId: 'cs_123' },
 		});

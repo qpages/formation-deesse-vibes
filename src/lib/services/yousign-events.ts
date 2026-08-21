@@ -1,7 +1,7 @@
 import { decryptPayload } from '../crypto';
+import { confirmNdaSignatureFromWebhook } from '../enrollment/confirm-nda-signature';
 import { eventOccurredAt } from '../signature/event-time';
 import { findEnrollmentByExternalRequestOrEnrollmentId } from '../enrollment/queries';
-import { confirmLearnerNdaSignatureFromWebhook } from '../signature/nda-sync';
 import { persistNdaSyncMirror } from '../signature/persist';
 import { resolveSignatureProvider } from '../signature/providers';
 import { contractStatusFromYousignRequest, yousignStatusFromEvent } from '../status';
@@ -119,7 +119,7 @@ export async function handleYousignProviderEvent(input: {
 			throw new Error(`Enrollment introuvable pour Yousign ${completed.requestId}`);
 		}
 
-		return confirmLearnerNdaSignatureFromWebhook(enrollment.id);
+		return confirmNdaSignatureFromWebhook(enrollment.id);
 	}
 
 	if (MONITOR_EVENTS.has(eventName)) {

@@ -1,9 +1,9 @@
 import type { EnqueueResult } from '../inngest/client';
 import { isAwaitingNda } from '../enrollment-gates';
-import { findEnrollmentById } from '../enrollment/queries';
-import { syncNdaStatus } from './sync-nda';
+import { refreshNdaRequestStatus } from '../signature/refresh-nda-request-status';
+import { findEnrollmentById } from './queries';
 
-export type ConfirmLearnerNdaSignatureResult =
+export type ConfirmNdaSignatureResult =
 	| { ok: true; signed: true; followUp: EnqueueResult }
 	| { ok: true; signed: false; followUp?: EnqueueResult }
 	| {
@@ -13,12 +13,10 @@ export type ConfirmLearnerNdaSignatureResult =
 	  };
 
 /**
- * Filet élève : lit le provider de signature, ne pose jamais `signed` à la main.
- * Idempotent si le contrat est déjà signé en DB.
+ * Learner-side safety net: reads the signature provider and never marks an NDA
+ * signed without provider confirmation. Idempotent when already signed locally.
  */
-export async function confirmLearnerNdaSignature(
-	enrollmentId: string,
-): Promise<ConfirmLearnerNdaSignatureResult> {
+export async function confirmNdaSignature(enrollmentId: string): Promise<ConfirmNdaSignatureResult> {
 	const enrollment = await findEnrollmentById(enrollmentId);
 	if (!enrollment) {
 		return { ok: false, reason: 'enrollment_not_found' };
@@ -32,7 +30,7 @@ export async function confirmLearnerNdaSignature(
 		return { ok: false, reason: 'not_awaiting' };
 	}
 
-	const result = await syncNdaStatus(enrollmentId);
+	const result = await refreshNdaRequestStatus(enrollmentId);
 	if (!result.ok) {
 		return {
 			ok: false,
@@ -52,13 +50,13 @@ export async function confirmLearnerNdaSignature(
 }
 
 /**
- * Webhook completion : même chemin que l’élève, mais retry si le provider
- * n’a pas encore propagé la signature ou si l’enqueue Teachizy a échoué.
+ * Webhook completion: uses the same confirmation path but retries when the
+ * provider has not propagated the signature or the Teachizy follow-up failed.
  */
-export async function confirmLearnerNdaSignatureFromWebhook(
+export async function confirmNdaSignatureFromWebhook(
 	enrollmentId: string,
 ): Promise<{ enrollmentId: string }> {
-	const result = await confirmLearnerNdaSignature(enrollmentId);
+	const result = await confirmNdaSignature(enrollmentId);
 	if (!result.ok) {
 		const detail = result.detail ? `: ${result.detail}` : '';
 		throw new Error(`NDA sync échoué (${result.reason})${detail}`);

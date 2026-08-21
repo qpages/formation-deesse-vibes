@@ -5,13 +5,17 @@ const {
 	consumeMagicLink,
 	findEnrollmentById,
 	reconcileEnrollment,
-	resolveNdaSignSurface,
+	resolveAwaitingNdaSignSurface,
+	parseCookie,
+	verifyEnrollmentSessionToken,
 } = vi.hoisted(() => ({
 	peekMagicLink: vi.fn(),
 	consumeMagicLink: vi.fn(),
 	findEnrollmentById: vi.fn(),
 	reconcileEnrollment: vi.fn(),
-	resolveNdaSignSurface: vi.fn(),
+	resolveAwaitingNdaSignSurface: vi.fn(),
+	parseCookie: vi.fn(() => null as string | null),
+	verifyEnrollmentSessionToken: vi.fn(),
 }));
 
 vi.mock('../enrollment', () => ({
@@ -19,7 +23,7 @@ vi.mock('../enrollment', () => ({
 	consumeMagicLink,
 	findEnrollmentById,
 	findEnrollmentByCheckoutSession: vi.fn(),
-	resolveNdaSignSurface,
+	resolveAwaitingNdaSignSurface,
 }));
 
 vi.mock('../enrollment/reconcile', () => ({ reconcileEnrollment }));
@@ -33,12 +37,10 @@ vi.mock('../services/slack', () => ({ notifyOps: vi.fn() }));
 vi.mock('../auth/session', () => ({
 	createEnrollmentSessionToken: vi.fn(async (id: string) => `jwt:${id}`),
 	enrollmentCookieOptions: vi.fn((token: string) => `sid=${token}`),
-	parseCookie: vi.fn(() => null),
+	parseCookie,
 	TRACKING_COOKIE: 'dv_enr',
-	verifyEnrollmentSessionToken: vi.fn(),
+	verifyEnrollmentSessionToken,
 }));
-
-import { parseCookie, verifyEnrollmentSessionToken } from '../auth/session';
 
 import { completeMagicLinkConsume, resolveHomeEnrollment } from './resolve-home-enrollment';
 
@@ -131,7 +133,7 @@ describe('resolveHomeEnrollment reconcile', () => {
 		);
 		expect(result.view.enrollment?.contractStatus).toBe('signed');
 		expect(result.view.ndaSignSurface).toBeNull();
-		expect(resolveNdaSignSurface).not.toHaveBeenCalled();
+		expect(resolveAwaitingNdaSignSurface).not.toHaveBeenCalled();
 	});
 });
 
