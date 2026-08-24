@@ -42,7 +42,7 @@
 		"prepare": "husky"
 	},
 	"dependencies": {
-		"@astrojs/vercel": "^11.0.5",
+		"@astrojs/vercel": "^11.0.7",
 		"@prisma/adapter-pg": "^7.9.0",
 		"@prisma/client": "^7.9.0",
 		"@tailwindcss/vite": "^4.3.3",
